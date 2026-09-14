@@ -39,6 +39,11 @@ jobs:
           command -v gpg || brew install gnupg
           command -v cmake || brew install cmake
           command -v ninja || brew install ninja
+          command -v xcodegen || brew install xcodegen
+      - name: Compile native reference before expensive pack builds
+        run: |
+          xcodegen generate --spec apps/macos/project.yml
+          xcodebuild -project apps/macos/Fileform.xcodeproj -scheme Fileform -configuration Debug -derivedDataPath apps/macos/Artifacts/DerivedData build CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES
       - name: Build pinned local-only media pack
         run: Tools/build-media-pack.sh
       - name: Build pinned PDF optimization pack
@@ -49,8 +54,6 @@ jobs:
         run: swift test --no-parallel
       - name: Verify the native reference app
         run: |
-          command -v xcodegen || brew install xcodegen
-          xcodegen generate --spec apps/macos/project.yml
           xcodebuild -project apps/macos/Fileform.xcodeproj -scheme Fileform -configuration Debug -derivedDataPath apps/macos/Artifacts/DerivedData test CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES
       - name: Verify CLI end to end
         run: |

@@ -47,7 +47,9 @@ struct PDFWorkspaceView: View {
                         }.padding(16)
                     }
                     .coordinateSpace(name: pageCoordinateSpace)
-                    .onPreferenceChange(PDFPageFramesKey.self) { pageFrames = $0 }
+                    .onPreferenceChange(PDFPageFramesKey.self) { [framesBinding = $pageFrames] frames in
+                        framesBinding.wrappedValue = frames
+                    }
                     .overlay(alignment: .topLeading) {
                         if let point = dragPointer, let payload = draft.activePageDrag {
                             Text("\(payload.pageIDs.count) \(payload.pageIDs.count == 1 ? "page" : "pages")")
