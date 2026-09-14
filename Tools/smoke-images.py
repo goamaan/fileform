@@ -227,6 +227,12 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     tiff_reply=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(tiff_output)}),capture_output=True,text=True,check=True)
     tiff_receipt=json.loads(tiff_reply.stdout)['result']
     assert tiff_receipt['width']==2 and tiff_receipt['height']==1
+    tiff_info=json.loads(subprocess.run([str(cli),'inspect-image',str(tiff_output)],capture_output=True,text=True,check=True).stdout)
+    assert tiff_info['has_alpha'] and tiff_info['conversion_available']
+    tiff_png=folder/'tiff-decoded.png'
+    subprocess.run([str(cli),'convert-image',str(tiff_output),str(tiff_png)],capture_output=True,text=True,check=True)
+    tiff_png_info=json.loads(subprocess.run([str(cli),'inspect-image',str(tiff_png)],capture_output=True,text=True,check=True).stdout)
+    assert tiff_png_info['decoded_rgba_sha256']==hashlib.sha256(pixels).hexdigest()
     tiff_bytes=tiff_output.read_bytes();assert tiff_bytes[:4] in [b'II\x2a\0',b'MM\0\x2a']
     tiff_collision=subprocess.run([str(cli),'convert-image',str(source),str(tiff_output)],capture_output=True,text=True)
     assert tiff_collision.returncode!=0 and tiff_output.read_bytes()==tiff_bytes
@@ -243,5 +249,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'verifiedTIFFExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'verifiedTIFFExport':True,'TIFFInputRoundTrip':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

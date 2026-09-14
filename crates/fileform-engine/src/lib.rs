@@ -21,6 +21,7 @@ pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
 mod jpeg_output;
+mod tiff_input;
 mod tiff_output;
 pub use jpeg_output::Background;
 mod json_table_reader;
@@ -193,6 +194,8 @@ fn prepare_image(
     source.snapshot_reader()?.read_exact(&mut signature)?;
     let decoded = if signature == [0xff, 0xd8] {
         jpeg_input::decode(io::BufReader::new(source.snapshot_reader()?))?
+    } else if signature == *b"II" || signature == *b"MM" {
+        tiff_input::decode(io::BufReader::new(source.snapshot_reader()?), cancellation)?
     } else {
         png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?
     };

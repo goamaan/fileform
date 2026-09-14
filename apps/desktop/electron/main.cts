@@ -85,7 +85,7 @@ ipcMain.handle('fileform:choose',async(event)=>{
 ipcMain.handle('fileform:choose-image',async(event)=>{
   authorize(event);
   return exclusive(async()=>{
-    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg']}]});
+    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg','tif','tiff']}]});
     if(result.canceled||result.filePaths.length!==1)return null;
     const path=await fs.realpath(result.filePaths[0]);
     const info=await worker({operation:'inspect_image',input:path,preview:true});

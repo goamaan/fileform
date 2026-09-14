@@ -440,3 +440,18 @@ The packaged Mac app saved a TIFF through a native dialog; independent Pillow
 verification proved exact oriented pixels/alpha, single-image structure, LZW and
 required tags, with the source checksum unchanged. One preview was replaced by
 one current build. TIFF input and broader parity/release gates remain open.
+
+## Shared TIFF input and desktop reopening
+
+Added bounded classic/BigTIFF input, single-image checks, 8-bit RGB/gray/alpha
+layouts, associated-alpha conversion, ICC/orientation and explicit plane/stride
+handling. A final source review caught the decoder's planar layout behavior;
+added a separate-plane fixture before completing the port. Unknown preservation
+metadata and unsupported pixel depths/layouts remain explicit gates.
+
+Fifty-one Rust tests, Clippy, Windows-target and image/table/cancel process checks
+pass. Independent RGB/RGBA/grayscale TIFF fixtures matched Pillow's oriented pixels.
+The packaged Mac app reopened its own TIFF, previewed it and exported PNG matching
+the original TIFF's RGBA exactly. The image guide was rewritten as a current support
+reference; historical implementation evidence remains here and in Git history.
+Only one preview build remains open. Broader TIFF variants and release work remain.

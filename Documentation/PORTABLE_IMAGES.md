@@ -1,324 +1,117 @@
 # Portable image pipeline
 
-Status: native PNG inspection, orientation, color normalization and verified PNG
-and PNG/JPEG/TIFF export are implemented in the native CLI/worker and Electron Images
-workspace, with native-generated previews, crop and resize controls. TIFF output
-and target-size fitting are pending.
+The shared Rust worker/CLI and Electron Images workspace support PNG, JPEG and
+TIFF input/output, with the limits below. Heavy decoding, color conversion,
+orientation, crop, resize, encoding and verification remain outside Electron.
+Full application/release readiness is tracked in ROADMAP.md and CROSS_PLATFORM.md.
 
-Build with `cargo build --release --workspace`, then run:
+## Current formats
 
-```sh
-target/release/fileform-native inspect-image photo.png
-target/release/fileform-native convert-image photo.png normalized.png
-```
+| Format | Input | Output |
+| --- | --- | --- |
+| PNG | Still images up to 8-bit samples, including palette/grayscale expansion | 8-bit RGBA, sRGB, exact rendered-pixel verification |
+| JPEG | 8-bit baseline/progressive RGB and grayscale, strict decoding | Quality 1–100 (default 85), sRGB ICC, explicit matte for alpha input |
+| TIFF | Single-image classic TIFF/BigTIFF, 8-bit RGB/RGBA/gray/gray-alpha, interleaved or planar | LZW-compressed 8-bit RGBA, unassociated alpha, orientation 1, sRGB ICC |
 
-Windows uses `target/release/fileform-native.exe`. The internal worker accepts
-`{"operation":"inspect_image","input":"/path/to/photo.png"}` and returns the
-same inspection in its versioned response envelope.
+Unmodeled preservation cases are not silently flattened. These include animated
+PNG, multi-image/sub-IFD TIFF, high-depth/float images, unsupported TIFF palette or
+bilevel layouts, CMYK/YCCK, special JPEG coding modes, and unresolved HDR/gain-map
+or application metadata. TIFF color tags without an ICC profile may require
+preservation handling. Expanding this coverage remains part of the full goal.
 
-The receipt distinguishes raw width/height and decoded RGBA checksum from
-orientation-adjusted display dimensions and oriented RGBA checksum. Inspection does not save a file. Conversion creates a new PNG and never replaces
-the original. Raw/oriented hashes precede color normalization; the sRGB hash
-identifies normalized pixels.
+TIFF associated-alpha samples are unpremultiplied with integer rounding; original
+stored premultiplied values are not the same representation as the resulting RGBA.
+Directory entry counts, metadata values, full-plane buffer layouts and offsets
+are checked before pixel processing. The decoder does not read just one plane.
 
-PNG decoding checks the complete IEND record, frame completion, an 80-million-pixel
-limit and a 512 MiB source limit. Animation and 16-bit input are rejected. Metadata
-flags indicate presence, not profile validity or proof that an image is SDR.
+## CLI
 
-EXIF orientation supports values 1–8 in little- or big-endian TIFF IFD0 metadata.
-Absent orientation in a valid directory means 1. Bad offsets, truncation, invalid
-field types/counts, duplicate orientation fields and invalid values are rejected.
-Metadata is bounded at 1 MiB and the root directory at 4096 entries. This is an
-orientation reader, not a general EXIF validator. The mapping matches the
-[image crate's EXIF orientation API](https://docs.rs/image/0.25.10/image/metadata/enum.Orientation.html).
-
-Orientation preserves all RGBA bytes, including alpha, uses checked/fallible
-output allocation, and checks cancellation while traversing pixels. Rotated images
-can temporarily require both input and output pixel buffers; this is not a claim
-of a hard process-memory limit.
-
-Run `python3 Tools/smoke-images.py` for independent generated PNG fixtures and
-real CLI/worker checks. Eight asymmetric pixel-layout fixtures verify every
-orientation and dimension swap. Unit tests also cover malformed metadata and
-cancellation. Both desktop CI platforms run the process checks.
-
-Next required stages remain those in PORTABLE_IMAGE_RESEARCH.md: ICC-to-sRGB
-normalization, gamma/chromaticity/HDR metadata handling, JPEG/TIFF and other
-reference input formats, verified output encoding, resize/crop/quality/fit,
-transparent JPEG backgrounds, and the Electron workspaces.
-
-## ICC transform stage
-
-The native pipeline now parses embedded ICC profiles (up to 1 MiB), validates
-that RGB/gray profile space matches PNG samples, and transforms color values to
-sRGB with moxcms 0.8.1. It processes at most 4096 pixels per block with fallible
-scratch allocations and cancellation checks. Alpha is kept outside the CMS and
-copied unchanged. The inspection's optional `icc_srgb_rgba_sha256` hashes these
-orientation-adjusted, ICC-transformed pixels; absence means no embedded ICC
-transform was performed. It is not a claim of HDR-safe rendering or export.
-
-Tests cover sRGB identity, a P3-to-sRGB sample checked against an independent
-D65 matrix/transfer calculation, gray gamma conversion, profile/sample mismatch,
-malformed profiles and cancellation. Real CLI tests embed generated standard ICC
-profiles in PNG files and check their receipts and unchanged source bytes.
-Gamma/chromaticity-only PNG color, metadata precedence/conflicts, HDR/gain maps,
-comparison against the native Apple renderer and output profile embedding remain
-release requirements. `conversion_available` is true for the implemented PNG rendering path and false
-for extended-color inputs still awaiting preservation support.
-
-## PNG gamma, chromaticity and metadata validation
-
-PNG inspection now builds native matrix/TRC profiles for gAMA/cHRM metadata and
-returns `srgb_rgba_sha256` with a `color_interpretation` label. ICC takes priority
-over sRGB, then gamma/chromaticities. A cICP or HDR-metadata image is marked
-`extended_color_pending` and receives no normalized hash until that path is
-implemented. This follows the [PNG color priority rules](https://www.w3.org/TR/png-3/#colorSpace).
-Untagged inputs are explicitly `assumed_srgb`; missing primaries use sRGB primaries,
-and chromaticities without gamma currently use the sRGB transfer curve. These
-assumptions require native-reference comparison before export is enabled.
-
-A bounded preflight verifies recognized color/EXIF chunk lengths, duplicates,
-CRC checksums and basic value constraints, and rejects metadata the decoder
-silently ignored. It bounds metadata chunks at 1 MiB and the container at 100,000
-chunks. Raw gama_chunk/chrm_chunk fields are used rather than relying on derived
-fields that were not populated in the tested png 0.18.1 decode path.
-
-Independent process fixtures verify linear-gamma normalization, explicit-sRGB
-precedence, extended-color deferral, zero-gamma rejection, metadata CRC rejection
-and duplicate rejection. Unit tests check Display P3 chromaticity conversion,
-invalid gamma and degenerate primaries. These extend the shared Windows/macOS
-worker checks; they do not complete image export or all color-space parity.
-
-## Verified PNG export and native comparison
-
-`convert-image INPUT.png OUTPUT.png` uses the same render stages as inspection,
-writes an eight-bit RGBA PNG marked sRGB with stale EXIF removed, then reopens it
-and compares every pixel, dimensions and normalized orientation before saving.
-Output is capped at 512 MiB. Source rechecks, cancellation, directory-identity
-checks and no-clobber publication apply. The worker also accepts convert_image
-with optional expected_source_sha256 to reject changed inspected inputs.
-
-Tools/smoke-images.py verifies actual CLI/worker exports, all eight orientations,
-exact alpha/pixels, stale-source rejection, collisions and invalid-input denial.
-Tools/compare-image-colors.py additionally compares exported PNGs with the Swift
-reference on macOS, using Pillow for independent output decoding. Four opaque
-fixtures (Apple sRGB, Apple Display P3, linear gamma and orientation 6) matched
-exactly in this run; the declared comparison tolerance is two code values.
-[Evidence](Benchmarks/native-color-macos-2026-09-14.json) records binary/profile
-hashes. Apple profile files are read from the OS and are not copied into Git.
-
-An initial synthetic moxcms-generated P3 profile was ignored by the Apple path,
-while the Rust transform matched the independent P3 matrix calculation. That
-fixture compatibility discrepancy is retained as a limitation; standard Apple
-profiles establish the native comparison above, not universal ICC equivalence.
-Additional real profiles, transparency rounding, gamut edges, CICP/HDR and other
-input/output formats remain parity work.
-
-## Electron PNG workspace
-
-The shared Electron app now has Tables and Images workspaces. Images uses native
-open/save dialogs, opaque source/result IDs, validated image receipts and the
-same Rust normalization/export code as the CLI. Unavailable extended-color images
-cannot be exported. Workspace switching retains the selected image and saved
-result during the session; it does not yet persist workspace state across launch.
-
-Packaged macOS acceptance selected an EXIF orientation-6 RGBA PNG, displayed its
-12 × 16 oriented dimensions, saved a new PNG, and retained state when switching
-to Tables and back. Pillow independently confirmed every pixel/alpha value,
-orientation normalization and sRGB tagging; the source checksum was unchanged.
-Light and dark appearance were inspected; the previous Dark setting was restored.
-Evidence is in Artifacts/Verification/electron-image/verified.json.
-The first workspace provides metadata and saving; image previews and the remaining
-editing controls still need to be ported. Windows GUI acceptance remains pending.
-
-## Bounded desktop previews
-
-Electron requests an optional preview during native inspection. Rust generates
-an orientation/color-adjusted thumbnail no larger than 128 × 128 pixels, using
-alpha-weighted area averaging so hidden transparent colors do not contaminate
-the result. The pixel payload is at most 64 KiB before JSON encoding. The main
-process validates dimensions, length and byte ranges before exposing it through
-the bridge; the renderer only draws the buffer to a canvas. Preview pixels never
-become export input, and unhandled extended-color images receive no preview.
-
-Unit tests cover payload bounds, transparent-color averaging and cancellation.
-The real worker smoke checks preview values and response size. The packaged Mac
-app displayed the correctly oriented transparent fixture over a checkerboard.
-The preview uses area averages in the encoded display space; higher-quality
-linear-light resampling and larger zoom previews remain refinement work.
-
-## JPEG output
-
-PNG input can now be saved as .jpg/.jpeg through the same native render and
-publication path. Transparent input requires an explicit white or black background
-in Electron, the worker request, or the CLI:
+Build with `cargo build --release --workspace`. On Windows, use the .exe suffix.
 
 ```sh
-target/release/fileform-native convert-image input.png output.jpg --background white
+target/release/fileform-native inspect-image photo.jpg
+target/release/fileform-native convert-image photo.jpg normalized.png
+target/release/fileform-native convert-image input.png output.jpg --background white --quality 85
+target/release/fileform-native convert-image photo.jpg output.tiff --crop 10,20,300,200 --max-dimension 1200
 ```
 
-JPEG defaults to quality 85 and supports an explicit 1–100 setting. Target-size
-fitting is still required; JPEG input decoding is also a separate pending port. The encoder embeds
-sRGB ICC data, then the verifier checks dimensions, RGB decode, ICC bytes, normal
-orientation and complete ending before publication. JPEG verification is lossy
-and does not promise pixel equality. PNG output retains its exact pixel check.
+Crop coordinates are x,y,width,height in oriented-image pixels, top-left origin.
+Crop follows orientation/color normalization and precedes resize. Empty,
+overflowing or out-of-bounds regions fail without saving. Maximum dimension never
+enlarges an image; the other edge rounds to the nearest integer, minimum one pixel.
+Resize uses pixel-area overlap in linear sRGB with alpha weighting, without a
+full-size float intermediate. It is not pixel-identical ImageIO resampling.
 
-Actual Mac app acceptance verified disabled saving before a background choice,
-white-background selection and native-dialog JPEG export. Pillow independently
-confirmed dimensions/profile and solid-color output within one code value; the
-black-background CLI fixture was exact. Source bytes were unchanged. Evidence:
-Artifacts/Verification/electron-image/jpeg-verified.json. Process tests on both CI
-platforms cover background enforcement, container/profile checks and collisions.
+JPEG transparency requires white/black background selection. Quality/background
+options on PNG/TIFF and unknown/repeated/malformed options are rejected. Target
+byte-size fitting remains unfinished.
 
-## JPEG quality controls
+## Color and metadata
 
-Electron exposes a keyboard-operable 1–100 quality slider; the default is 85.
-The CLI accepts `--quality 40` alongside `--background white`, in either order.
-The worker and main process validate the value independently. Missing, repeated,
-unknown and out-of-range options are rejected, and PNG does not silently ignore
-JPEG-only quality/background options.
+- Embedded ICC profiles use moxcms for actual pixel conversion to sRGB. Copying a
+  profile or changing a color label alone is not normalization. Alpha stays out of
+  the CMS. Color conversion is processed in bounded cancellable blocks.
+- PNG follows [color-tag precedence](https://www.w3.org/TR/png-3/#colorSpace): cICP,
+  ICC, sRGB, then gAMA/cHRM. Unhandled cICP/HDR inputs are deferred. Lower-priority
+  tags do not override them. Independent chunk checks reject corrupt or silently
+  ignored ancillary color/EXIF metadata.
+- JPEG EXIF sRGB/R98 and uncalibrated+R03 Adobe RGB are recognized without ICC.
+  ColorSpace 2 is supported as a non-standard compatibility value. Conflicting,
+  unknown or gamma declarations defer without ICC; ICC remains authoritative.
+  See [ExifTool's tag documentation](https://exiftool.org/TagNames/EXIF.html).
+- Untagged inputs use an explicit sRGB assumption. Missing PNG primaries use sRGB
+  primaries; cHRM without gamma currently uses the sRGB transfer curve. Wider
+  native-reference/color-profile comparisons remain required.
+- EXIF/TIFF orientation values 1–8 are applied once. Invalid orientation metadata
+  fails; exports omit stale orientation metadata or write orientation 1.
+- JPEG unknown application metadata (including XMP/MPF-style segments) and TIFF
+  unresolved metadata are conservatively deferred. Detailed preservation support
+  remains required before claiming universal JPEG/TIFF coverage.
 
-A detailed native process fixture produces a smaller JPEG at quality 20 than 95.
-Packaged Mac acceptance set the slider to 40 using the keyboard, saved via the
-native dialog, and compared against a CLI quality-40 conversion. Quantization,
-compressed image data and decoded pixels matched; the embedded ICC profile's
-creation timestamp differed, so full-file byte equality is not claimed. The
-quality-85 fixture has different quantization. Evidence: electron-image/
-quality-verified.json under Artifacts/Verification. The preview shows normalized
-source pixels and the chosen matte, not a recompressed JPEG preview.
+Inspection distinguishes raw, oriented and normalized pixel checksums, inferred
+color interpretation, embedded ICC presence and conversion availability. A preview
+is optional. Inferred Adobe RGB is not mislabeled as an embedded ICC profile.
 
-## Exact pixel cropping
+## Resource and file safety
 
-The native worker and CLI now accept an optional crop after orientation/color
-normalization, before PNG/JPEG encoding:
+Image inputs/outputs are bounded at 512 MiB and decoding at 80 million pixels.
+Metadata values/chunks have 1 MiB limits; aggregate JPEG/TIFF metadata is bounded
+at 8 MiB, TIFF directories at 4096 entries and PNG/JPEG marker work at 100,000.
+Decoder scratch limits are not a hard whole-process memory cap. Simultaneous
+pixel buffers and forced-stop recovery still require release acceptance.
 
-```sh
-target/release/fileform-native convert-image input.png cropped.png --crop 10,20,300,200
-```
+Sources are snapshotted, hashed and rechecked. Export accepts an optional inspected
+source hash. Temporary results are verified, synced and published without replacing
+an existing path; source/output collisions and invalid requests preserve originals.
+PNG/TIFF verification compares every rendered pixel and required metadata. JPEG
+verification fully decodes and checks dimensions/profile/orientation/completeness;
+it does not promise lossless pixel equality. Cooperative cancellation cleans owned
+staging/snapshots; hard-kill cleanup remains a separate release gate.
 
-Coordinates are x,y,width,height in oriented-image pixels, with a top-left origin.
-The worker uses a crop object with those four integer fields. Empty, overflowing,
-out-of-bounds and malformed rectangles fail without publication. Row copies use
-fallible allocation and cancellation checks; selected RGBA pixels are retained
-exactly before any lossy JPEG encoding. Electron crop controls are now connected to this native operation.
+## Desktop controls
 
-Thirty-six Rust tests and the real image process checks pass. An independent
-Pillow comparison applied EXIF orientation, cropped the selected region and
-matched every output pixel/alpha value; the original bytes stayed unchanged.
-Evidence: Artifacts/Verification/electron-image/crop-verified.json.
+Electron provides native dialogs, bounded native previews, PNG/JPEG/TIFF selection,
+JPEG quality/matte, draggable and keyboard crop corners, exact pixel fields, 1:1,
+remove-crop, undo/redo, and longest-edge resizing with predicted output dimensions.
+Named export options and receipts are validated in main and again in Rust.
 
-## Electron crop controls
+Previews are at most 128 × 128 RGBA (64 KiB before JSON), alpha-weighted area
+averages in display encoding. They never become export input. The canvas shows
+normalized source/selection and matte, not a recompressed or full-resolution
+output preview. Workspace state survives tab changes, not app restarts yet.
+Only one development preview is kept running; repeated launch reuses its window.
 
-Images now provides a visible crop selection, four draggable corner handles,
-keyboard corner adjustment (Shift for larger steps), a centered 1:1 preset,
-exact pixel fields, remove-crop, and bounded undo/redo history. Main-process and
-native validation both enforce a non-empty rectangle within oriented dimensions.
-Export receipts are checked against the selected crop dimensions.
+## Verification
 
-Packaged Mac acceptance applied the square preset, dragged width from 12 to 10,
-undid to 12, redid to 10, adjusted a corner with the keyboard, and saved through a
-native dialog. Independent Pillow decoding matched every selected pixel and alpha
-value; the original checksum was unchanged. An observed drag-history grouping
-failure was fixed before this successful retest. Geometry boundary tests now run
-in both desktop CI jobs. Evidence: electron-image/crop-ui-verified.json under
-Artifacts/Verification. Windows interactive crop acceptance remains pending.
+`cargo test --workspace`, Clippy, Tools/smoke-images.py and the desktop tests run
+in macOS/Windows CI. Process fixtures cover orientation, color, crop/resize,
+PNG/JPEG/TIFF round-trips, invalid metadata, collision and stale-source rejection.
+Tools/compare-image-colors.py uses the Swift CLI and Pillow on macOS. Standard
+Apple-profile fixtures matched the reference; a generated P3 profile was ignored
+by the Apple path, so universal ICC equivalence is not claimed.
 
-## Native downscaling
-
-The worker and CLI accept `max_dimension` / `--max-dimension` after cropping:
-
-```sh
-target/release/fileform-native convert-image input.png small.png --max-dimension 1200
-```
-
-The longest edge is capped without enlargement. The other dimension is rounded
-to the nearest integer, with a minimum of one pixel. Resampling uses exact pixel
-area overlap in linear sRGB with alpha weighting; transparent hidden colors do
-not tint visible edges. It allocates only the byte output buffer plus small
-working data, not a full-size floating-point image, and checks cancellation.
-This is an area filter, not a claim of pixel-identical ImageIO resampling.
-
-Thirty-nine Rust tests and real process checks pass, including fractional areas,
-no enlargement, alpha, crop-then-resize and invalid limits. Independent Pillow
-decoding matched an analytic linear-light black/white average. Evidence:
-Artifacts/Verification/resize-verified.json. Electron size controls, broader
-resampling/performance comparisons and target-byte fitting are still pending.
-
-## Electron resize controls and export options
-
-The Images workspace now has an optional longest-edge limit and predicted output
-dimensions. Prediction uses the same integer rounding policy as the native engine,
-after cropping, and never enlarges smaller images. Invalid/empty enabled limits
-show an error and disable saving. The image bridge now takes named export options;
-main validates allowed fields, formats, alpha background, quality, crop and size,
-and checks the receipt against predicted dimensions.
-
-Tests cover invalid export objects, crop copying, large integer rounding and
-no-enlargement behavior; they run on both desktop CI platforms. Packaged Mac
-acceptance combined a square crop and eight-pixel limit, rejected zero, displayed
-8 × 8, and saved via a native dialog. The resulting PNG matched the CLI bytes
-exactly and retained alpha/sRGB metadata, with the source unchanged. Evidence:
-Artifacts/Verification/electron-image/resize-ui-verified.json. The preview remains
-a selection preview; output dimensions describe the saved resampling result.
-
-## Native JPEG input
-
-The CLI/worker now recognizes JPEG content and supports eight-bit baseline and
-progressive RGB/grayscale input. It uses zune-jpeg 0.5.15 directly in strict mode
-on the cancellable snapshot stream, avoiding the image wrapper's compressed-file
-copy. A bounded full-container preflight checks frame dimensions, marker lengths,
-scan/end presence, trailing content, metadata budgets, EXIF orientation and ICC
-segment consistency before decode. Decoded dimensions/layout must match preflight.
-
-JPEG input feeds the same orientation, ICC, crop, resize, PNG/JPEG export and
-publication pipeline. Unrecognized application metadata (including XMP/MPF-style
-segments) sets preservation_pending and disables export. CMYK/YCCK and other
-coding modes are not implemented. This conservative deferral must be replaced
-with format-specific preservation handling before claiming full JPEG parity.
-Inputs without ICC currently use the documented sRGB assumption; EXIF-only color
-hints and wider real-profile/native-renderer comparisons remain verification work.
-Electron's picker still needs to expose the tested JPEG input route.
-
-Forty-two Rust tests pass, including baseline, progressive grayscale, EXIF,
-truncation, trailing content and incomplete ICC. Real CLI tests round-trip JPEG
-through PNG and reject deferred metadata exports. Independently generated baseline
-and progressive color JPEGs decoded/rotated within two code values of Pillow,
-with unchanged originals. Evidence: jpeg-input-independent.json under
-Artifacts/Verification. The progressive grayscale fixture is generated project
-content; its recipe is recorded beside it. Notices remain complete for 62 components.
-
-## EXIF color declarations and desktop JPEG import
-
-JPEGs without ICC now honor EXIF ColorSpace and InteropIndex: sRGB/R98 and
-uncalibrated+R03 Adobe RGB are recognized. ColorSpace 2 is accepted as a known
-non-standard Adobe RGB compatibility value. Conflicting/unknown declarations and
-EXIF gamma are deferred without ICC; a valid embedded ICC remains authoritative.
-Nested directories, field types/counts, duplicates, bounds and cycles are checked.
-See [ExifTool's primary tag documentation](https://exiftool.org/TagNames/EXIF.html)
-for the standard R03 representation and the non-standard value-2 distinction.
-Inferred Adobe RGB uses the native CMS and is labeled exif_adobe_rgb; it is not
-misreported as an embedded ICC profile.
-
-The Electron picker now accepts PNG/JPEG, showing the same native preview and
-editing controls. A packaged Mac test imported an oriented progressive JPEG and
-exported PNG via native dialogs. Output bytes matched the CLI; Pillow confirmed
-oriented dimensions and at most two channel-value difference from its independent
-JPEG decode. Evidence: electron-image/jpeg-import-ui-verified.json under
-Artifacts/Verification. Unmodeled application metadata, CMYK/YCCK, special coding
-modes and wider real-camera/profile coverage remain preservation/parity work.
-
-## TIFF output
-
-PNG/JPEG input can now be saved as .tif/.tiff in Electron or the CLI. The native
-encoder writes eight-bit RGBA with LZW compression, explicit unassociated alpha,
-orientation 1 and an sRGB ICC profile. Strip sizing targets a small working buffer.
-The output writer bounds writes/seeks and remains cancellable. Verification fully
-decodes, compares every rendered pixel and checks image count, dimensions, alpha,
-orientation and ICC bytes before no-clobber publication.
-
-Forty-six Rust tests, Clippy, Windows-target checks, process smoke and desktop
-validation tests pass. Packaged Mac acceptance exported an oriented transparent
-PNG to TIFF. Pillow independently confirmed exact pixels/alpha, one image, LZW,
-orientation and ICC metadata, with the original unchanged. Evidence:
-Artifacts/Verification/electron-image/tiff-ui-verified.json. TIFF input, high-depth
-preservation and target-byte fitting remain unfinished; this is output support.
+Local independent evidence is under Artifacts/Verification, including
+portable-images.json, tiff-input-independent.json and electron-image/*-verified.json.
+Packaged Mac acceptance covers import, previews, editing and native-dialog saves.
+Latest TIFF acceptance reopened Fileform's own TIFF and exported PNG with exact
+independently decoded RGBA. Interactive Windows acceptance remains pending.
