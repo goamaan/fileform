@@ -103,11 +103,12 @@ ipcMain.handle('fileform:save-image',async(event,id:unknown,options:unknown)=>{
   const {format,background,quality,crop,maxDimension}=validateImageExport(options,source.width,source.height,source.hasAlpha);
   if(!source.canConvert)throw new Error('This image requires preservation support that is still being implemented.');
   const expected=outputDimensions(crop?.width??source.width,crop?.height??source.height,maxDimension);
-  const extension=format==='jpeg'?'jpg':'png';
+  const extension=format==='jpeg'?'jpg':format;
+  const extensions=format==='jpeg'?['jpg','jpeg']:format==='tiff'?['tif','tiff']:['png'];
   return exclusive(async()=>{
-    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+extension),filters:[{name:format.toUpperCase()+' image',extensions:format==='jpeg'?['jpg','jpeg']:['png']}],properties:['createDirectory']});
+    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+extension),filters:[{name:format.toUpperCase()+' image',extensions}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;
-    if(!(format==='jpeg'?['.jpg','.jpeg']:['.png']).includes(parse(choice.filePath).ext.toLowerCase()))throw new Error('Use a filename matching the selected format.');
+    if(!extensions.map(value=>'.'+value).includes(parse(choice.filePath).ext.toLowerCase()))throw new Error('Use a filename matching the selected format.');
     const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality,crop,max_dimension:maxDimension});
     if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==expected.width||receipt.height!==expected.height||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
     const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height};

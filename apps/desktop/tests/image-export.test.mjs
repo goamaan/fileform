@@ -10,7 +10,8 @@ test('predicted dimensions match integer native rounding and do not enlarge',()=
  assert.deepEqual(outputDimensions(10,12,8),{width:7,height:8});
 });
 test('export validation rejects malformed settings and copies allowed crop values',()=>{
- for(const value of [{format:'png',maxDimension:0},{format:'png',maxDimension:1.5},{format:'png',maxDimension:Infinity},{format:'png',maxDimension:4294967296},{format:'jpeg'},{format:'png',quality:85},{format:'png',background:'white'},{format:'png',path:'/tmp/anything'},{format:'png',crop:{x:0,y:0,width:13,height:1}}])assert.throws(()=>validateImageExport(value,12,16,true));
+ for(const value of [{format:'png',maxDimension:0},{format:'png',maxDimension:1.5},{format:'png',maxDimension:Infinity},{format:'png',maxDimension:4294967296},{format:'jpeg'},{format:'png',quality:85},{format:'png',background:'white'},{format:'tiff',quality:80},{format:'tiff',background:'white'},{format:'png',path:'/tmp/anything'},{format:'png',crop:{x:0,y:0,width:13,height:1}}])assert.throws(()=>validateImageExport(value,12,16,true));
+ assert.equal(validateImageExport({format:'tiff'},12,16,true).format,'tiff');
  const input={format:'jpeg',background:'black',quality:40,maxDimension:8,crop:{x:0,y:2,width:10,height:12}};
  const checked=validateImageExport(input,12,16,true);input.crop.width=1;
  assert.equal(checked.crop.width,10);

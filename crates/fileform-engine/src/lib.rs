@@ -21,6 +21,7 @@ pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
 mod jpeg_output;
+mod tiff_output;
 pub use jpeg_output::Background;
 mod json_table_reader;
 mod png_metadata;
@@ -306,21 +307,23 @@ fn convert_image(
             "Maximum image dimension must be positive.",
         ));
     }
-    let jpeg = match output
+    let output_kind = match output
         .extension()
         .and_then(|s| s.to_str())
         .map(str::to_ascii_lowercase)
         .as_deref()
     {
-        Some("png") => false,
-        Some("jpg" | "jpeg") => true,
+        Some("png") => "png",
+        Some("jpg" | "jpeg") => "jpeg",
+        Some("tif" | "tiff") => "tiff",
         _ => {
             return Err(fail(
                 "invalid_output",
-                "Choose a .png, .jpg or .jpeg output filename.",
+                "Choose a .png, .jpg, .jpeg, .tif or .tiff output filename.",
             ))
         }
     };
+    let jpeg = output_kind == "jpeg";
     if quality.is_some_and(|value| !(1..=100).contains(&value)) {
         return Err(fail(
             "invalid_request",
@@ -375,6 +378,7 @@ fn convert_image(
     let directory = same_file::Handle::from_path(parent)?;
     let mut temporary = NamedTempFile::new_in(parent)?;
     let mut jpeg_profile = None;
+    let mut tiff_profile = None;
     {
         let mut writer = LimitedWriter {
             inner: io::BufWriter::new(temporary.as_file_mut()),
@@ -390,6 +394,8 @@ fn convert_image(
                 quality.unwrap_or(85),
                 cancellation,
             )?);
+        } else if output_kind == "tiff" {
+            tiff_profile = Some(tiff_output::encode(&mut writer, &pixels, cancellation)?);
         } else {
             let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
             encoder.set_color(png::ColorType::Rgba);
@@ -416,6 +422,16 @@ fn convert_image(
             }),
             pixels.width(),
             pixels.height(),
+            &profile,
+            cancellation,
+        )?;
+    } else if let Some(profile) = tiff_profile {
+        tiff_output::verify(
+            CancellableReader {
+                inner: temporary.as_file_mut(),
+                cancellation: cancellation.clone(),
+            },
+            &pixels,
             &profile,
             cancellation,
         )?;
@@ -646,6 +662,19 @@ impl<W: Write> Write for LimitedWriter<W> {
     }
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
+    }
+}
+
+impl<W: Write + Seek> Seek for LimitedWriter<W> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        if self.cancellation.is_cancelled() {
+            return Err(io::Error::other("Cancelled"));
+        }
+        let position = self.inner.seek(position)?;
+        if position > self.maximum_bytes {
+            return Err(io::Error::other("Output seek exceeds its size limit."));
+        }
+        Ok(position)
     }
 }
 

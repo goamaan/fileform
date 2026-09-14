@@ -149,6 +149,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "tiff",
  "zune-core",
  "zune-jpeg",
 ]

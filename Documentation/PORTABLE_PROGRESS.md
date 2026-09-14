@@ -426,3 +426,17 @@ ICC-tagged equivalent; ambiguous metadata produced no output. The shared Electro
 picker now accepts JPEG. Packaged Mac E2E imported an oriented progressive JPEG,
 showed its preview and saved PNG matching CLI bytes and independent Pillow decode
 within two values. One old preview was quit before replacement; one remains open.
+
+## Verified TIFF export
+
+Added the third reference image output format, TIFF, to native processing and
+Electron. It uses lossless LZW, unassociated alpha, normal orientation and sRGB
+ICC tagging, with full pixel/metadata verification and existing no-clobber safety.
+TIFF quality/background misuse is rejected; JPEG-only controls stay hidden.
+
+Forty-six Rust tests, Clippy, Windows-target checking, image/table/cancellation
+process smoke and three desktop tests pass. Notices still cover 62 components.
+The packaged Mac app saved a TIFF through a native dialog; independent Pillow
+verification proved exact oriented pixels/alpha, single-image structure, LZW and
+required tags, with the source checksum unchanged. One preview was replaced by
+one current build. TIFF input and broader parity/release gates remain open.

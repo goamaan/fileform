@@ -3,10 +3,10 @@ const integer=(value:unknown):value is number=>Number.isSafeInteger(value)&&Numb
 export function validateImageExport(value:unknown,width:number,height:number,hasAlpha:boolean):ImageExportOptions {
   if(!value||typeof value!=='object'||Object.keys(value).some(key=>!['format','background','quality','crop','maxDimension'].includes(key)))throw new Error('Invalid image export options.');
   const {format,background,quality,crop:region,maxDimension}=value as Record<string,unknown>;
-  if(format!=='png'&&format!=='jpeg')throw new Error('Choose PNG or JPEG.');
+  if(format!=='png'&&format!=='jpeg'&&format!=='tiff')throw new Error('Choose PNG, JPEG or TIFF.');
   if(quality!==undefined&&(!integer(quality)||quality<1||quality>100))throw new Error('JPEG quality must be between 1 and 100.');
   if(background!==undefined&&background!=='white'&&background!=='black')throw new Error('Choose a white or black background.');
-  if(format==='png'&&(quality!==undefined||background!==undefined))throw new Error('Quality and background apply to JPEG output.');
+  if(format!=='jpeg'&&(quality!==undefined||background!==undefined))throw new Error('Quality and background apply to JPEG output.');
   if(format==='jpeg'&&hasAlpha&&background===undefined)throw new Error('Choose a background for JPEG.');
   if(maxDimension!==undefined&&(!integer(maxDimension)||maxDimension<1||maxDimension>4294967295))throw new Error('Maximum dimension must be a positive whole number.');
   let crop:PixelCrop|undefined;

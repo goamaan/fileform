@@ -223,6 +223,13 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     ambiguous_output=folder/'ambiguous.png'
     rejected_ambiguous=subprocess.run([str(cli),'convert-image',str(ambiguous),str(ambiguous_output)],capture_output=True,text=True)
     assert rejected_ambiguous.returncode!=0 and not ambiguous_output.exists()
+    tiff_output=folder/'pixels.tiff'
+    tiff_reply=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(tiff_output)}),capture_output=True,text=True,check=True)
+    tiff_receipt=json.loads(tiff_reply.stdout)['result']
+    assert tiff_receipt['width']==2 and tiff_receipt['height']==1
+    tiff_bytes=tiff_output.read_bytes();assert tiff_bytes[:4] in [b'II\x2a\0',b'MM\0\x2a']
+    tiff_collision=subprocess.run([str(cli),'convert-image',str(source),str(tiff_output)],capture_output=True,text=True)
+    assert tiff_collision.returncode!=0 and tiff_output.read_bytes()==tiff_bytes
     rejected = []
     for name, data in [('bad-color-crc', png(2,1,pixels,extra=gamma_chunk[:-1]+bytes([gamma_chunk[-1]^1]))), ('duplicate-gamma', png(2,1,pixels,extra=gamma_chunk+gamma_chunk)), ('zero-gamma', png(2,1,pixels,extra=chunk(b'gAMA',struct.pack('>I',0)))), ('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
@@ -236,5 +243,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'verifiedTIFFExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

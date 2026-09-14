@@ -1,7 +1,7 @@
 # Portable image pipeline
 
 Status: native PNG inspection, orientation, color normalization and verified PNG
-and PNG/JPEG export are implemented in the native CLI/worker and Electron Images
+and PNG/JPEG/TIFF export are implemented in the native CLI/worker and Electron Images
 workspace, with native-generated previews, crop and resize controls. TIFF output
 and target-size fitting are pending.
 
@@ -306,3 +306,19 @@ oriented dimensions and at most two channel-value difference from its independen
 JPEG decode. Evidence: electron-image/jpeg-import-ui-verified.json under
 Artifacts/Verification. Unmodeled application metadata, CMYK/YCCK, special coding
 modes and wider real-camera/profile coverage remain preservation/parity work.
+
+## TIFF output
+
+PNG/JPEG input can now be saved as .tif/.tiff in Electron or the CLI. The native
+encoder writes eight-bit RGBA with LZW compression, explicit unassociated alpha,
+orientation 1 and an sRGB ICC profile. Strip sizing targets a small working buffer.
+The output writer bounds writes/seeks and remains cancellable. Verification fully
+decodes, compares every rendered pixel and checks image count, dimensions, alpha,
+orientation and ICC bytes before no-clobber publication.
+
+Forty-six Rust tests, Clippy, Windows-target checks, process smoke and desktop
+validation tests pass. Packaged Mac acceptance exported an oriented transparent
+PNG to TIFF. Pillow independently confirmed exact pixels/alpha, one image, LZW,
+orientation and ICC metadata, with the original unchanged. Evidence:
+Artifacts/Verification/electron-image/tiff-ui-verified.json. TIFF input, high-depth
+preservation and target-byte fitting remain unfinished; this is output support.
