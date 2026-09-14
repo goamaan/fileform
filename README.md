@@ -17,7 +17,8 @@ verification and full migration parity remain pending. See the
 [user requirements](Documentation/USER_REQUIREMENTS.md).
 
 Current Mac build target: macOS 14 or later. The complete tested runtime is arm64;
-Windows and Intel release support must be demonstrated before being advertised.
+A Windows x64 preview installer now builds in CI and its native worker checks pass.
+Full Windows workflow/UI acceptance and Intel Mac release support remain open.
 Do not assume every input can convert to every format. The CLI capability command
 and operation documentation describe the implemented routes and limits.
 
@@ -50,8 +51,8 @@ apps/macos/Tools/build-development.sh
 ```
 
 See [dependencies](Documentation/Dependencies.md) and the individual operation
-contracts before changing supported behavior. Windows build and end-to-end jobs
-are required work in the migration, not claimed as passing today.
+contracts before changing supported behavior. The Windows build and worker/CLI checks pass in CI; native Windows interface
+acceptance and full workflow parity remain open.
 
 ## License
 

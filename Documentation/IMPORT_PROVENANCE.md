@@ -1,6 +1,6 @@
 # Consolidation provenance
 
-Prepared September 14, 2026; not yet published as the canonical repository.
+Published September 14, 2026 at https://github.com/goamaan/fileform.
 
 - Root history: public goamaan/fileform-core through
   5fc4656061f7c397d3f5ce7169213f160d63b8bf, cloned without hardlinks.
@@ -15,14 +15,17 @@ Prepared September 14, 2026; not yet published as the canonical repository.
   explicit open-source instruction. Dependency licenses remain separate.
 
 The original checkouts, parked password branches and notarized candidates remain
-unchanged as local/private backups. No existing repository has been renamed,
-made public, deleted or force-pushed by this import. A broader source/secret and
-license review remains required before publication; a narrow credential-pattern
-scan of the imported app/site found no matches.
+unchanged as local/private backups. The public engine repository was renamed to fileform, preserving its history and
+issues. The former private app repository was renamed fileform-native-archive;
+it and fileform-site remain private and archived. Their Git histories were not
+made public. No history rewrite or force push was used. The reviewed source was
+fast-forwarded onto the existing public engine history after the publication
+review in PUBLICATION_REVIEW.md.
 
 
 Local verification: the imported macOS app builds against the root package and
 passes the five-executable bundle audit. Native tests initially exposed obsolete
 sibling-core fixture paths; those were corrected to the monorepo root and the
 63-test suite passed. Logs are local at /tmp/fileform-monorepo-build.log and
-/tmp/fileform-monorepo-tests.log. No portable desktop/Windows completion is claimed.
+/tmp/fileform-monorepo-tests.log. The first Electron/Rust table workflow is now implemented. Both platform CI builds
+and native worker checks passed; full operation/UI parity remains incomplete.

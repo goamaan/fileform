@@ -58,3 +58,25 @@ Local proof: `Artifacts/Verification/electron-table/` and
    One local process RSS sample exists; it is not a comparative performance result.
 5. Complete the free Vicinae-inspired website, public downloads, secure updates,
    contributor/security docs and release installation acceptance.
+
+
+## Public consolidation and Windows build
+
+The canonical public repository is now https://github.com/goamaan/fileform.
+Private native/site repositories are archived; their histories remain private.
+The minimal free-project website is deployed publicly at
+https://fileform.amaangokak18.chatgpt.site from the canonical website source via a
+private deployment mirror. The mirror's .fileform-source.json records provenance.
+
+Desktop CI run 34846825786 at b5a175c3750c0408e4590d31ab2f6ba46614f39c passed on
+windows-2025 and macos-26. Windows ran the Rust tests, Clippy, release compilation,
+real CLI/worker smoke and Electron NSIS packaging. Artifact
+fileform-preview-Windows-X64 contains a 112,429,353-byte installer, SHA-256
+0fde56640709f59d29a534afb869593fa674e67e1f6d97c4e6ebfacfc616eec5.
+Its PE header has no embedded Authenticode signature. This is an unsigned preview;
+manual installation/UI testing and full Windows workflow parity remain open.
+
+The core/reference matrix passed macOS 26. The newly added macOS 14 app build
+exposed older-SDK Undo callback isolation annotations. Synchronous MainActor
+bridges fix those callbacks; all 63 local native tests pass. A fresh matrix run
+will verify the older compiler. No platform check was removed to hide the failure.

@@ -45,7 +45,9 @@ extension WorkspaceModel {
 
     func changeTrim(_ job: FileJob, to value: MediaTrimDraft, undo: UndoManager? = nil, persist: Bool = true) {
         guard job.trimEditable, let prior = job.trimDraft, prior != value else { return }
-        undo?.registerUndo(withTarget: self) { model in model.changeTrim(job, to: prior, undo: undo) }
+        undo?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated { model.changeTrim(job, to: prior, undo: undo) }
+        }
         undo?.setActionName("Change trim")
         job.trimDraft = value; job.trimPlan = nil; job.trimError = nil
         if persist { saveSession() }
@@ -53,7 +55,9 @@ extension WorkspaceModel {
 
     func finishTrimGesture(_ job: FileJob, prior: MediaTrimDraft, undo: UndoManager?) {
         guard prior != job.trimDraft else { return }
-        undo?.registerUndo(withTarget: self) { model in model.changeTrim(job, to: prior, undo: undo) }
+        undo?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated { model.changeTrim(job, to: prior, undo: undo) }
+        }
         undo?.setActionName("Adjust trim range")
         saveSession()
     }

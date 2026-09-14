@@ -66,7 +66,10 @@ extension WorkspaceModel {
     func changeCrop(_ job: FileJob, to draft: ImageCropDraft, undo: UndoManager?) {
         guard jobs.contains(where: { $0 === job }), job.editable, job.crop != draft else { return }
         let prior = job.crop
-        undo?.registerUndo(withTarget: self) { model in model.changeCrop(job, to: prior, undo: undo) }
+        // Older SDKs do not annotate the synchronous UI undo callback as MainActor.
+        undo?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated { model.changeCrop(job, to: prior, undo: undo) }
+        }
         undo?.setActionName("Adjust crop")
         job.crop = draft
         Task { await refreshPlan(job) }

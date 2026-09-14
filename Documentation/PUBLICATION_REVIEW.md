@@ -50,3 +50,10 @@ updates, clean-machine installation or a final public application release.
 Those requirements remain in REQUIREMENTS.json and PORTABLE_PROGRESS.md.
 
 Local reports are in Artifacts/audit; they are intentionally not published.
+
+
+Publication completed: canonical source is public, both former private repositories
+are archived privately, and the redesigned site is public. Desktop Windows/macOS
+CI passed afterward; see PORTABLE_PROGRESS.md for precise evidence and remaining
+release gaps. The deployment mirror is generated from website/ and is not a second
+maintained source repository.
