@@ -320,3 +320,18 @@ White was selected, then exported through the native dialog. Independent Pillow
 decoding verified the white result within one channel value and the black CLI
 result exactly; originals remained unchanged. The earlier preview was quit before
 launching this build, maintaining one running Fileform Preview app.
+
+## JPEG quality selection
+
+Added validated 1–100 JPEG quality through the native request, CLI options and
+Electron slider. Default remains 85. CLI image options now accept background and
+quality in either order and reject duplicates/unknowns; PNG rejects JPEG-only
+options rather than ignoring them. Existing 34 Rust tests, Clippy, Windows-target
+checking and expanded image/table/cancellation process smoke pass.
+
+Packaged Mac acceptance set quality to 40 by keyboard, saved through the native
+dialog and compared with CLI output. JPEG quantization, compressed image data and
+decoded pixels matched; only the ICC creation timestamp differed. A detailed
+fixture verified quality 20 output is smaller than quality 95. Invalid quality
+values and PNG misuse produced no output. Earlier JPEG CI run 34893395784 passed
+both platforms. The single old preview was quit before launching its replacement.

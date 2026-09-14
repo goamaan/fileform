@@ -157,8 +157,8 @@ in Electron, the worker request, or the CLI:
 target/release/fileform-native convert-image input.png output.jpg --background white
 ```
 
-JPEG currently uses quality 85. Quality controls and target-size fitting are still
-required; JPEG input decoding is also a separate pending port. The encoder embeds
+JPEG defaults to quality 85 and supports an explicit 1–100 setting. Target-size
+fitting is still required; JPEG input decoding is also a separate pending port. The encoder embeds
 sRGB ICC data, then the verifier checks dimensions, RGB decode, ICC bytes, normal
 orientation and complete ending before publication. JPEG verification is lossy
 and does not promise pixel equality. PNG output retains its exact pixel check.
@@ -169,3 +169,20 @@ confirmed dimensions/profile and solid-color output within one code value; the
 black-background CLI fixture was exact. Source bytes were unchanged. Evidence:
 Artifacts/Verification/electron-image/jpeg-verified.json. Process tests on both CI
 platforms cover background enforcement, container/profile checks and collisions.
+
+## JPEG quality controls
+
+Electron exposes a keyboard-operable 1–100 quality slider; the default is 85.
+The CLI accepts `--quality 40` alongside `--background white`, in either order.
+The worker and main process validate the value independently. Missing, repeated,
+unknown and out-of-range options are rejected, and PNG does not silently ignore
+JPEG-only quality/background options.
+
+A detailed native process fixture produces a smaller JPEG at quality 20 than 95.
+Packaged Mac acceptance set the slider to 40 using the keyboard, saved via the
+native dialog, and compared against a CLI quality-40 conversion. Quantization,
+compressed image data and decoded pixels matched; the embedded ICC profile's
+creation timestamp differed, so full-file byte equality is not claimed. The
+quality-85 fixture has different quantization. Evidence: electron-image/
+quality-verified.json under Artifacts/Verification. The preview shows normalized
+source pixels and the chosen matte, not a recompressed JPEG preview.

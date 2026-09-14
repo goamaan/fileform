@@ -10,3 +10,5 @@
 .image-preview canvas{width:256px;height:256px;object-fit:contain;max-width:100%;}.image-preview{padding:20px}
 
 .image-options{display:flex;gap:28px;flex-wrap:wrap;margin:22px 0}
+
+.image-options input[type=range]{width:130px;accent-color:var(--accent)}.image-options output{min-width:3ch;font-variant-numeric:tabular-nums}.image-options input:focus-visible{outline:2px solid var(--accent);outline-offset:4px}

@@ -7,7 +7,7 @@ export interface ImageSource { id:string; name:string; bytes:number; width:numbe
 export interface ImageSavedFile { id:string; name:string; bytes:number; width:number; height:number }
 export interface FileformAPI {
   chooseImage():Promise<ImageSource|null>;
-  saveImage(sourceID:string,format:'png'|'jpeg',background?:'white'|'black'):Promise<ImageSavedFile|null>;
+  saveImage(sourceID:string,format:'png'|'jpeg',background?:'white'|'black',quality?:number):Promise<ImageSavedFile|null>;
   cancel():Promise<void>;
   chooseTable():Promise<SourceFile|null>;
   saveTable(sourceID:string,format:TableOutput):Promise<SavedFile|null>;

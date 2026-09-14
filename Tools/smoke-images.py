@@ -124,6 +124,24 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
         assert dimensions==(2,1) and profile_found
         repeated=subprocess.run([str(cli),'convert-image',str(source),str(jpeg),'--background',background],capture_output=True,text=True)
         assert repeated.returncode!=0 and jpeg.read_bytes()==data
+    noise_source = folder / 'detail.png'
+    noise = bytes(channel for y in range(64) for x in range(64) for channel in [((x*73+y*29)%256),((x*17+y*97)%256),((x*y*13)%256),255])
+    noise_source.write_bytes(png(64,64,noise))
+    quality_sizes = {}
+    for quality in [20,95]:
+        target = folder / f'quality-{quality}.jpg'
+        subprocess.run([str(cli),'convert-image',str(noise_source),str(target),'--quality',str(quality),'--background','white'],capture_output=True,text=True,check=True)
+        quality_sizes[str(quality)] = target.stat().st_size
+    assert quality_sizes['20'] < quality_sizes['95']
+    for quality in [0,101,-1,1.5,'invalid']:
+        target = folder / 'invalid-quality.jpg'
+        failure = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(target),'background':'white','quality':quality}),capture_output=True,text=True)
+        assert failure.returncode!=0 and not target.exists()
+    ignored = folder / 'quality-on-png.png'
+    invalid_option = subprocess.run([str(cli),'convert-image',str(source),str(ignored),'--quality','85'],capture_output=True,text=True)
+    assert invalid_option.returncode!=0 and not ignored.exists()
+    duplicate_option = subprocess.run([str(cli),'convert-image',str(source),str(ignored),'--quality','20','--quality','95'],capture_output=True,text=True)
+    assert duplicate_option.returncode!=0 and not ignored.exists()
     stale_output = folder / 'stale.png'
     stale = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(stale_output),'expected_source_sha256':'0'*64}),capture_output=True,text=True)
     assert stale.returncode != 0 and not stale_output.exists()
@@ -148,5 +166,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'jpegBackgroundAndContainerChecks':True,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'jpegBackgroundAndContainerChecks':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

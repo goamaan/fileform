@@ -72,6 +72,7 @@ pub enum Request {
         input: PathBuf,
         output: PathBuf,
         background: Option<Background>,
+        quality: Option<u8>,
         expected_source_sha256: Option<String>,
     },
     InspectImage {
@@ -258,6 +259,7 @@ fn convert_image(
     expected_hash: Option<&str>,
     cancellation: &Cancellation,
     background: Option<Background>,
+    quality: Option<u8>,
 ) -> Result<Response> {
     let jpeg = match output
         .extension()
@@ -274,6 +276,18 @@ fn convert_image(
             ))
         }
     };
+    if quality.is_some_and(|value| !(1..=100).contains(&value)) {
+        return Err(fail(
+            "invalid_request",
+            "JPEG quality must be between 1 and 100.",
+        ));
+    }
+    if !jpeg && (quality.is_some() || background.is_some()) {
+        return Err(fail(
+            "invalid_request",
+            "Quality and background options apply to JPEG output.",
+        ));
+    }
     if output.try_exists()? {
         return Err(fail(
             "collision",
@@ -318,6 +332,7 @@ fn convert_image(
                 &mut writer,
                 &pixels,
                 background.unwrap_or(Background::White),
+                quality.unwrap_or(85),
                 cancellation,
             )?);
         } else {
@@ -596,6 +611,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         output,
         expected_source_sha256,
         background,
+        quality,
     } = &request
     {
         return convert_image(
@@ -604,6 +620,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             expected_source_sha256.as_deref(),
             cancellation,
             *background,
+            *quality,
         );
     }
     if let Request::InspectImage { input, preview } = &request {

@@ -36,13 +36,20 @@ pub(crate) fn encode<W: Write>(
     writer: &mut W,
     pixels: &image::RgbaImage,
     background: Background,
+    quality: u8,
     cancellation: &Cancellation,
 ) -> Result<Vec<u8>> {
+    if !(1..=100).contains(&quality) {
+        return Err(fail(
+            "invalid_request",
+            "JPEG quality must be between 1 and 100.",
+        ));
+    }
     let rgb = flatten(pixels, background, cancellation)?;
     let profile = moxcms::ColorProfile::new_srgb()
         .encode()
         .map_err(|e| fail("encoding", e.to_string()))?;
-    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut *writer, 85);
+    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut *writer, quality);
     encoder
         .set_icc_profile(profile.clone())
         .map_err(|e| fail("encoding", e.to_string()))?;
@@ -133,7 +140,7 @@ mod tests {
         let pixels = image::RgbaImage::from_pixel(8, 8, image::Rgba([100, 150, 200, 255]));
         let mut output = Vec::new();
         let signal = Cancellation::default();
-        let profile = encode(&mut output, &pixels, Background::White, &signal).unwrap();
+        let profile = encode(&mut output, &pixels, Background::White, 85, &signal).unwrap();
         verify(std::io::Cursor::new(&output), 8, 8, &profile, &signal).unwrap();
         assert!(verify(
             std::io::Cursor::new(&output[..output.len() - 2]),

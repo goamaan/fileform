@@ -95,8 +95,10 @@ ipcMain.handle('fileform:choose-image',async(event)=>{
     images.clear();images.set(source.id,{...source,path,sha256:info.sha256});return source;
   });
 });
-ipcMain.handle('fileform:save-image',async(event,id:unknown,format:unknown,background:unknown)=>{
+ipcMain.handle('fileform:save-image',async(event,id:unknown,format:unknown,background:unknown,quality:unknown)=>{
   authorize(event);
+  if(quality!==undefined&&(!count(quality)||quality<1||quality>100))throw new Error('JPEG quality must be between 1 and 100.');
+  if(format==='png'&&quality!==undefined)throw new Error('Quality applies to JPEG output.');
   if(format!=='png'&&format!=='jpeg')throw new Error('Choose PNG or JPEG.');
   if(background!==undefined&&background!=='white'&&background!=='black')throw new Error('Choose a white or black background.');
   if(typeof id!=='string'||!images.has(id))throw new Error('Choose the image again.');
@@ -108,7 +110,7 @@ ipcMain.handle('fileform:save-image',async(event,id:unknown,format:unknown,backg
     const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+extension),filters:[{name:format.toUpperCase()+' image',extensions:format==='jpeg'?['jpg','jpeg']:['png']}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;
     if(!(format==='jpeg'?['.jpg','.jpeg']:['.png']).includes(parse(choice.filePath).ext.toLowerCase()))throw new Error('Use a filename matching the selected format.');
-    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background});
+    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality});
     if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==source.width||receipt.height!==source.height||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
     const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height};
     if(saved.size>=100)saved.delete(saved.keys().next().value!);

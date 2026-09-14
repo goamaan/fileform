@@ -5,28 +5,12 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
-        [command, input, output, flag, background]
-            if command == "convert-image"
-                && flag == "--background"
-                && (background == "white" || background == "black") =>
-        {
-            Request::ConvertImage {
-                input: PathBuf::from(input),
-                output: PathBuf::from(output),
-                expected_source_sha256: None,
-                background: Some(if background == "white" {
-                    Background::White
-                } else {
-                    Background::Black
-                }),
-            }
+        [command, rest @ ..] if command == "convert-image" => {
+            image_request(rest).unwrap_or_else(|message| {
+                eprintln!("{message}");
+                std::process::exit(2);
+            })
         }
-        [command, input, output] if command == "convert-image" => Request::ConvertImage {
-            background: None,
-            input: PathBuf::from(input),
-            output: PathBuf::from(output),
-            expected_source_sha256: None,
-        },
         [command, input] if command == "inspect-image" => Request::InspectImage {
             input: PathBuf::from(input),
             preview: None,
@@ -41,7 +25,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] [--quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
@@ -59,4 +43,43 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
+    let [input, output, options @ ..] = args else {
+        return Err("convert-image requires input and output paths.");
+    };
+    if options.len() % 2 != 0 {
+        return Err("Each image option requires a value.");
+    }
+    let mut background = None;
+    let mut quality = None;
+    for option in options.as_chunks::<2>().0 {
+        match option[0].to_str() {
+            Some("--background") if background.is_none() => {
+                background = Some(match option[1].to_str() {
+                    Some("white") => Background::White,
+                    Some("black") => Background::Black,
+                    _ => return Err("Background must be white or black."),
+                })
+            }
+            Some("--quality") if quality.is_none() => {
+                quality = Some(
+                    option[1]
+                        .to_str()
+                        .and_then(|s| s.parse::<u8>().ok())
+                        .filter(|v| (1..=100).contains(v))
+                        .ok_or("Quality must be an integer from 1 to 100.")?,
+                )
+            }
+            _ => return Err("Unknown or repeated image option."),
+        }
+    }
+    Ok(Request::ConvertImage {
+        input: PathBuf::from(input),
+        output: PathBuf::from(output),
+        background,
+        quality,
+        expected_source_sha256: None,
+    })
 }
