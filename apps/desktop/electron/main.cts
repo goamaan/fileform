@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { basename, dirname, join, parse, resolve, relative, isAbsolute, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Appearance, SourceFile, SavedFile } from '../src/contracts.js';
+import type { Appearance, SourceFile, SavedFile, TableOutput } from '../src/contracts.js';
 
 app.setName('Fileform Preview');
 app.setAppUserModelId('app.fileform.DesktopPreview');
@@ -57,12 +57,13 @@ const count=(x:unknown):x is number=>Number.isSafeInteger(x) && Number(x)>=0;
 ipcMain.handle('fileform:choose',async(event)=>{
   authorize(event);
   return exclusive(async()=>{
-    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Tables',extensions:['csv','tsv']}]});
+    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Tables',extensions:['csv','tsv','json']}]});
     if(result.canceled || result.filePaths.length!==1)return null;
     const path=await fs.realpath(result.filePaths[0]);
     const inspected=await worker({operation:'inspect',input:path});
     if(inspected.kind!=='inspection' || !count(inspected.rows) || !count(inspected.columns) || !count(inspected.bytes) || typeof inspected.sha256!=='string' || !/^[a-f0-9]{64}$/.test(inspected.sha256))throw new Error('Invalid inspection receipt.');
-    const source={id:randomUUID(),name:basename(path),bytes:inspected.bytes,rows:inspected.rows,columns:inspected.columns};
+    if(!Array.isArray(inspected.outputs)||!inspected.outputs.length||!inspected.outputs.every((x:unknown)=>x==='json'||x==='csv'||x==='tsv'))throw new Error('Invalid output capabilities.');
+    const source={outputs:inspected.outputs as TableOutput[],scalarTypesBecomeText:parse(path).ext.toLowerCase()==='.json',id:randomUUID(),name:basename(path),bytes:inspected.bytes,rows:inspected.rows,columns:inspected.columns};
     sources.clear();sources.set(source.id,{...source,path,sha256:inspected.sha256});return source;
   });
 });
@@ -71,6 +72,7 @@ ipcMain.handle('fileform:save',async(event,id:unknown,format:unknown)=>{
   if(format!=='json'&&format!=='csv'&&format!=='tsv')throw new Error('Choose JSON, CSV or TSV.');
   if(typeof id!=='string'||!sources.has(id))throw new Error('Choose the source file again.');
   const source=sources.get(id)!;
+  if(!source.outputs.includes(format))throw new Error('This output format is unavailable for the selected table.');
   return exclusive(async()=>{
     const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+format),filters:[{name:format.toUpperCase()+' table',extensions:[format]}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;

@@ -11,7 +11,9 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+mod json_table_reader;
 mod table_reader;
+use json_table_reader::JsonTableReader;
 use table_reader::TableReader;
 pub const MAX_INPUT: u64 = 8 * 1024 * 1024;
 const MAX_OUTPUT: u64 = 128 * 1024 * 1024;
@@ -76,18 +78,19 @@ pub enum Response {
     Saved(Receipt),
 }
 
-fn delimiter(path: &Path) -> Result<u8> {
+fn delimiter(path: &Path) -> Result<Option<u8>> {
     match path
         .extension()
         .and_then(|x| x.to_str())
         .map(str::to_ascii_lowercase)
         .as_deref()
     {
-        Some("csv") => Ok(b','),
-        Some("tsv") => Ok(b'\t'),
+        Some("csv") => Ok(Some(b',')),
+        Some("tsv") => Ok(Some(b'\t')),
+        Some("json") => Ok(None),
         _ => Err(fail(
             "unsupported",
-            "This worker currently accepts CSV and TSV tables.",
+            "This worker accepts CSV, TSV and flat JSON tables.",
         )),
     }
 }
@@ -157,12 +160,32 @@ impl Source {
         }
         Ok(())
     }
-    fn reader(&mut self, delimiter: u8) -> Result<TableReader<&mut File>> {
+    fn reader(&mut self, delimiter: Option<u8>) -> Result<InputReader<&mut File>> {
         self.snapshot.as_file_mut().seek(SeekFrom::Start(0))?;
-        TableReader::new(self.snapshot.as_file_mut(), delimiter)
+        match delimiter {
+            Some(separator) => Ok(InputReader::Delimited(TableReader::new(
+                self.snapshot.as_file_mut(),
+                separator,
+            )?)),
+            None => Ok(InputReader::Json(JsonTableReader::new(
+                self.snapshot.as_file_mut(),
+            )?)),
+        }
     }
 }
-fn headers<R: Read>(reader: &mut TableReader<R>) -> Result<Vec<String>> {
+enum InputReader<R: Read> {
+    Delimited(TableReader<R>),
+    Json(JsonTableReader<R>),
+}
+impl<R: Read> InputReader<R> {
+    fn next_record(&mut self) -> Result<Option<Vec<String>>> {
+        match self {
+            Self::Delimited(reader) => reader.next_record(),
+            Self::Json(reader) => reader.next_record(),
+        }
+    }
+}
+fn headers<R: Read>(reader: &mut InputReader<R>) -> Result<Vec<String>> {
     let names = reader
         .next_record()?
         .ok_or_else(|| fail("invalid_table", "A header row is required."))?;
@@ -230,7 +253,11 @@ pub fn execute(request: Request) -> Result<Response> {
                     .take(20)
                     .map(|s| s.chars().take(128).collect())
                     .collect(),
-                outputs: vec!["json", "csv", "tsv"],
+                outputs: if separator.is_none() {
+                    vec!["csv", "tsv"]
+                } else {
+                    vec!["json", "csv", "tsv"]
+                },
             }))
         }
         Request::ConvertTable {
@@ -263,6 +290,12 @@ pub fn execute(request: Request) -> Result<Response> {
                     ))
                 }
             };
+            if separator.is_none() && output_separator.is_none() {
+                return Err(fail(
+                    "invalid_output",
+                    "Choose CSV or TSV for JSON input. JSON scalar types become text cells.",
+                ));
+            }
             if output.try_exists()? {
                 return Err(fail(
                     "collision",
@@ -355,10 +388,11 @@ fn write_record<W: Write>(writer: &mut W, record: &[String], separator: u8) -> R
         if index > 0 {
             writer.write_all(&[separator])?;
         }
-        let quote = cell
-            .as_bytes()
-            .iter()
-            .any(|b| [separator, b'"', b'\r', b'\n'].contains(b));
+        let quote = (index == 0 && cell.starts_with('\u{feff}'))
+            || cell
+                .as_bytes()
+                .iter()
+                .any(|b| [separator, b'"', b'\r', b'\n'].contains(b));
         if quote {
             writer.write_all(b"\"")?;
         }
@@ -378,7 +412,7 @@ fn write_record<W: Write>(writer: &mut W, record: &[String], separator: u8) -> R
 
 fn verify_delimited(
     source: &mut Source,
-    separator: u8,
+    separator: Option<u8>,
     output: &mut File,
     output_separator: u8,
     expected_rows: u64,
@@ -406,13 +440,13 @@ fn verify_delimited(
 
 fn verify_table(
     source: &mut Source,
-    separator: u8,
+    separator: Option<u8>,
     output: &mut File,
     expected_rows: u64,
 ) -> Result<()> {
     use serde::de::{self, SeqAccess, Visitor};
     struct Rows<'a> {
-        reader: TableReader<&'a mut File>,
+        reader: InputReader<&'a mut File>,
         columns: Vec<String>,
         expected: u64,
     }
@@ -656,11 +690,108 @@ mod tests {
         let mut output = NamedTempFile::new().unwrap();
         output.write_all(b"a\tb\r\n1\t3\r\n").unwrap();
         assert_eq!(
-            verify_delimited(&mut source, b',', output.as_file_mut(), b'\t', 1)
+            verify_delimited(&mut source, Some(b','), output.as_file_mut(), b'\t', 1)
                 .unwrap_err()
                 .code,
             "verification"
         );
+    }
+    #[test]
+    fn flat_json_preserves_numeric_lexemes_and_aligns_reordered_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.json");
+        let output = dir.path().join("result.csv");
+        let text = "\u{feff}[{\"large\":9007199254740993,\"decimal\":-0.001200e+999,\"text\":\"日本\\n語\",\"flag\":true,\"empty\":null},{\"empty\":\"\",\"text\":\"001\",\"flag\":false,\"decimal\":-0,\"large\":123456789012345678901234567890}]";
+        std::fs::write(&input, text).unwrap();
+        let Response::Inspection(info) = execute(Request::Inspect {
+            input: input.clone(),
+        })
+        .unwrap() else {
+            panic!("inspection expected")
+        };
+        assert_eq!(info.rows, 2);
+        assert_eq!(info.outputs, ["csv", "tsv"]);
+        execute(Request::ConvertTable {
+            input: input.clone(),
+            output: output.clone(),
+            expected_source_sha256: Some(info.sha256),
+        })
+        .unwrap();
+        let mut reader = TableReader::new(File::open(output).unwrap(), b',').unwrap();
+        assert_eq!(
+            reader.next_record().unwrap().unwrap(),
+            ["large", "decimal", "text", "flag", "empty"]
+        );
+        assert_eq!(
+            reader.next_record().unwrap().unwrap(),
+            ["9007199254740993", "-0.001200e+999", "日本\n語", "true", ""]
+        );
+        assert_eq!(
+            reader.next_record().unwrap().unwrap(),
+            ["123456789012345678901234567890", "-0", "001", "false", ""]
+        );
+        assert!(reader.next_record().unwrap().is_none());
+        assert_eq!(std::fs::read_to_string(input).unwrap(), text);
+    }
+    #[test]
+    fn json_bom_in_a_column_name_is_not_lost_as_file_encoding_marker() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.json");
+        let output = dir.path().join("result.tsv");
+        std::fs::write(
+            &input,
+            serde_json::to_vec(&serde_json::json!([{ "\u{feff}name": "value" }])).unwrap(),
+        )
+        .unwrap();
+        execute(Request::ConvertTable {
+            input,
+            output: output.clone(),
+            expected_source_sha256: None,
+        })
+        .unwrap();
+        let mut reader = TableReader::new(File::open(output).unwrap(), b'\t').unwrap();
+        assert_eq!(reader.next_record().unwrap().unwrap(), ["\u{feff}name"]);
+    }
+    #[test]
+    fn invalid_json_tables_never_publish() {
+        for text in [
+            r#"[]"#,
+            r#"[{}]"#,
+            r#"[{"a":1,"a":2}]"#,
+            r#"[{"a":1,"\u0061":2}]"#,
+            r#"[{"a":1},{"b":2}]"#,
+            r#"[{"a":[]}]"#,
+            r#"[{"a":{}}]"#,
+            r#"[{"a":01}]"#,
+            r#"[{"a":1.}]"#,
+            r#"[{"a":1e}]"#,
+            r#"[{"a":+1}]"#,
+            r#"[{"a":NaN}]"#,
+            r#"[{"a":true},]"#,
+            r#"[{"a":false,}]"#,
+            r#"[{"a":null}] trailing"#,
+            r#"[{"a":"\ud800"}]"#,
+            r#"[{" ":1}]"#,
+            r#"[{"a":1},{"a":2,"b":3}]"#,
+            r#"[{"a":"unterminated}]"#,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let input = dir.path().join("source.json");
+            let output = dir.path().join("result.tsv");
+            std::fs::write(&input, text).unwrap();
+            assert!(
+                execute(Request::ConvertTable {
+                    input: input.clone(),
+                    output: output.clone(),
+                    expected_source_sha256: None
+                })
+                .is_err(),
+                "accepted {text}"
+            );
+            assert!(!output.exists());
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+            assert_eq!(std::fs::read_to_string(input).unwrap(), text);
+        }
     }
     #[test]
     fn concurrent_publish_never_overwrites() {

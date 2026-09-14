@@ -1,6 +1,6 @@
 export type Appearance = 'system'|'light'|'dark';
 export type TableOutput = 'json'|'csv'|'tsv';
-export interface SourceFile { id:string; name:string; bytes:number; rows:number; columns:number }
+export interface SourceFile { id:string; name:string; bytes:number; rows:number; columns:number; outputs:TableOutput[]; scalarTypesBecomeText:boolean }
 export interface SavedFile { id:string; name:string; bytes:number; rows:number }
 export interface FileformAPI {
   chooseTable():Promise<SourceFile|null>;

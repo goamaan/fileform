@@ -101,3 +101,26 @@ The new Windows CI run must verify these output changes on Windows.
 
 Reference CI run 34884604844: the macOS 14 job now passed its complete verification,
 including native compilation and CLI E2E, after the SwiftUI preference fix.
+
+## Flat JSON input migration
+
+The Rust table reader now streams flat JSON arrays row by row. It preserves the
+first object's column order, accepts reordered keys in subsequent objects, and
+retains numeric lexemes without floating-point conversion. Null becomes an empty
+cell and booleans become true/false text, matching the reference table contract.
+Duplicate decoded keys, blank names, mismatched columns, nested values, malformed
+numbers/strings, trailing content and empty schema-less tables fail before saving.
+Limits and output verification remain in force. JSON input offers only CSV/TSV;
+Electron validates worker capabilities and explains scalar-to-text conversion.
+
+Verification: 15 Rust tests, Clippy, Windows-target checking and real CLI/worker
+smoke passed locally. Packaged macOS Electron selected a JSON file, showed only
+CSV/TSV options and the type-conversion note, then saved CSV through a native
+dialog. Python's independent CSV parser confirmed large integers, exponent text,
+booleans and null mapping; the original was unchanged. Evidence is retained in
+Artifacts/Verification/electron-table/json-input-verified.json.
+
+The previous output-format CI run 34886459428 passed both Windows and macOS,
+including the expanded delimited process smoke and Electron installers. The new
+JSON changes require their own Windows CI run. Full app parity, process
+cancellation, performance comparison, signing and secure updates remain open.
