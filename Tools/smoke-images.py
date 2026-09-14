@@ -102,6 +102,28 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert json.loads(reply.stdout)['ok'] and worker_output.read_bytes() == before
     collision = subprocess.run([str(cli),'convert-image',str(source),str(exported)],capture_output=True,text=True)
     assert collision.returncode != 0 and exported.read_bytes() == before
+    no_background = folder / 'missing-background.jpg'
+    denied_jpeg = subprocess.run([str(cli),'convert-image',str(source),str(no_background)],capture_output=True,text=True)
+    assert denied_jpeg.returncode != 0 and not no_background.exists()
+    for background in ['white','black']:
+        jpeg = folder / (background + '.jpg')
+        result = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(jpeg),'background':background}),capture_output=True,text=True,check=True)
+        assert json.loads(result.stdout)['result']['width']==2
+        data=jpeg.read_bytes()
+        assert data[:2]==b'\xff\xd8' and data[-2:]==b'\xff\xd9'
+        offset=2; dimensions=None; profile_found=False
+        while offset<len(data)-2:
+            assert data[offset]==255
+            marker=data[offset+1]
+            if marker==0xda: break
+            length=struct.unpack('>H',data[offset+2:offset+4])[0]
+            payload=data[offset+4:offset+2+length]
+            if marker==0xc0: dimensions=struct.unpack('>HH',payload[1:5])[::-1]
+            if marker==0xe2 and payload.startswith(b'ICC_PROFILE\0'): profile_found=True
+            offset+=2+length
+        assert dimensions==(2,1) and profile_found
+        repeated=subprocess.run([str(cli),'convert-image',str(source),str(jpeg),'--background',background],capture_output=True,text=True)
+        assert repeated.returncode!=0 and jpeg.read_bytes()==data
     stale_output = folder / 'stale.png'
     stale = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(stale_output),'expected_source_sha256':'0'*64}),capture_output=True,text=True)
     assert stale.returncode != 0 and not stale_output.exists()
@@ -126,5 +148,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'jpegBackgroundAndContainerChecks':True,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

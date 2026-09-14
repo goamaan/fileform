@@ -8,3 +8,5 @@
 .image-preview{min-height:200px;margin:22px 0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.image-preview canvas{width:auto;height:auto;max-width:100%;border-radius:3px;background-color:#fff;background-image:conic-gradient(#dce2e4 25%,transparent 0 50%,#dce2e4 0 75%,transparent 0);background-size:16px 16px}
 
 .image-preview canvas{width:256px;height:256px;object-fit:contain;max-width:100%;}.image-preview{padding:20px}
+
+.image-options{display:flex;gap:28px;flex-wrap:wrap;margin:22px 0}

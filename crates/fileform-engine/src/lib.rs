@@ -14,6 +14,8 @@ use tempfile::NamedTempFile;
 mod image_color;
 mod image_orientation;
 mod image_preview;
+mod jpeg_output;
+pub use jpeg_output::Background;
 mod json_table_reader;
 mod png_metadata;
 mod png_pipeline;
@@ -69,6 +71,7 @@ pub enum Request {
     ConvertImage {
         input: PathBuf,
         output: PathBuf,
+        background: Option<Background>,
         expected_source_sha256: Option<String>,
     },
     InspectImage {
@@ -249,18 +252,28 @@ fn prepare_png(
     Ok((source, inspection, oriented))
 }
 
-fn convert_png(
+fn convert_image(
     input: &Path,
     output: &Path,
     expected_hash: Option<&str>,
     cancellation: &Cancellation,
+    background: Option<Background>,
 ) -> Result<Response> {
-    if !output
+    let jpeg = match output
         .extension()
-        .is_some_and(|s| s.eq_ignore_ascii_case("png"))
+        .and_then(|s| s.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
     {
-        return Err(fail("invalid_output", "Choose a .png output filename."));
-    }
+        Some("png") => false,
+        Some("jpg" | "jpeg") => true,
+        _ => {
+            return Err(fail(
+                "invalid_output",
+                "Choose a .png, .jpg or .jpeg output filename.",
+            ))
+        }
+    };
     if output.try_exists()? {
         return Err(fail(
             "collision",
@@ -280,44 +293,73 @@ fn convert_png(
             "The inspected image changed. Add it again.",
         ));
     }
+    if jpeg && inspection.has_alpha && background.is_none() {
+        return Err(fail(
+            "invalid_request",
+            "Choose a white or black background for transparent JPEG output.",
+        ));
+    }
     let parent = output
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
     let directory = same_file::Handle::from_path(parent)?;
     let mut temporary = NamedTempFile::new_in(parent)?;
+    let mut jpeg_profile = None;
     {
-        let writer = LimitedWriter {
+        let mut writer = LimitedWriter {
             inner: io::BufWriter::new(temporary.as_file_mut()),
             cancellation: cancellation.clone(),
             bytes: 0,
             maximum_bytes: 512 * 1024 * 1024,
         };
-        let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
-        let mut writer = encoder
-            .write_header()
-            .map_err(|e| fail("encoding", e.to_string()))?;
-        writer
-            .write_image_data(pixels.as_raw())
-            .map_err(|e| fail("encoding", e.to_string()))?;
-        writer
-            .finish()
-            .map_err(|e| fail("encoding", e.to_string()))?;
+        if jpeg {
+            jpeg_profile = Some(jpeg_output::encode(
+                &mut writer,
+                &pixels,
+                background.unwrap_or(Background::White),
+                cancellation,
+            )?);
+        } else {
+            let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+            let mut writer = encoder
+                .write_header()
+                .map_err(|e| fail("encoding", e.to_string()))?;
+            writer
+                .write_image_data(pixels.as_raw())
+                .map_err(|e| fail("encoding", e.to_string()))?;
+            writer
+                .finish()
+                .map_err(|e| fail("encoding", e.to_string()))?;
+        }
     }
     cancellation.check()?;
     temporary.as_file_mut().seek(SeekFrom::Start(0))?;
-    let checked = png_pipeline::decode(io::BufReader::new(CancellableReader {
-        inner: temporary.as_file_mut(),
-        cancellation: cancellation.clone(),
-    }))?;
-    if checked.pixels != pixels || !checked.srgb || checked.orientation != 1 {
-        return Err(fail(
-            "verification",
-            "Saved PNG pixels or color metadata differ from the rendered image.",
-        ));
+    if let Some(profile) = jpeg_profile {
+        jpeg_output::verify(
+            io::BufReader::new(CancellableReader {
+                inner: temporary.as_file_mut(),
+                cancellation: cancellation.clone(),
+            }),
+            pixels.width(),
+            pixels.height(),
+            &profile,
+            cancellation,
+        )?;
+    } else {
+        let checked = png_pipeline::decode(io::BufReader::new(CancellableReader {
+            inner: temporary.as_file_mut(),
+            cancellation: cancellation.clone(),
+        }))?;
+        if checked.pixels != pixels || !checked.srgb || checked.orientation != 1 {
+            return Err(fail(
+                "verification",
+                "Saved PNG pixels or color metadata differ from the rendered image.",
+            ));
+        }
     }
     let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, 512 * 1024 * 1024)?;
     source.check(input)?;
@@ -553,13 +595,15 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         input,
         output,
         expected_source_sha256,
+        background,
     } = &request
     {
-        return convert_png(
+        return convert_image(
             input,
             output,
             expected_source_sha256.as_deref(),
             cancellation,
+            *background,
         );
     }
     if let Request::InspectImage { input, preview } = &request {

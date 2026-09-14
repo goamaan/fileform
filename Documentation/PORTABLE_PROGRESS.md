@@ -305,3 +305,18 @@ The existing image/workspace survived, verified through the native UI. Evidence:
 Artifacts/Verification/single-instance.json. Windows repeat-launch GUI acceptance
 is still pending. AGENTS.md now requires quitting superseded QA builds and keeping
 one current preview app open. Artifact copies on disk are not installed products.
+
+## Shared JPEG export
+
+Added PNG-to-JPEG output to Rust and Electron, including explicit background
+selection for alpha input. Native compositing preserves the selected matte;
+encoding embeds sRGB and verifies a full RGB decode, dimensions, metadata and
+ending before no-clobber publication. PNG's exact output verification is retained.
+The current JPEG quality is 85; quality/fit controls and JPEG input remain pending.
+
+Thirty-four Rust tests and Clippy pass. Windows-target checking and real image,
+table and cancellation smoke pass. The packaged Mac app blocked JPEG save until
+White was selected, then exported through the native dialog. Independent Pillow
+decoding verified the white result within one channel value and the black CLI
+result exactly; originals remained unchanged. The earlier preview was quit before
+launching this build, maintaining one running Fileform Preview app.

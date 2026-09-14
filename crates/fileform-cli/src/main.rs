@@ -1,11 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
-use fileform_engine::Request;
+use fileform_engine::{Background, Request};
 use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, flag, background]
+            if command == "convert-image"
+                && flag == "--background"
+                && (background == "white" || background == "black") =>
+        {
+            Request::ConvertImage {
+                input: PathBuf::from(input),
+                output: PathBuf::from(output),
+                expected_source_sha256: None,
+                background: Some(if background == "white" {
+                    Background::White
+                } else {
+                    Background::Black
+                }),
+            }
+        }
         [command, input, output] if command == "convert-image" => Request::ConvertImage {
+            background: None,
             input: PathBuf::from(input),
             output: PathBuf::from(output),
             expected_source_sha256: None,
@@ -24,7 +41,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.png | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

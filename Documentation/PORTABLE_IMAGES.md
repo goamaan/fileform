@@ -1,8 +1,9 @@
 # Portable image pipeline
 
 Status: native PNG inspection, orientation, color normalization and verified PNG
-export are implemented in the native CLI/worker and the Electron Images workspace.
-JPEG/TIFF output, visual previews and crop/resize controls are pending.
+and PNG/JPEG export are implemented in the native CLI/worker and Electron Images
+workspace, with native-generated previews. TIFF output and crop/resize controls
+are pending.
 
 Build with `cargo build --release --workspace`, then run:
 
@@ -145,3 +146,26 @@ The real worker smoke checks preview values and response size. The packaged Mac
 app displayed the correctly oriented transparent fixture over a checkerboard.
 The preview uses area averages in the encoded display space; higher-quality
 linear-light resampling and larger zoom previews remain refinement work.
+
+## JPEG output
+
+PNG input can now be saved as .jpg/.jpeg through the same native render and
+publication path. Transparent input requires an explicit white or black background
+in Electron, the worker request, or the CLI:
+
+```sh
+target/release/fileform-native convert-image input.png output.jpg --background white
+```
+
+JPEG currently uses quality 85. Quality controls and target-size fitting are still
+required; JPEG input decoding is also a separate pending port. The encoder embeds
+sRGB ICC data, then the verifier checks dimensions, RGB decode, ICC bytes, normal
+orientation and complete ending before publication. JPEG verification is lossy
+and does not promise pixel equality. PNG output retains its exact pixel check.
+
+Actual Mac app acceptance verified disabled saving before a background choice,
+white-background selection and native-dialog JPEG export. Pillow independently
+confirmed dimensions/profile and solid-color output within one code value; the
+black-background CLI fixture was exact. Source bytes were unchanged. Evidence:
+Artifacts/Verification/electron-image/jpeg-verified.json. Process tests on both CI
+platforms cover background enforcement, container/profile checks and collisions.
