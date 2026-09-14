@@ -53,7 +53,7 @@ enum PDFCompositionBackend {
                 guard let page = document.page(at: reference.pageIndex) else {
                     throw FileformError(.invalidRequest, "A selected PDF page is missing.")
                 }
-                for box in [PDFDisplayBox.mediaBox, .cropBox] {
+                for box in [PDFDisplayBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox] {
                     let bounds = page.bounds(for: box)
                     guard bounds.minX.isFinite, bounds.minY.isFinite, bounds.width.isFinite, bounds.height.isFinite,
                           bounds.width > 0, bounds.height > 0, bounds.width <= 1_000_000, bounds.height <= 1_000_000,
@@ -66,7 +66,7 @@ enum PDFCompositionBackend {
         }
         try FileSafety.rejectSourceAliases(destination: request.output.destination, inputs: fresh.map(\.inspection))
         var warnings = ["A new PDF is created. Document-level bookmarks, metadata and form behavior are not guaranteed to carry over; existing digital signatures do not certify the new document.",
-                        "PDF page sizes, visible content and rotation are retained. Originals remain unchanged."]
+                        "PDF page sizes, relative page boxes, content and rotation are retained. The native writer may normalize coordinate origins, image interpolation hints and color-space representation. Originals remain unchanged."]
         if fresh.contains(where: { $0.inspection.family == .image }) {
             warnings.append("Each image becomes one page at one PDF point per oriented pixel. Images use sRGB and omit descriptive metadata; transparent areas appear against the PDF page background.")
         }
@@ -135,6 +135,16 @@ enum PDFCompositionBackend {
         }
     }
     private static func normalizedRotation(_ value: Int) -> Int { ((value % 360) + 360) % 360 }
+    private static func equivalentPageBoxes(_ before: PDFPage, _ after: PDFPage) -> Bool {
+        // PDFKit may translate the media box and content together to (0, 0)
+        // when serializing a copied page. Compare the complete relative geometry.
+        let originalMedia = before.bounds(for: .mediaBox), savedMedia = after.bounds(for: .mediaBox)
+        guard originalMedia.size == savedMedia.size else { return false }
+        return [PDFDisplayBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox].allSatisfy { box in
+            before.bounds(for: box).offsetBy(dx: -originalMedia.minX, dy: -originalMedia.minY)
+                == after.bounds(for: box).offsetBy(dx: -savedMedia.minX, dy: -savedMedia.minY)
+        }
+    }
     private static func verify(_ url: URL, expected: PDFDocument) throws -> Int64 {
         let actual = try DocumentBackend.document(url)
         guard actual.pageCount == expected.pageCount else { throw FileformError(.verificationFailed, "The PDF page count changed during saving.") }
@@ -142,8 +152,7 @@ enum PDFCompositionBackend {
             try Task.checkCancellation()
             guard let before = expected.page(at: index), let after = actual.page(at: index),
                   normalizedRotation(before.rotation) == normalizedRotation(after.rotation),
-                  before.bounds(for: .mediaBox) == after.bounds(for: .mediaBox),
-                  before.bounds(for: .cropBox) == after.bounds(for: .cropBox),
+                  equivalentPageBoxes(before, after),
                   before.string == after.string,
                   let page = after.pageRef else { throw FileformError(.verificationFailed, "Saved PDF pages do not match their planned content, size or orientation.") }
             // Force a bounded decode, instead of accepting parseable page objects only.

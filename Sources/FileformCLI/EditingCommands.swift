@@ -62,29 +62,21 @@ struct PDFMerge: AsyncParsableCommand {
 struct PDFSplit: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "split", abstract: "Publish selected page groups as one complete output folder.")
     @Argument(help: "PDF input file.") var input: String
-    @Option(help: "One-based groups separated by semicolons, e.g. '1-3;4,2;5'. Order and duplicates are retained.") var ranges: String
+    @Option(help: "One-based groups separated by semicolons, e.g. '1-3;4,2;5'. Order and duplicates are retained.") var ranges: String?
+    @Option(help: "Split all pages into groups of this size; mutually exclusive with --ranges.") var every: Int?
     @Option(help: "New output directory.") var output: String
     @Option(help: "Collision policy: fail or rename.") var collision: CollisionPolicy = .fail
     @Flag(help: "Emit a plan without saving.") var dryRun = false
     @Flag(help: "Emit structured errors/results.") var json = false
     mutating func run() async throws {
         do {
-            guard ranges.utf8.count <= 16384 else { throw FileformError(.resourceLimit, "The page selection is too long.") }
-            var totalPages = 0
-            let groups = try ranges.split(separator: ";", omittingEmptySubsequences: false).map { group -> [PageReference] in
-                var pages: [PageReference] = []
-                for part in group.split(separator: ",", omittingEmptySubsequences: false) {
-                    let bounds = part.trimmingCharacters(in: .whitespaces).split(separator: "-", omittingEmptySubsequences: false)
-                    guard (1...2).contains(bounds.count), let start = Int(bounds[0]), start > 0, start <= 1000,
-                          let end = bounds.count == 2 ? Int(bounds[1]) : start, end >= start, end <= 1000 else {
-                        throw FileformError(.invalidRequest, "Use one-based pages or increasing ranges between 1 and 1000.")
-                    }
-                    totalPages += end - start + 1
-                    guard totalPages <= 1000 else { throw FileformError(.resourceLimit, "A split operation accepts at most 1000 selected pages.") }
-                    pages += (start...end).map { .init(sourceID: "source", pageIndex: $0 - 1) }
-                }
-                return pages
-            }
+            guard (ranges != nil) != (every != nil) else { throw FileformError(.invalidRequest, "Choose exactly one of --ranges or --every.") }
+            let engine = makeEngine(nil)
+            let info = try await engine.inspect(URL(fileURLWithPath: input))
+            guard info.family == .pdf, let pageCount = info.pageCount else { throw FileformError(.unsupported, "Use a PDF input.") }
+            let indexes = try ranges.map { try PDFPageSelection.groups(ranges: $0, pageCount: pageCount) }
+                ?? PDFPageSelection.groups(every: every!, pageCount: pageCount)
+            let groups = indexes.map { $0.map { PageReference(sourceID: "source", pageIndex: $0) } }
             let request = try TransformationRequest(assets: [.init(id: "source", url: URL(fileURLWithPath: input))], operation: .pdfSplit(groups: groups),
                 output: .init(destination: URL(fileURLWithPath: output), format: .pdf, cardinality: .directory), collisionPolicy: collision)
             try await executeEditing(request, engine: makeEngine(nil), dryRun: dryRun)

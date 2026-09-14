@@ -62,3 +62,10 @@ Verify using `swift test`, `Tools/smoke-cli.sh`, and
 `pdf.extract-images` adds a heterogeneous `images` directory target with actual JPEG/PNG artifact formats. Optional `pdfImageExtraction` plan/result details and `pdfEmbeddedImage` artifact details preserve counts, source/object/generation provenance, exact encoding outcomes and explicit skips. See [embedded PDF images](PDF-embedded-images.md) for the resource-discovery policy, fidelity and bounds.
 
 `pdf.optimize` adds explicit lossy embedded-image recompression, optional pixel-edge resampling and quality-floor fit through `PDFOptimizationParameters`. It is distinct from the lossless legacy PDF compress/fit conversion route. Optional `pdfOptimization` plan/result/target-miss details report candidate dimensions, retained-image reasons, counts and actual attempted qualities. See [PDF image optimization](PDF-image-optimization.md).
+
+
+## Split ranges and regular groups
+
+`fileform pdf split input.pdf --ranges '2-5;4,2,4' --output parts` creates two PDFs in one atomically published folder, retaining order and repeated pages. `--every 2` instead divides all pages into groups of two, including a final shorter group. Choose exactly one of `--ranges` and `--every`. The shared `PDFPageSelection` parser accepts current one-based page positions and returns zero-based groups; empty groups, invalid/out-of-range positions and more than 1000 selected pages fail before publication.
+
+Native PDF assembly may translate a page's media-box origin to zero while translating its contents and other page boxes together. Verification compares all five boxes relative to the media box, preserving their geometry and rotation. The native writer may also normalize image interpolation hints and color-space representation; PDF assembly is not a strict lossless rewrite. These consequences are included in the plan warnings.

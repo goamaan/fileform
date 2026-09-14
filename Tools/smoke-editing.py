@@ -25,8 +25,13 @@ with tempfile.TemporaryDirectory(prefix='fileform-edit-smoke-') as name:
     split=run('pdf','split',work/'combined.pdf','--ranges','2;1,3','--output',work/'parts','--json')
     assert len(split['artifacts'])==2
     assert [run('inspect',Path(unquote(urlparse(a['url']).path)),'--json')['pageCount'] for a in split['artifacts']]==[1,2]
+    every=run('pdf','split',work/'combined.pdf','--every','2','--output',work/'every-two','--json')
+    assert [run('inspect',Path(unquote(urlparse(a['url']).path)),'--json')['pageCount'] for a in every['artifacts']]==[2,1]
+    for args in [[], ['--every','0'], ['--every','2','--ranges','1-2']]:
+        bad=run('pdf','split',pdf,*args,'--output',work/'bad-mode','--json',status=2)
+        assert bad['code']=='invalid_request' and not (work/'bad-mode').exists()
     invalid=run('pdf','split',pdf,'--ranges','0;1','--output',work/'invalid','--json',status=2)
     assert invalid['code']=='invalid_request' and not (work/'invalid').exists()
     for path,digest in hashes.items(): assert hashlib.sha256(path.read_bytes()).digest()==digest
     assert not list(work.glob('.fileform-*'))
-print('Editing CLI passed: crop geometry, merged page count, atomic split cardinalities, invalid ranges and source hashes.')
+print('Editing CLI passed: crop geometry, merged page count, atomic range/every-N split cardinalities, invalid ranges/modes and source hashes.')
