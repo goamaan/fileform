@@ -412,3 +412,17 @@ checks pass. Independent Pillow comparisons on generated baseline/progressive
 color JPEGs verified oriented dimensions and a maximum two-code-value difference,
 with originals unchanged. Dependency notices cover all 62 components. No extra
 GUI application was opened for this native-only increment.
+
+## EXIF color hints and Electron JPEG import
+
+Added bounded EXIF color-space/interop parsing so profile-less Adobe RGB JPEGs are
+not silently treated as sRGB. Standard R03 and sRGB/R98 are handled, with explicit
+compatibility for ColorSpace 2; ambiguous declarations defer export. Embedded ICC
+retains precedence. Inferred-profile labels distinguish them from actual ICC data.
+
+Forty-five Rust tests, Clippy, Windows-target checks and real image/table/cancel
+process smoke pass. An EXIF Adobe RGB fixture normalized identically to its
+ICC-tagged equivalent; ambiguous metadata produced no output. The shared Electron
+picker now accepts JPEG. Packaged Mac E2E imported an oriented progressive JPEG,
+showed its preview and saved PNG matching CLI bytes and independent Pillow decode
+within two values. One old preview was quit before replacement; one remains open.

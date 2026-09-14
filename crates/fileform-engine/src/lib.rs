@@ -11,6 +11,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+mod exif_color;
 mod image_color;
 mod image_crop;
 mod image_input;
@@ -224,9 +225,15 @@ fn prepare_image(
         if decoded.has_cicp || decoded.has_hdr_metadata || decoded.preservation_pending {
             (None, "extended_color_pending")
         } else if icc_srgb_rgba_sha256.is_some() {
-            (icc_srgb_rgba_sha256.clone(), "icc")
+            (
+                icc_srgb_rgba_sha256.clone(),
+                decoded.color_override.unwrap_or("icc"),
+            )
         } else if decoded.srgb {
-            (Some(oriented_hash.clone()), "srgb")
+            (
+                Some(oriented_hash.clone()),
+                decoded.color_override.unwrap_or("srgb"),
+            )
         } else if decoded.gamma.is_some() || decoded.chromaticities.is_some() {
             let profile = image_color::png_gamma_profile(decoded.gamma, decoded.chromaticities)?;
             image_color::normalize_icc(&mut oriented, &profile, false, cancellation)?;
@@ -242,6 +249,11 @@ fn prepare_image(
         } else {
             (Some(oriented_hash.clone()), "assumed_srgb")
         };
+    let icc_srgb_rgba_sha256 = if decoded.has_icc {
+        icc_srgb_rgba_sha256
+    } else {
+        None
+    };
     source.check(input)?;
     let conversion_available = srgb_rgba_sha256.is_some();
     let inspection = ImageInspection {

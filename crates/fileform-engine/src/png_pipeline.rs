@@ -161,6 +161,7 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
     let pixels = image::RgbaImage::from_raw(width, height, rgba)
         .ok_or_else(|| fail("invalid_image", "PNG pixel buffer is incomplete."))?;
     Ok(DecodedImage {
+        color_override: None,
         preservation_pending: false,
         pixels,
         orientation,

@@ -85,7 +85,7 @@ ipcMain.handle('fileform:choose',async(event)=>{
 ipcMain.handle('fileform:choose-image',async(event)=>{
   authorize(event);
   return exclusive(async()=>{
-    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'PNG images',extensions:['png']}]});
+    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg']}]});
     if(result.canceled||result.filePaths.length!==1)return null;
     const path=await fs.realpath(result.filePaths[0]);
     const info=await worker({operation:'inspect_image',input:path,preview:true});
@@ -101,7 +101,7 @@ ipcMain.handle('fileform:save-image',async(event,id:unknown,options:unknown)=>{
   if(typeof id!=='string'||!images.has(id))throw new Error('Choose the image again.');
   const source=images.get(id)!;
   const {format,background,quality,crop,maxDimension}=validateImageExport(options,source.width,source.height,source.hasAlpha);
-  if(!source.canConvert)throw new Error('This PNG requires color support that is still being implemented.');
+  if(!source.canConvert)throw new Error('This image requires preservation support that is still being implemented.');
   const expected=outputDimensions(crop?.width??source.width,crop?.height??source.height,maxDimension);
   const extension=format==='jpeg'?'jpg':'png';
   return exclusive(async()=>{

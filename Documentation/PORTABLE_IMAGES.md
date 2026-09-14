@@ -286,3 +286,23 @@ and progressive color JPEGs decoded/rotated within two code values of Pillow,
 with unchanged originals. Evidence: jpeg-input-independent.json under
 Artifacts/Verification. The progressive grayscale fixture is generated project
 content; its recipe is recorded beside it. Notices remain complete for 62 components.
+
+## EXIF color declarations and desktop JPEG import
+
+JPEGs without ICC now honor EXIF ColorSpace and InteropIndex: sRGB/R98 and
+uncalibrated+R03 Adobe RGB are recognized. ColorSpace 2 is accepted as a known
+non-standard Adobe RGB compatibility value. Conflicting/unknown declarations and
+EXIF gamma are deferred without ICC; a valid embedded ICC remains authoritative.
+Nested directories, field types/counts, duplicates, bounds and cycles are checked.
+See [ExifTool's primary tag documentation](https://exiftool.org/TagNames/EXIF.html)
+for the standard R03 representation and the non-standard value-2 distinction.
+Inferred Adobe RGB uses the native CMS and is labeled exif_adobe_rgb; it is not
+misreported as an embedded ICC profile.
+
+The Electron picker now accepts PNG/JPEG, showing the same native preview and
+editing controls. A packaged Mac test imported an oriented progressive JPEG and
+exported PNG via native dialogs. Output bytes matched the CLI; Pillow confirmed
+oriented dimensions and at most two channel-value difference from its independent
+JPEG decode. Evidence: electron-image/jpeg-import-ui-verified.json under
+Artifacts/Verification. Unmodeled application metadata, CMYK/YCCK, special coding
+modes and wider real-camera/profile coverage remain preservation/parity work.

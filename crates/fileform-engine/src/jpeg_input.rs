@@ -12,6 +12,7 @@ struct Metadata {
     icc: Option<Vec<u8>>,
     exif: bool,
     pending: bool,
+    color_hint: crate::exif_color::Hint,
 }
 fn byte<R: BufRead>(input: &mut R) -> Result<u8> {
     let mut b = [0];
@@ -30,6 +31,7 @@ fn metadata<R: BufRead + Seek>(input: &mut R) -> Result<Metadata> {
     let mut saw_scan = false;
     let mut orientation = 1;
     let mut exif = false;
+    let mut color_hint = crate::exif_color::Hint::Unspecified;
     let mut pending = false;
     let mut parts = BTreeMap::new();
     let mut expected_parts = None;
@@ -123,6 +125,7 @@ fn metadata<R: BufRead + Seek>(input: &mut R) -> Result<Metadata> {
                 }
                 exif = true;
                 orientation = crate::image_orientation::parse_exif(&data[6..])?;
+                color_hint = crate::exif_color::read(&data[6..])?;
             }
             0xe2 if data.starts_with(b"ICC_PROFILE\0") => {
                 if data.len() < 14 {
@@ -187,10 +190,11 @@ fn metadata<R: BufRead + Seek>(input: &mut R) -> Result<Metadata> {
         icc,
         exif,
         pending,
+        color_hint,
     })
 }
 pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
-    let meta = metadata(&mut input)?;
+    let mut meta = metadata(&mut input)?;
     let options = zune_core::options::DecoderOptions::default()
         .set_strict_mode(true)
         .set_max_width(meta.width as usize)
@@ -223,19 +227,38 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
     let pixels = image::RgbaImage::from_raw(meta.width, meta.height, rgba)
         .ok_or_else(|| fail("invalid_image", "JPEG pixel buffer is incomplete."))?;
     let has_icc = meta.icc.is_some();
+    let mut color_override = None;
+    if !has_icc {
+        match meta.color_hint {
+            crate::exif_color::Hint::AdobeRgb if !meta.gray => {
+                meta.icc = Some(
+                    moxcms::ColorProfile::new_adobe_rgb()
+                        .encode()
+                        .map_err(|e| fail("invalid_image", e.to_string()))?,
+                );
+                color_override = Some("exif_adobe_rgb");
+            }
+            crate::exif_color::Hint::Srgb => color_override = Some("exif_srgb"),
+            crate::exif_color::Hint::Pending | crate::exif_color::Hint::AdobeRgb => {
+                meta.pending = true
+            }
+            _ => (),
+        }
+    }
     Ok(DecodedImage {
+        color_override,
         pixels,
         orientation: meta.orientation,
         has_alpha: false,
         has_icc,
         icc_profile: meta.icc,
         source_gray: meta.gray,
-        srgb: false,
+        srgb: meta.color_hint == crate::exif_color::Hint::Srgb,
         gamma: None,
         chromaticities: None,
         has_cicp: false,
         has_exif: meta.exif,
-        has_color_metadata: has_icc,
+        has_color_metadata: has_icc || meta.color_hint != crate::exif_color::Hint::Unspecified,
         has_hdr_metadata: false,
         preservation_pending: meta.pending,
     })

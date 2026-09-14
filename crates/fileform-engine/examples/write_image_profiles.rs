@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     for (name, profile) in [
         ("srgb", ColorProfile::new_srgb()),
+        ("adobe-rgb", ColorProfile::new_adobe_rgb()),
         ("display-p3", ColorProfile::new_display_p3()),
     ] {
         std::fs::write(directory.join(format!("{name}.icc")), profile.encode()?)?;

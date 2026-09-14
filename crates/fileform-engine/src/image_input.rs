@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pub(crate) struct DecodedImage {
+    pub color_override: Option<&'static str>,
     pub preservation_pending: bool,
     pub pixels: image::RgbaImage,
     pub orientation: u8,

@@ -196,6 +196,33 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     invalid_size=folder/'invalid-size.png'
     invalid_resize=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(invalid_size),'max_dimension':0}),capture_output=True,text=True)
     assert invalid_resize.returncode!=0 and not invalid_size.exists()
+    def without_icc(data):
+        output=data[:2];position=2
+        while position<len(data):
+            if data[position:position+2]==b'\xff\xda': return output+data[position:]
+            size=int.from_bytes(data[position+2:position+4],'big')
+            if data[position+1]!=0xe2: output+=data[position:position+2+size]
+            position+=2+size
+        raise AssertionError('Missing scan')
+    plain_jpeg=without_icc((folder/'white.jpg').read_bytes())
+    def segment(marker,data): return bytes([255,marker])+struct.pack('>H',len(data)+2)+data
+    def exif_color(space,index):
+        return b'Exif\0\0II'+struct.pack('<HIH',42,8,1)+struct.pack('<HHII',0x8769,4,1,26)+struct.pack('<I',0)+struct.pack('<H',2)+struct.pack('<HHIHH',0xa001,3,1,space,0)+struct.pack('<HHII',0xa005,4,1,56)+struct.pack('<I',0)+struct.pack('<HHHI',1,1,2,4)+index+struct.pack('<I',0)
+    inferred=folder/'exif-adobe.jpg'
+    inferred.write_bytes(plain_jpeg[:2]+segment(0xe1,exif_color(65535,b'R03\0'))+plain_jpeg[2:])
+    explicit=folder/'icc-adobe.jpg'
+    explicit.write_bytes(plain_jpeg[:2]+segment(0xe2,b'ICC_PROFILE\0\x01\x01'+(folder/'adobe-rgb.icc').read_bytes())+plain_jpeg[2:])
+    inferred_info=json.loads(subprocess.run([str(cli),'inspect-image',str(inferred)],capture_output=True,text=True,check=True).stdout)
+    explicit_info=json.loads(subprocess.run([str(cli),'inspect-image',str(explicit)],capture_output=True,text=True,check=True).stdout)
+    assert inferred_info['color_interpretation']=='exif_adobe_rgb' and not inferred_info['has_icc']
+    assert inferred_info['srgb_rgba_sha256']==explicit_info['srgb_rgba_sha256']
+    ambiguous=folder/'exif-unknown.jpg'
+    ambiguous.write_bytes(plain_jpeg[:2]+segment(0xe1,exif_color(65535,b'???\0'))+plain_jpeg[2:])
+    ambiguous_info=json.loads(subprocess.run([str(cli),'inspect-image',str(ambiguous)],capture_output=True,text=True,check=True).stdout)
+    assert not ambiguous_info['conversion_available']
+    ambiguous_output=folder/'ambiguous.png'
+    rejected_ambiguous=subprocess.run([str(cli),'convert-image',str(ambiguous),str(ambiguous_output)],capture_output=True,text=True)
+    assert rejected_ambiguous.returncode!=0 and not ambiguous_output.exists()
     rejected = []
     for name, data in [('bad-color-crc', png(2,1,pixels,extra=gamma_chunk[:-1]+bytes([gamma_chunk[-1]^1]))), ('duplicate-gamma', png(2,1,pixels,extra=gamma_chunk+gamma_chunk)), ('zero-gamma', png(2,1,pixels,extra=chunk(b'gAMA',struct.pack('>I',0)))), ('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
@@ -209,5 +236,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')
