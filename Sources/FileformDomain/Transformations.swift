@@ -3,7 +3,7 @@ import Foundation
 
 /// Stable operation identifiers. Declaration does not imply backend availability.
 public enum OperationID: String, Codable, Sendable {
-    case conversion = "file.convert", pdfComposition = "pdf.compose", pdfSplit = "pdf.split", pdfRasterize = "pdf.rasterize", pdfExtractImages = "pdf.extract-images"
+    case conversion = "file.convert", pdfComposition = "pdf.compose", pdfSplit = "pdf.split", pdfRasterize = "pdf.rasterize", pdfExtractImages = "pdf.extract-images", pdfOptimize = "pdf.optimize"
     case mediaTrim = "media.trim", imageCrop = "image.crop", fetch = "link.fetch"
 }
 public enum OutputCardinality: String, Codable, Sendable { case file, directory }
@@ -82,6 +82,7 @@ public enum TransformationOperation: Codable, Equatable, Sendable {
     case pdfComposition(pages: [PageReference])
     /// Each nonempty group is one output PDF; duplicates and order are intentional.
     case pdfSplit(groups: [[PageReference]])
+    case pdfOptimize(parameters: PDFOptimizationParameters)
     case pdfExtractImages(pages: [PageReference])
     case pdfRasterize(pages: [PageReference], dpi: Int, quality: Double)
     case mediaTrim(interval: MediaInterval, mode: TrimMode, audioStream: Int?, muteAudio: Bool = false)
@@ -91,8 +92,8 @@ public enum TransformationOperation: Codable, Equatable, Sendable {
 
     // Decode existing v1 records without a mute field as automatic audio
     // selection. Never reinterpret nil audioStream as permission to drop audio.
-    private enum OperationKey: String, CodingKey { case conversion, pdfComposition, pdfSplit, pdfRasterize, pdfExtractImages, mediaTrim, mediaTrimMuted, imageCrop, fetch }
-    private enum ParameterKey: String, CodingKey { case _0, pages, groups, dpi, quality, interval, mode, audioStream, muteAudio, rectangle, conversion, url, maximumBytes }
+    private enum OperationKey: String, CodingKey { case conversion, pdfComposition, pdfSplit, pdfRasterize, pdfExtractImages, pdfOptimize, mediaTrim, mediaTrimMuted, imageCrop, fetch }
+    private enum ParameterKey: String, CodingKey { case _0, parameters, pages, groups, dpi, quality, interval, mode, audioStream, muteAudio, rectangle, conversion, url, maximumBytes }
     public init(from decoder: Decoder) throws {
         let root = try decoder.container(keyedBy: OperationKey.self)
         guard root.allKeys.count == 1, let key = root.allKeys.first else {
@@ -103,6 +104,7 @@ public enum TransformationOperation: Codable, Equatable, Sendable {
         case .conversion: self = .conversion(try value.decode(ConversionParameters.self, forKey: ._0))
         case .pdfComposition: self = .pdfComposition(pages: try value.decode([PageReference].self, forKey: .pages))
         case .pdfSplit: self = .pdfSplit(groups: try value.decode([[PageReference]].self, forKey: .groups))
+        case .pdfOptimize: self = .pdfOptimize(parameters: try value.decode(PDFOptimizationParameters.self, forKey: .parameters))
         case .pdfExtractImages: self = .pdfExtractImages(pages: try value.decode([PageReference].self, forKey: .pages))
         case .pdfRasterize: self = .pdfRasterize(pages: try value.decode([PageReference].self, forKey: .pages), dpi: try value.decode(Int.self, forKey: .dpi), quality: try value.decode(Double.self, forKey: .quality))
         case .mediaTrim, .mediaTrimMuted:
@@ -135,6 +137,9 @@ public enum TransformationOperation: Codable, Equatable, Sendable {
         case .pdfSplit(let groups):
             var value = root.nestedContainer(keyedBy: ParameterKey.self, forKey: .pdfSplit)
             try value.encode(groups, forKey: .groups)
+        case .pdfOptimize(let parameters):
+            var value = root.nestedContainer(keyedBy: ParameterKey.self, forKey: .pdfOptimize)
+            try value.encode(parameters, forKey: .parameters)
         case .pdfExtractImages(let pages):
             var value = root.nestedContainer(keyedBy: ParameterKey.self, forKey: .pdfExtractImages)
             try value.encode(pages, forKey: .pages)
@@ -163,7 +168,7 @@ public enum TransformationOperation: Codable, Equatable, Sendable {
 
     public var id: OperationID {
         switch self {
-        case .conversion: .conversion; case .pdfComposition: .pdfComposition; case .pdfSplit: .pdfSplit; case .pdfRasterize: .pdfRasterize; case .pdfExtractImages: .pdfExtractImages
+        case .conversion: .conversion; case .pdfComposition: .pdfComposition; case .pdfSplit: .pdfSplit; case .pdfRasterize: .pdfRasterize; case .pdfExtractImages: .pdfExtractImages; case .pdfOptimize: .pdfOptimize
         case .mediaTrim: .mediaTrim; case .imageCrop: .imageCrop; case .fetch: .fetch
         }
     }
@@ -214,6 +219,9 @@ public struct TransformationRequest: Codable, Sendable {
                 throw FileformError(.invalidRequest, "Choose between 1 and 10000 split groups, with at most 100000 pages.")
             }
             for pages in groups { try validatePages(pages) }
+        case .pdfOptimize(let parameters):
+            try singleAsset(); try parameters.validate()
+            guard output.format == .pdf, fidelity == .allowDeclaredLosses else { throw FileformError(.invalidRequest, "Image optimization requires PDF output and declared lossy fidelity.") }
         case .pdfExtractImages(let pages):
             let ids = Set(assets.map(\.id))
             guard !assets.isEmpty, assets.count <= 128, !pages.isEmpty, pages.count <= 1000, output.format == .images,

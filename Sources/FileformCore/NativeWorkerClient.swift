@@ -57,6 +57,22 @@ public struct NativeWorkerClient: Sendable {
         return digest
     }
 
+    func pdfContentFingerprint(_ input: URL) async throws -> String {
+        let operation = WorkerOperation.pdfContentFingerprint(asset: .init(assetID: "source", descriptor: 3))
+        let result = try await perform(input: input, previewDimension: nil, pageIndex: nil, rasterOperation: operation)
+        guard case .pdfFingerprint(let digest) = result.response.payload else { throw FileformError(.verificationFailed, "Invalid PDF content fingerprint.") }
+        return digest
+    }
+    func optimizePDFImage(_ input: URL, destination: URL, width: Int, height: Int, channels: Int, encodedJPEG: Bool,
+                          outputWidth: Int, outputHeight: Int, quality: Double) async throws -> WorkerRasterArtifact {
+        let operation = WorkerOperation.optimizePDFImage(asset: .init(assetID: "source", descriptor: 3), outputDescriptor: 4,
+            width: width, height: height, channels: channels, encodedJPEG: encodedJPEG, outputWidth: outputWidth, outputHeight: outputHeight, quality: quality)
+        let result = try await perform(input: input, previewDimension: nil, pageIndex: nil, rasterOperation: operation, rasterDestination: destination)
+        guard case .pageRaster(let metadata) = result.response.payload, metadata.width == outputWidth, metadata.height == outputHeight,
+              metadata.format == .jpeg, metadata.bytes != nil else { throw FileformError(.verificationFailed, "Invalid optimized image response.") }
+        return metadata
+    }
+
     /// Render full pages through inherited descriptors. A nil destination validates
     /// page geometry without publishing or encoding an image.
     public func rasterPage(_ input: URL, destination: URL? = nil, pageIndex: Int, clockwiseRotation: Int = 0,

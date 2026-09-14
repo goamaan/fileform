@@ -31,7 +31,7 @@ struct ImageCrop: AsyncParsableCommand {
     }
 }
 struct PDFCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "pdf", abstract: "Compose and split PDFs using verified page order.", subcommands: [PDFMerge.self, PDFSplit.self, PDFPages.self, PDFExtractImages.self])
+    static let configuration = CommandConfiguration(commandName: "pdf", abstract: "Compose and split PDFs using verified page order.", subcommands: [PDFMerge.self, PDFSplit.self, PDFPages.self, PDFExtractImages.self, PDFOptimize.self])
 }
 struct PDFMerge: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "merge", abstract: "Combine ordered PDFs and still images into one PDF.")
@@ -196,6 +196,29 @@ struct PDFExtractImages: AsyncParsableCommand {
                     output: .init(destination: destination, format: .images, cardinality: .directory), collisionPolicy: collision)
                 try await performEditing(request, engine: makeEngine(nil, pdfPath: pdfPack), dryRun: dryRun)
             }
+        } catch { try fail(error, json: json) }
+    }
+}
+
+struct PDFOptimize: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "optimize", abstract: "Explicitly recompress supported PDF images as JPEG; retain every page and all text/vector content.")
+    @Argument(help: "PDF source.") var input: String
+    @Option(help: "New PDF output path.") var output: String
+    @Option(help: "JPEG encoder quality, 0.05–1.") var quality: Double = 0.8
+    @Option(help: "Lowest permitted JPEG quality for fit, 0.05–quality.") var minimumQuality: Double = 0.5
+    @Option(help: "Optional longest intrinsic image edge in pixels; no inferred DPI.") var maximumImageDimension: Int?
+    @Option(help: "Fit every page within this exact byte limit, or fail.") var maxBytes: Int64?
+    @Option(help: "Verified PDF engine pack directory.") var pdfPack: String?
+    @Option(help: "Collision policy: fail or rename.") var collision: CollisionPolicy = .fail
+    @Flag(help: "Validate and emit a plan without publishing an output.") var dryRun = false
+    @Flag(help: "Emit structured errors/results.") var json = false
+    mutating func run() async throws {
+        do {
+            let parameters = PDFOptimizationParameters(goal: maxBytes == nil ? .compress : .fit, quality: quality,
+                minimumQuality: minimumQuality, maximumImageDimension: maximumImageDimension, maximumBytes: maxBytes)
+            let request = try TransformationRequest(assets: [.init(id: "source", url: URL(fileURLWithPath: input))],
+                operation: .pdfOptimize(parameters: parameters), output: .init(destination: URL(fileURLWithPath: output), format: .pdf), collisionPolicy: collision)
+            try await executeEditing(request, engine: makeEngine(nil, pdfPath: pdfPack), dryRun: dryRun)
         } catch { try fail(error, json: json) }
     }
 }

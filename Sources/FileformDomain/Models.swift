@@ -183,7 +183,10 @@ public struct FileformError: Error, Codable, Sendable, LocalizedError {
     }
     public let code: Code
     public let message: String
-    public init(_ code: Code, _ message: String) { self.code = code; self.message = message }
+    public let pdfOptimization: PDFOptimizationDetails?
+    public init(_ code: Code, _ message: String, pdfOptimization: PDFOptimizationDetails? = nil) {
+        self.code = code; self.message = message; self.pdfOptimization = pdfOptimization
+    }
     public var errorDescription: String? { message }
     public var exitCode: Int32 {
         switch code {

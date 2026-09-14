@@ -77,7 +77,7 @@ enum PDFStructuralFingerprint {
         }
         return result
     }
-    static func compute(_ input: URL) throws -> String {
+    static func compute(_ input: URL, includeRenderedPixels: Bool = true) throws -> String {
         let pdf = try DocumentBackend.document(input)
         guard let cg = CGPDFDocument(input as CFURL), !cg.isEncrypted, let catalog = cg.catalog else {
             throw FileformError(.unsupported, "Encrypted or unreadable PDF.")
@@ -123,6 +123,7 @@ enum PDFStructuralFingerprint {
                     for i in 0..<CGPDFArrayGetCount(array) { var item: CGPDFObjectRef?; guard CGPDFArrayGetObject(array, i, &item), let item else { throw FileformError(.unsupported, "Invalid PDF content.") }; try streamBytes(item) }
                 } else { try streamBytes(contents) }
             }
+            if !includeRenderedPixels { continue }
             let bounds = ref.getBoxRect(.mediaBox)
             let scale = min(2.0, 2048 / max(bounds.width, bounds.height))
             let width = max(1, Int(ceil(bounds.width * scale))), height = max(1, Int(ceil(bounds.height * scale)))

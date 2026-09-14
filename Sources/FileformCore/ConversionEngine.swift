@@ -18,6 +18,10 @@ public actor ConversionEngine {
         return PDFOptimizationBackend(pack: try PDFPack(directory: pdfPackURL), worker: try nativeWorker())
     }
 
+    func pdfLossyOptimizationBackend() throws -> PDFLossyOptimizationBackend {
+        let backend = try pdfBackend()
+        return PDFLossyOptimizationBackend(pack: backend.pack, worker: backend.worker)
+    }
     func pdfImageExtractionBackend() throws -> PDFImageExtractionBackend {
         guard let pdfPackURL else { throw FileformError(.engineUnavailable, "Install the PDF engine pack to extract embedded images.") }
         return PDFImageExtractionBackend(pack: try PDFPack(directory: pdfPackURL), worker: try nativeWorker())
@@ -128,6 +132,11 @@ public actor ConversionEngine {
             }
         }
         if inspection == nil || inspection?.family == .pdf {
+            let optimizer = try? pdfLossyOptimizationBackend()
+            let optimization = Capability(format: .pdf, goals: [.compress, .fit], engine: "pdf-image-optimize", available: optimizer != nil,
+                limitation: "Explicit lossy JPEG recompression, optional intrinsic pixel-edge resampling, bounded quality floor. Unsupported images retained with reasons. Plain PDFs only; all pages retained or target unmet.")
+            routes.append(.init(id: "pdf.optimize:qpdf:pdf", inputFamilies: [.pdf], capability: optimization,
+                backendVersion: optimizer?.pack.version, verification: "Exact expected reachable object/stream graph, isolated JPEG decode and geometry, independent page text/content/boxes/rotation and Info/XMP; atomic publication.", operationID: .pdfOptimize))
             let backend = try? pdfImageExtractionBackend()
             let capability = Capability(format: .images, goals: [.convert], engine: "pdf-images", available: backend != nil,
                 limitation: "Resource-referenced images only, including nested Forms. Eligible original JPEG or 8-bit DeviceRGB/Gray PNG with supported soft masks; explicit skips, no page rendering. Up to 1000 unique images and 512 MiB cumulative decoded/output bytes.")

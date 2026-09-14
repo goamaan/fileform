@@ -11,12 +11,14 @@ public struct TransformationPlan: Codable, Sendable {
     public let request: TransformationRequest
     public let inputs: [InspectedAsset]
     public let warnings: [String]
+    public let pdfOptimization: PDFOptimizationDetails?
     public let pdfImageExtraction: PDFImageExtractionDetails?
     public let mediaTrim: MediaTrimDetails?
     public let fetchSource: FetchSourceSnapshot?
-    public init(request: TransformationRequest, inputs: [InspectedAsset], warnings: [String], mediaTrim: MediaTrimDetails? = nil, fetchSource: FetchSourceSnapshot? = nil, pdfImageExtraction: PDFImageExtractionDetails? = nil) {
+    public init(request: TransformationRequest, inputs: [InspectedAsset], warnings: [String], mediaTrim: MediaTrimDetails? = nil, fetchSource: FetchSourceSnapshot? = nil, pdfImageExtraction: PDFImageExtractionDetails? = nil, pdfOptimization: PDFOptimizationDetails? = nil) {
         schemaVersion = 1; self.request = request; self.inputs = inputs; self.warnings = warnings
         self.pdfImageExtraction = pdfImageExtraction
+        self.pdfOptimization = pdfOptimization
         self.mediaTrim = mediaTrim; self.fetchSource = fetchSource
     }
 }
@@ -38,14 +40,16 @@ public struct TransformationResult: Codable, Sendable {
     public let artifacts: [CommittedArtifact]
     public let warnings: [String]
     public let attempts: Int
+    public let pdfOptimization: PDFOptimizationDetails?
     public let pdfImageExtraction: PDFImageExtractionDetails?
     public let mediaTrim: MediaTrimDetails?
     public let fetchReceipt: FetchReceipt?
     public init(operationID: OperationID, status: ResultStatus, artifacts: [CommittedArtifact], warnings: [String], attempts: Int,
-                mediaTrim: MediaTrimDetails? = nil, fetchReceipt: FetchReceipt? = nil, pdfImageExtraction: PDFImageExtractionDetails? = nil) {
+                mediaTrim: MediaTrimDetails? = nil, fetchReceipt: FetchReceipt? = nil, pdfImageExtraction: PDFImageExtractionDetails? = nil, pdfOptimization: PDFOptimizationDetails? = nil) {
         schemaVersion = 1; self.operationID = operationID; self.status = status
         self.artifacts = artifacts; self.warnings = warnings; self.attempts = attempts
         self.pdfImageExtraction = pdfImageExtraction
+        self.pdfOptimization = pdfOptimization
         self.mediaTrim = mediaTrim; self.fetchReceipt = fetchReceipt
     }
 }

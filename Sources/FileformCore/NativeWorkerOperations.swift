@@ -31,7 +31,7 @@ public enum NativeWorkerOperations {
     private static func perform(_ operation: WorkerOperation) throws -> WorkerResponsePayload {
         let asset: WorkerAssetHandle
         switch operation {
-        case .embeddedImage(let value, _, _, _, _, _, _), .inspect(let value), .pdfFingerprint(let value), .preview(let value, _, _, _), .pageRaster(let value, _, _, _, _, _, _): asset = value
+        case .optimizePDFImage(let value, _, _, _, _, _, _, _, _), .pdfContentFingerprint(let value), .embeddedImage(let value, _, _, _, _, _, _), .inspect(let value), .pdfFingerprint(let value), .preview(let value, _, _, _), .pageRaster(let value, _, _, _, _, _, _): asset = value
         case .handshake: throw WorkerProtocolError.invalidRequest
         }
         let before = try sourceIdentity(asset.descriptor)
@@ -52,6 +52,16 @@ public enum NativeWorkerOperations {
             try writePreview(encoded, to: output, expectedBytes: bytes)
             guard try sourceIdentity(asset.descriptor) == before else { _ = ftruncate(output, 0); throw FileformError(.inputChanged, "Source changed.") }
             return .pageRaster(.init(bytes: bytes, width: width, height: height, format: jpeg ? .jpeg : .png))
+        }
+        if case .optimizePDFImage(_, let output, let width, let height, let channels, let jpeg, let outputWidth, let outputHeight, let quality) = operation {
+            try validateOutput(output, source: before)
+            let encoded = directory.appendingPathComponent("optimized.jpg")
+            try PDFLossyImageEncoder.encode(input, destination: encoded, width: width, height: height, channels: channels, encodedJPEG: jpeg, outputWidth: outputWidth, outputHeight: outputHeight, quality: quality)
+            let bytes = try FileSafety.identity(encoded).bytes
+            guard bytes <= maximumInputBytes, try sourceIdentity(asset.descriptor) == before else { throw FileformError(.inputChanged, "Source changed or output exceeded limits.") }
+            try writePreview(encoded, to: output, expectedBytes: bytes)
+            guard try sourceIdentity(asset.descriptor) == before else { _ = ftruncate(output, 0); throw FileformError(.inputChanged, "Source changed.") }
+            return .pageRaster(.init(bytes: bytes, width: outputWidth, height: outputHeight, format: .jpeg))
         }
         let inspection: Inspection
         if DocumentBackend.recognizesPDF(input) { inspection = try DocumentBackend.inspect(input, identity: before) }
@@ -118,6 +128,8 @@ public enum NativeWorkerOperations {
             try writePreview(encoded, to: descriptor, expectedBytes: bytes)
             guard try sourceIdentity(asset.descriptor) == before else { _ = ftruncate(descriptor, 0); throw FileformError(.inputChanged, "Source changed.") }
             return .pageRaster(.init(bytes: bytes, width: width, height: height, format: format))
+        case .pdfContentFingerprint:
+            return .pdfFingerprint(try PDFStructuralFingerprint.compute(input, includeRenderedPixels: false))
         case .pdfFingerprint:
             return .pdfFingerprint(try PDFStructuralFingerprint.compute(input))
         case .inspect:
@@ -170,7 +182,7 @@ public enum NativeWorkerOperations {
                 throw FileformError(.inputChanged, "Source changed.")
             }
             return .preview(.init(bytes: bytes, width: image.width, height: image.height))
-        case .embeddedImage, .handshake: throw WorkerProtocolError.invalidRequest
+        case .optimizePDFImage, .embeddedImage, .handshake: throw WorkerProtocolError.invalidRequest
         }
     }
 

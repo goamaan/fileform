@@ -60,3 +60,5 @@ Verify using `swift test`, `Tools/smoke-cli.sh`, and
 `python3 Tools/smoke-transformations.py` after building the CLI.
 
 `pdf.extract-images` adds a heterogeneous `images` directory target with actual JPEG/PNG artifact formats. Optional `pdfImageExtraction` plan/result details and `pdfEmbeddedImage` artifact details preserve counts, source/object/generation provenance, exact encoding outcomes and explicit skips. See [embedded PDF images](PDF-embedded-images.md) for the resource-discovery policy, fidelity and bounds.
+
+`pdf.optimize` adds explicit lossy embedded-image recompression, optional pixel-edge resampling and quality-floor fit through `PDFOptimizationParameters`. It is distinct from the lossless legacy PDF compress/fit conversion route. Optional `pdfOptimization` plan/result/target-miss details report candidate dimensions, retained-image reasons, counts and actual attempted qualities. See [PDF image optimization](PDF-image-optimization.md).

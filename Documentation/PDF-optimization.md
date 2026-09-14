@@ -1,5 +1,7 @@
 # PDF structural optimization
 
+For explicit lossy image recompression/resampling and a quality floor, use the separate [PDF image optimization operation](PDF-image-optimization.md). The defaults below remain lossless.
+
 The `qpdf` route supports PDF `compress` and `fit` using a verified PDF engine pack and an isolated native worker. It retains every page. It does not rasterize the document, resize images or introduce lossy JPEG encoding. A fit attempt may fail with `targetUnmet`; compression returns `notSmaller` without publishing when the candidate is not smaller.
 
 Configure `ConversionEngine(mediaPack:pdfPack:workerExecutable:)`; all arguments are optional. The PDF pack uses `manifest.json` schema 1, ID `app.fileform.pdf`, a version string and `executables.qpdf` containing the SHA-256 of `bin/qpdf`. Pack integrity is checked again at execution. The worker defaults to `FILEFORM_WORKER_PATH` or a sibling `fileform-worker`. Apps should pass their bundled helper explicitly.

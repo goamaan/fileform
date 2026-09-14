@@ -64,3 +64,5 @@ The separate proprietary Fileform app adds native interaction, visual workflows,
 See [architecture](Documentation/Architecture.md), [dependency policy](Documentation/Dependencies.md), [contribution guidance](CONTRIBUTING.md), [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party components retain their own licenses; the core license does not grant rights to proprietary GUI or brand assets.
 
 Direct media URLs can be looked up and saved through the shared verified fetch adapter. See [direct fetch](Documentation/Direct-fetch.md) for CLI syntax, source binding, limits and network behavior. Web-page extraction and service coverage are separate capabilities.
+
+PDF image recompression is an explicit operation: `fileform pdf optimize input.pdf --output smaller.pdf --quality 0.8 --minimum-quality 0.5 --maximum-image-dimension 1920 --pdf-pack ./Artifacts/PDFPack --json`. Add `--max-bytes` for quality-floor fit. Existing PDF `compress` and `fit` stay lossless by default. See [PDF image optimization](Documentation/PDF-image-optimization.md) for supported images, preservation proof, skips and bounds.
