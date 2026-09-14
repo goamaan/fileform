@@ -146,11 +146,25 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     noise = bytes(channel for y in range(64) for x in range(64) for channel in [((x*73+y*29)%256),((x*17+y*97)%256),((x*y*13)%256),255])
     noise_source.write_bytes(png(64,64,noise))
     quality_sizes = {}
-    for quality in [20,95]:
+    for quality in [20,35,95]:
         target = folder / f'quality-{quality}.jpg'
         subprocess.run([str(cli),'convert-image',str(noise_source),str(target),'--quality',str(quality),'--background','white'],capture_output=True,text=True,check=True)
         quality_sizes[str(quality)] = target.stat().st_size
     assert quality_sizes['20'] < quality_sizes['95']
+    fit_limit=(quality_sizes['20']+quality_sizes['95'])//2
+    fitted=folder/'fitted.jpg'
+    fit_receipt=json.loads(subprocess.run([str(cli),'convert-image',str(noise_source),str(fitted),'--quality','95','--minimum-quality','20','--max-bytes',str(fit_limit),'--background','white'],capture_output=True,text=True,check=True).stdout)
+    assert fitted.stat().st_size<=fit_limit and 20<=fit_receipt['quality']<95 and 1<fit_receipt['attempts']<=11
+    failed_dir=folder/'failed-fit';failed_dir.mkdir()
+    impossible=failed_dir/'impossible.jpg'
+    cannot_fit=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(noise_source),'output':str(impossible),'background':'white','quality':95,'minimum_quality':95,'max_bytes':quality_sizes['35']+16}),capture_output=True,text=True)
+    assert cannot_fit.returncode!=0 and json.loads(cannot_fit.stdout)['error']['code']=='target_unmet'
+    assert not list(failed_dir.iterdir())
+    assert noise_source.read_bytes()==png(64,64,noise)
+    lossless_fail=failed_dir/'impossible.png'
+    cannot_fit_png=subprocess.run([str(cli),'convert-image',str(source),str(lossless_fail),'--max-bytes','1'],capture_output=True,text=True)
+    assert cannot_fit_png.returncode!=0 and not list(failed_dir.iterdir())
+
     for quality in [0,101,-1,1.5,'invalid']:
         target = folder / 'invalid-quality.jpg'
         failure = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(target),'background':'white','quality':quality}),capture_output=True,text=True)
@@ -249,5 +263,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'verifiedTIFFExport':True,'TIFFInputRoundTrip':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'verifiedTIFFExport':True,'TIFFInputRoundTrip':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'exifAdobeMatchesICC':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'byteFit':{'limit':fit_limit,'bytes':fitted.stat().st_size,'quality':fit_receipt['quality'],'attempts':fit_receipt['attempts']},'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

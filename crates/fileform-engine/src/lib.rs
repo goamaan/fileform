@@ -14,6 +14,7 @@ use tempfile::NamedTempFile;
 mod exif_color;
 mod image_color;
 mod image_crop;
+mod image_fit;
 mod image_input;
 mod image_resize;
 mod jpeg_input;
@@ -83,6 +84,8 @@ pub enum Request {
         quality: Option<u8>,
         crop: Option<PixelCrop>,
         max_dimension: Option<u32>,
+        max_bytes: Option<u64>,
+        minimum_quality: Option<u8>,
         expected_source_sha256: Option<String>,
     },
     InspectImage {
@@ -173,6 +176,8 @@ pub struct ImageInspection {
 #[derive(Debug, Serialize)]
 pub struct ImageReceipt {
     pub output: PathBuf,
+    pub attempts: u32,
+    pub quality: Option<u8>,
     pub bytes: u64,
     pub sha256: String,
     pub width: u32,
@@ -290,6 +295,8 @@ struct ImageOptions {
     quality: Option<u8>,
     crop: Option<PixelCrop>,
     max_dimension: Option<u32>,
+    max_bytes: Option<u64>,
+    minimum_quality: Option<u8>,
 }
 fn convert_image(
     input: &Path,
@@ -303,6 +310,8 @@ fn convert_image(
         quality,
         crop,
         max_dimension,
+        max_bytes,
+        minimum_quality,
     } = options;
     if max_dimension == Some(0) {
         return Err(fail(
@@ -339,6 +348,7 @@ fn convert_image(
             "Quality and background options apply to JPEG output.",
         ));
     }
+    let qualities = image_fit::qualities(quality.unwrap_or(85), minimum_quality, max_bytes, jpeg)?;
     if output.try_exists()? {
         return Err(fail(
             "collision",
@@ -379,101 +389,109 @@ fn convert_image(
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
     let directory = same_file::Handle::from_path(parent)?;
-    let mut temporary = NamedTempFile::new_in(parent)?;
-    let mut jpeg_profile = None;
-    let mut tiff_profile = None;
-    {
-        let mut writer = LimitedWriter {
-            inner: io::BufWriter::new(temporary.as_file_mut()),
-            cancellation: cancellation.clone(),
-            bytes: 0,
-            maximum_bytes: 512 * 1024 * 1024,
-        };
-        if jpeg {
-            jpeg_profile = Some(jpeg_output::encode(
-                &mut writer,
-                &pixels,
-                background.unwrap_or(Background::White),
-                quality.unwrap_or(85),
-                cancellation,
-            )?);
-        } else if output_kind == "tiff" {
-            tiff_profile = Some(tiff_output::encode(&mut writer, &pixels, cancellation)?);
-        } else {
-            let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
-            let mut writer = encoder
-                .write_header()
-                .map_err(|e| fail("encoding", e.to_string()))?;
-            writer
-                .write_image_data(pixels.as_raw())
-                .map_err(|e| fail("encoding", e.to_string()))?;
-            writer
-                .finish()
-                .map_err(|e| fail("encoding", e.to_string()))?;
-        }
-    }
-    cancellation.check()?;
-    temporary.as_file_mut().seek(SeekFrom::Start(0))?;
-    if let Some(profile) = jpeg_profile {
-        jpeg_output::verify(
-            io::BufReader::new(CancellableReader {
-                inner: temporary.as_file_mut(),
+    for (attempt, candidate_quality) in qualities.into_iter().enumerate() {
+        let mut temporary = NamedTempFile::new_in(parent)?;
+        let mut jpeg_profile = None;
+        let mut tiff_profile = None;
+        {
+            let mut writer = LimitedWriter {
+                inner: io::BufWriter::new(temporary.as_file_mut()),
                 cancellation: cancellation.clone(),
-            }),
-            pixels.width(),
-            pixels.height(),
-            &profile,
-            cancellation,
-        )?;
-    } else if let Some(profile) = tiff_profile {
-        tiff_output::verify(
-            CancellableReader {
-                inner: temporary.as_file_mut(),
-                cancellation: cancellation.clone(),
-            },
-            &pixels,
-            &profile,
-            cancellation,
-        )?;
-    } else {
-        let checked = png_pipeline::decode(io::BufReader::new(CancellableReader {
-            inner: temporary.as_file_mut(),
-            cancellation: cancellation.clone(),
-        }))?;
-        if checked.pixels != pixels || !checked.srgb || checked.orientation != 1 {
-            return Err(fail(
-                "verification",
-                "Saved PNG pixels or color metadata differ from the rendered image.",
-            ));
-        }
-    }
-    let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, 512 * 1024 * 1024)?;
-    source.check(input)?;
-    if directory != same_file::Handle::from_path(parent)? {
-        return Err(fail("output_changed", "The output folder changed."));
-    }
-    temporary.as_file().sync_all()?;
-    cancellation.check()?;
-    temporary.persist_noclobber(output).map_err(|e| {
-        fail(
-            if e.error.kind() == io::ErrorKind::AlreadyExists {
-                "collision"
+                bytes: 0,
+                maximum_bytes: 512 * 1024 * 1024,
+            };
+            if jpeg {
+                jpeg_profile = Some(jpeg_output::encode(
+                    &mut writer,
+                    &pixels,
+                    background.unwrap_or(Background::White),
+                    candidate_quality,
+                    cancellation,
+                )?);
+            } else if output_kind == "tiff" {
+                tiff_profile = Some(tiff_output::encode(&mut writer, &pixels, cancellation)?);
             } else {
-                "io"
-            },
-            e.error.to_string(),
-        )
-    })?;
-    Ok(Response::SavedImage(ImageReceipt {
-        output: output.to_path_buf(),
-        bytes,
-        sha256,
-        width: pixels.width(),
-        height: pixels.height(),
-    }))
+                let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
+                encoder.set_color(png::ColorType::Rgba);
+                encoder.set_depth(png::BitDepth::Eight);
+                encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+                let mut writer = encoder
+                    .write_header()
+                    .map_err(|e| fail("encoding", e.to_string()))?;
+                writer
+                    .write_image_data(pixels.as_raw())
+                    .map_err(|e| fail("encoding", e.to_string()))?;
+                writer
+                    .finish()
+                    .map_err(|e| fail("encoding", e.to_string()))?;
+            }
+        }
+        cancellation.check()?;
+        temporary.as_file_mut().seek(SeekFrom::Start(0))?;
+        if let Some(profile) = jpeg_profile {
+            jpeg_output::verify(
+                io::BufReader::new(CancellableReader {
+                    inner: temporary.as_file_mut(),
+                    cancellation: cancellation.clone(),
+                }),
+                pixels.width(),
+                pixels.height(),
+                &profile,
+                cancellation,
+            )?;
+        } else if let Some(profile) = tiff_profile {
+            tiff_output::verify(
+                CancellableReader {
+                    inner: temporary.as_file_mut(),
+                    cancellation: cancellation.clone(),
+                },
+                &pixels,
+                &profile,
+                cancellation,
+            )?;
+        } else {
+            let checked = png_pipeline::decode(io::BufReader::new(CancellableReader {
+                inner: temporary.as_file_mut(),
+                cancellation: cancellation.clone(),
+            }))?;
+            if checked.pixels != pixels || !checked.srgb || checked.orientation != 1 {
+                return Err(fail(
+                    "verification",
+                    "Saved PNG pixels or color metadata differ from the rendered image.",
+                ));
+            }
+        }
+        let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, 512 * 1024 * 1024)?;
+        if max_bytes.is_some_and(|limit| bytes > limit) {
+            continue;
+        }
+        source.check(input)?;
+        if directory != same_file::Handle::from_path(parent)? {
+            return Err(fail("output_changed", "The output folder changed."));
+        }
+        temporary.as_file().sync_all()?;
+        cancellation.check()?;
+        temporary.persist_noclobber(output).map_err(|e| {
+            fail(
+                if e.error.kind() == io::ErrorKind::AlreadyExists {
+                    "collision"
+                } else {
+                    "io"
+                },
+                e.error.to_string(),
+            )
+        })?;
+        return Ok(Response::SavedImage(ImageReceipt {
+            attempts: (attempt + 1) as u32,
+            quality: jpeg.then_some(candidate_quality),
+            output: output.to_path_buf(),
+            bytes,
+            sha256,
+            width: pixels.width(),
+            height: pixels.height(),
+        }));
+    }
+    Err(fail("target_unmet","The complete image could not fit the byte limit within the chosen quality floor. No output was saved."))
 }
 
 fn delimiter(path: &Path) -> Result<Option<u8>> {
@@ -701,6 +719,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         quality,
         crop,
         max_dimension,
+        max_bytes,
+        minimum_quality,
     } = &request
     {
         return convert_image(
@@ -713,6 +733,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
                 quality: *quality,
                 crop: *crop,
                 max_dimension: *max_dimension,
+                max_bytes: *max_bytes,
+                minimum_quality: *minimum_quality,
             },
         );
     }

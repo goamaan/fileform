@@ -25,7 +25,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
@@ -56,6 +56,8 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
     let mut quality = None;
     let mut crop = None;
     let mut max_dimension = None;
+    let mut max_bytes = None;
+    let mut minimum_quality = None;
     for option in options.as_chunks::<2>().0 {
         match option[0].to_str() {
             Some("--background") if background.is_none() => {
@@ -64,6 +66,24 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
                     Some("black") => Background::Black,
                     _ => return Err("Background must be white or black."),
                 })
+            }
+            Some("--max-bytes") if max_bytes.is_none() => {
+                max_bytes = Some(
+                    option[1]
+                        .to_str()
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .filter(|v| *v > 0)
+                        .ok_or("Byte limit must be a positive integer.")?,
+                )
+            }
+            Some("--minimum-quality") if minimum_quality.is_none() => {
+                minimum_quality = Some(
+                    option[1]
+                        .to_str()
+                        .and_then(|s| s.parse::<u8>().ok())
+                        .filter(|v| (1..=100).contains(v))
+                        .ok_or("Minimum quality must be from 1 to 100.")?,
+                )
             }
             Some("--max-dimension") if max_dimension.is_none() => {
                 max_dimension = Some(
@@ -111,6 +131,8 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
         quality,
         crop,
         max_dimension,
+        max_bytes,
+        minimum_quality,
         expected_source_sha256: None,
     })
 }

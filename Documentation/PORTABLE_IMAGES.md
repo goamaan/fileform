@@ -44,7 +44,7 @@ full-size float intermediate. It is not pixel-identical ImageIO resampling.
 
 JPEG transparency requires white/black background selection. Quality/background
 options on PNG/TIFF and unknown/repeated/malformed options are rejected. Target
-byte-size fitting remains unfinished.
+byte-size fitting is available in the native CLI/worker; desktop controls are pending.
 
 ## Color and metadata
 
@@ -115,3 +115,27 @@ portable-images.json, tiff-input-independent.json and electron-image/*-verified.
 Packaged Mac acceptance covers import, previews, editing and native-dialog saves.
 Latest TIFF acceptance reopened Fileform's own TIFF and exported PNG with exact
 independently decoded RGBA. Interactive Windows acceptance remains pending.
+
+## Native byte-size fitting
+
+`--max-bytes` checks the complete encoded file, including color metadata. JPEG
+tries at most eleven descending integer quality levels from the requested quality
+to `--minimum-quality`, inclusive. The default floor is 35, capped by a lower
+explicit starting quality. It selects the first verified candidate that fits;
+this is a bounded sampled search, not a claim of globally optimal JPEG quality.
+PNG/TIFF make one lossless attempt. Dimensions only change when crop/resize was
+explicitly requested; fitting never silently shrinks them.
+
+```sh
+target/release/fileform-native convert-image photo.jpg small.jpg --quality 95 --minimum-quality 35 --max-bytes 1000000
+```
+
+The receipt reports actual JPEG quality and attempt count. A missed target saves
+nothing and removes staging files. Limits are 1 byte–512 MiB; minimum quality
+requires JPEG and a byte limit. A real fixture fit 5,812 bytes under a 6,630-byte
+cap at quality 72 in four attempts. A 3,000-byte test reached quality 20 in eleven
+attempts and was independently decoded with Pillow. A stricter floor correctly
+prevented publication even though a lower-quality version would fit.
+Desktop fit controls, compression-if-smaller behavior and broader format parity
+remain unfinished. Evidence: portable-images.json and image-fit-independent.json
+under Artifacts/Verification.

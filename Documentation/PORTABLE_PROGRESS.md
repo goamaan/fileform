@@ -455,3 +455,17 @@ The packaged Mac app reopened its own TIFF, previewed it and exported PNG matchi
 the original TIFF's RGBA exactly. The image guide was rewritten as a current support
 reference; historical implementation evidence remains here and in Git history.
 Only one preview build remains open. Broader TIFF variants and release work remain.
+
+## Native target-byte fitting
+
+Ported the reference workflow's bounded quality search: at most eleven tested
+JPEG levels including the floor, with complete-file byte checks. PNG/TIFF use one
+lossless candidate. Each failed candidate is discarded; target failure publishes
+nothing. No dimensions change implicitly. Receipts include quality and attempts.
+
+Fifty-three Rust tests, Clippy, Windows-target checks and process smoke pass.
+A 6,630-byte target produced 5,812 bytes at quality 72 after four attempts. A tighter
+3,000-byte target reached quality 20 after eleven attempts and decoded independently
+with Pillow. Quality-floor and impossible-lossless tests left no output/staging.
+TIFF input CI run 34901453290 passed Windows and macOS. Desktop fitting controls
+remain next work; no additional GUI preview was opened for this native increment.
