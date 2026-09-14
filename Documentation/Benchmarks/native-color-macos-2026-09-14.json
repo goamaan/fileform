@@ -1,0 +1,52 @@
+{
+  "platform": "macOS-26.2-arm64-arm-64bit",
+  "scope": "Four opaque PNG fixtures; not complete image/color parity",
+  "decoder": "Pillow 11.3.0",
+  "tolerance": 2,
+  "profileSHA256": {
+    "srgb": "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e",
+    "display-p3": "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0"
+  },
+  "cases": [
+    {
+      "case": "srgb",
+      "dimensions": [
+        2,
+        1
+      ],
+      "maximumChannelDifference": 0,
+      "alphaMatches": true
+    },
+    {
+      "case": "display-p3",
+      "dimensions": [
+        2,
+        1
+      ],
+      "maximumChannelDifference": 0,
+      "alphaMatches": true
+    },
+    {
+      "case": "linear-gamma",
+      "dimensions": [
+        2,
+        1
+      ],
+      "maximumChannelDifference": 0,
+      "alphaMatches": true
+    },
+    {
+      "case": "orientation-6",
+      "dimensions": [
+        3,
+        2
+      ],
+      "maximumChannelDifference": 0,
+      "alphaMatches": true
+    }
+  ],
+  "binaries": {
+    "swift": "1a0502b911ed592b7645b56d2e8df8de9b0988a234b6babd154ddea10dce1e9c",
+    "rust": "a24965df7e497e504f2aa9a6c431fd4cacc4df2585ec6365d35e2d7a70c2b8c7"
+  }
+}

@@ -1,12 +1,13 @@
 # Portable image pipeline
 
-Status: native PNG inspection and orientation are implemented. Portable image
-conversion/export and Electron image controls are not yet available.
+Status: native PNG inspection, orientation, color normalization and verified PNG
+export are implemented. JPEG/TIFF output and Electron image controls are pending.
 
 Build with `cargo build --release --workspace`, then run:
 
 ```sh
 target/release/fileform-native inspect-image photo.png
+target/release/fileform-native convert-image photo.png normalized.png
 ```
 
 Windows uses `target/release/fileform-native.exe`. The internal worker accepts
@@ -14,8 +15,9 @@ Windows uses `target/release/fileform-native.exe`. The internal worker accepts
 same inspection in its versioned response envelope.
 
 The receipt distinguishes raw width/height and decoded RGBA checksum from
-orientation-adjusted display dimensions and oriented RGBA checksum. No file is
-saved or original changed. Pixel hashes are before color normalization.
+orientation-adjusted display dimensions and oriented RGBA checksum. Inspection does not save a file. Conversion creates a new PNG and never replaces
+the original. Raw/oriented hashes precede color normalization; the sRGB hash
+identifies normalized pixels.
 
 PNG decoding checks the complete IEND record, frame completion, an 80-million-pixel
 limit and a 512 MiB source limit. Animation and 16-bit input are rejected. Metadata
@@ -59,7 +61,8 @@ malformed profiles and cancellation. Real CLI tests embed generated standard ICC
 profiles in PNG files and check their receipts and unchanged source bytes.
 Gamma/chromaticity-only PNG color, metadata precedence/conflicts, HDR/gain maps,
 comparison against the native Apple renderer and output profile embedding remain
-release requirements. `conversion_available` therefore remains false.
+release requirements. `conversion_available` is true for the implemented PNG rendering path and false
+for extended-color inputs still awaiting preservation support.
 
 ## PNG gamma, chromaticity and metadata validation
 
@@ -83,3 +86,28 @@ precedence, extended-color deferral, zero-gamma rejection, metadata CRC rejectio
 and duplicate rejection. Unit tests check Display P3 chromaticity conversion,
 invalid gamma and degenerate primaries. These extend the shared Windows/macOS
 worker checks; they do not complete image export or all color-space parity.
+
+## Verified PNG export and native comparison
+
+`convert-image INPUT.png OUTPUT.png` uses the same render stages as inspection,
+writes an eight-bit RGBA PNG marked sRGB with stale EXIF removed, then reopens it
+and compares every pixel, dimensions and normalized orientation before saving.
+Output is capped at 512 MiB. Source rechecks, cancellation, directory-identity
+checks and no-clobber publication apply. The worker also accepts convert_image
+with optional expected_source_sha256 to reject changed inspected inputs.
+
+Tools/smoke-images.py verifies actual CLI/worker exports, all eight orientations,
+exact alpha/pixels, stale-source rejection, collisions and invalid-input denial.
+Tools/compare-image-colors.py additionally compares exported PNGs with the Swift
+reference on macOS, using Pillow for independent output decoding. Four opaque
+fixtures (Apple sRGB, Apple Display P3, linear gamma and orientation 6) matched
+exactly in this run; the declared comparison tolerance is two code values.
+[Evidence](Benchmarks/native-color-macos-2026-09-14.json) records binary/profile
+hashes. Apple profile files are read from the OS and are not copied into Git.
+
+An initial synthetic moxcms-generated P3 profile was ignored by the Apple path,
+while the Rust transform matched the independent P3 matrix calculation. That
+fixture compatibility discrepancy is retained as a limitation; standard Apple
+profiles establish the native comparison above, not universal ICC equivalence.
+Additional real profiles, transparency rounding, gamut edges, CICP/HDR and other
+input/output formats remain parity work.

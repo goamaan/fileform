@@ -65,6 +65,11 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ConvertImage {
+        input: PathBuf,
+        output: PathBuf,
+        expected_source_sha256: Option<String>,
+    },
     InspectImage {
         input: PathBuf,
     },
@@ -121,6 +126,7 @@ pub struct Receipt {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
     ImageInspection(ImageInspection),
+    SavedImage(ImageReceipt),
     Inspection(Inspection),
     Saved(Receipt),
 }
@@ -146,7 +152,22 @@ pub struct ImageInspection {
     pub color_interpretation: String,
     pub conversion_available: bool,
 }
+#[derive(Debug, Serialize)]
+pub struct ImageReceipt {
+    pub output: PathBuf,
+    pub bytes: u64,
+    pub sha256: String,
+    pub width: u32,
+    pub height: u32,
+}
 fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
+    let (_, inspection, _) = prepare_png(input, cancellation)?;
+    Ok(Response::ImageInspection(inspection))
+}
+fn prepare_png(
+    input: &Path,
+    cancellation: &Cancellation,
+) -> Result<(Source, ImageInspection, image::RgbaImage)> {
     let mut source = Source::open_with_limit(input, cancellation.clone(), 512 * 1024 * 1024)?;
     let decoded = png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?;
     cancellation.check()?;
@@ -197,7 +218,8 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         (Some(oriented_hash.clone()), "assumed_srgb")
     };
     source.check(input)?;
-    Ok(Response::ImageInspection(ImageInspection {
+    let conversion_available = srgb_rgba_sha256.is_some();
+    let inspection = ImageInspection {
         sha256: source.hash.clone(),
         bytes: source.input.metadata()?.len(),
         width,
@@ -215,7 +237,104 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         has_color_metadata: decoded.has_color_metadata,
         has_hdr_metadata: decoded.has_hdr_metadata,
         decoded_rgba_sha256: decoded_hash,
-        conversion_available: false,
+        conversion_available,
+    };
+    Ok((source, inspection, oriented))
+}
+
+fn convert_png(
+    input: &Path,
+    output: &Path,
+    expected_hash: Option<&str>,
+    cancellation: &Cancellation,
+) -> Result<Response> {
+    if !output
+        .extension()
+        .is_some_and(|s| s.eq_ignore_ascii_case("png"))
+    {
+        return Err(fail("invalid_output", "Choose a .png output filename."));
+    }
+    if output.try_exists()? {
+        return Err(fail(
+            "collision",
+            "The output already exists. Choose another filename.",
+        ));
+    }
+    let (mut source, inspection, pixels) = prepare_png(input, cancellation)?;
+    if !inspection.conversion_available {
+        return Err(fail(
+            "unsupported",
+            "This image requires an extended-color preservation workflow.",
+        ));
+    }
+    if expected_hash.is_some_and(|hash| hash != source.hash) {
+        return Err(fail(
+            "source_changed",
+            "The inspected image changed. Add it again.",
+        ));
+    }
+    let parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let directory = same_file::Handle::from_path(parent)?;
+    let mut temporary = NamedTempFile::new_in(parent)?;
+    {
+        let writer = LimitedWriter {
+            inner: io::BufWriter::new(temporary.as_file_mut()),
+            cancellation: cancellation.clone(),
+            bytes: 0,
+            maximum_bytes: 512 * 1024 * 1024,
+        };
+        let mut encoder = png::Encoder::new(writer, pixels.width(), pixels.height());
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_source_srgb(png::SrgbRenderingIntent::Perceptual);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e| fail("encoding", e.to_string()))?;
+        writer
+            .write_image_data(pixels.as_raw())
+            .map_err(|e| fail("encoding", e.to_string()))?;
+        writer
+            .finish()
+            .map_err(|e| fail("encoding", e.to_string()))?;
+    }
+    cancellation.check()?;
+    temporary.as_file_mut().seek(SeekFrom::Start(0))?;
+    let checked = png_pipeline::decode(io::BufReader::new(CancellableReader {
+        inner: temporary.as_file_mut(),
+        cancellation: cancellation.clone(),
+    }))?;
+    if checked.pixels != pixels || !checked.srgb || checked.orientation != 1 {
+        return Err(fail(
+            "verification",
+            "Saved PNG pixels or color metadata differ from the rendered image.",
+        ));
+    }
+    let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, 512 * 1024 * 1024)?;
+    source.check(input)?;
+    if directory != same_file::Handle::from_path(parent)? {
+        return Err(fail("output_changed", "The output folder changed."));
+    }
+    temporary.as_file().sync_all()?;
+    cancellation.check()?;
+    temporary.persist_noclobber(output).map_err(|e| {
+        fail(
+            if e.error.kind() == io::ErrorKind::AlreadyExists {
+                "collision"
+            } else {
+                "io"
+            },
+            e.error.to_string(),
+        )
+    })?;
+    Ok(Response::SavedImage(ImageReceipt {
+        output: output.to_path_buf(),
+        bytes,
+        sha256,
+        width: pixels.width(),
+        height: pixels.height(),
     }))
 }
 
@@ -392,14 +511,15 @@ struct LimitedWriter<W> {
     cancellation: Cancellation,
     inner: W,
     bytes: u64,
+    maximum_bytes: u64,
 }
 impl<W: Write> Write for LimitedWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if self.cancellation.is_cancelled() {
             return Err(io::Error::other("Cancelled"));
         }
-        if self.bytes + bytes.len() as u64 > MAX_OUTPUT {
-            return Err(io::Error::other("Table output exceeds 128 MiB."));
+        if self.bytes + bytes.len() as u64 > self.maximum_bytes {
+            return Err(io::Error::other("Output exceeds its size limit."));
         }
         let n = self.inner.write(bytes)?;
         self.bytes += n as u64;
@@ -422,18 +542,34 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::ConvertImage {
+        input,
+        output,
+        expected_source_sha256,
+    } = &request
+    {
+        return convert_png(
+            input,
+            output,
+            expected_source_sha256.as_deref(),
+            cancellation,
+        );
+    }
     if let Request::InspectImage { input } = &request {
         return inspect_png(input, cancellation);
     }
     let input = match &request {
-        Request::InspectImage { input }
+        Request::ConvertImage { input, .. }
+        | Request::InspectImage { input }
         | Request::Inspect { input }
         | Request::ConvertTable { input, .. } => input,
     };
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::InspectImage { .. } => unreachable!("handled above"),
+        Request::ConvertImage { .. } | Request::InspectImage { .. } => {
+            unreachable!("handled above")
+        }
         Request::Inspect { input } => {
             let mut reader = source.reader(separator)?;
             let columns = headers(&mut reader)?;
@@ -516,6 +652,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             let mut rows = 0;
             {
                 let mut writer = LimitedWriter {
+                    maximum_bytes: MAX_OUTPUT,
                     cancellation: cancellation.clone(),
                     inner: io::BufWriter::new(temporary.as_file_mut()),
                     bytes: 0,

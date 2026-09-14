@@ -5,6 +5,11 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output] if command == "convert-image" => Request::ConvertImage {
+            input: PathBuf::from(input),
+            output: PathBuf::from(output),
+            expected_source_sha256: None,
+        },
         [command, input] if command == "inspect-image" => Request::InspectImage {
             input: PathBuf::from(input),
         },
@@ -18,7 +23,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.png | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

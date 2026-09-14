@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     result = subprocess.run([str(cli), 'inspect-image', str(source)], capture_output=True, text=True, check=True)
     info = json.loads(result.stdout)
     assert info['kind'] == 'image_inspection' and info['width'] == 2 and info['height'] == 1
-    assert info['has_alpha'] and not info['conversion_available']
+    assert info['has_alpha'] and info['conversion_available']
     assert info['decoded_rgba_sha256'] == hashlib.sha256(pixels).hexdigest()
     request = json.dumps({'operation':'inspect_image', 'input':str(source)})
     reply = subprocess.run([str(worker)], input=request, capture_output=True, text=True, check=True)
@@ -85,15 +85,41 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
             assert checked['srgb_rgba_sha256'] == hashlib.sha256(gamma_pixels).hexdigest()
         else:
             assert checked['srgb_rgba_sha256'] is None and checked['icc_srgb_rgba_sha256'] is None
+    exported = folder / 'exported.png'
+    receipt = json.loads(subprocess.run([str(cli),'convert-image',str(source),str(exported)],capture_output=True,text=True,check=True).stdout)
+    assert receipt['kind'] == 'saved_image'
+    saved_info = json.loads(subprocess.run([str(cli),'inspect-image',str(exported)],capture_output=True,text=True,check=True).stdout)
+    assert saved_info['decoded_rgba_sha256'] == hashlib.sha256(pixels).hexdigest()
+    assert saved_info['orientation'] == 1 and saved_info['color_interpretation'] == 'srgb'
+    before = exported.read_bytes()
+    worker_output = folder / 'worker-export.png'
+    reply = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(worker_output),'expected_source_sha256':info['sha256']}),capture_output=True,text=True,check=True)
+    assert json.loads(reply.stdout)['ok'] and worker_output.read_bytes() == before
+    collision = subprocess.run([str(cli),'convert-image',str(source),str(exported)],capture_output=True,text=True)
+    assert collision.returncode != 0 and exported.read_bytes() == before
+    stale_output = folder / 'stale.png'
+    stale = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(stale_output),'expected_source_sha256':'0'*64}),capture_output=True,text=True)
+    assert stale.returncode != 0 and not stale_output.exists()
+    for orientation in range(1,9):
+        oriented_input = folder / f'orientation-{orientation}.png'
+        oriented_output = folder / f'export-{orientation}.png'
+        subprocess.run([str(cli),'convert-image',str(oriented_input),str(oriented_output)],capture_output=True,text=True,check=True)
+        saved = json.loads(subprocess.run([str(cli),'inspect-image',str(oriented_output)],capture_output=True,text=True,check=True).stdout)
+        expected_pixels = b''.join(bytes([n,0,0,n]) for n in layouts[orientation-1].encode())
+        assert saved['decoded_rgba_sha256'] == hashlib.sha256(expected_pixels).hexdigest()
+        assert saved['orientation'] == 1
     rejected = []
     for name, data in [('bad-color-crc', png(2,1,pixels,extra=gamma_chunk[:-1]+bytes([gamma_chunk[-1]^1]))), ('duplicate-gamma', png(2,1,pixels,extra=gamma_chunk+gamma_chunk)), ('zero-gamma', png(2,1,pixels,extra=chunk(b'gAMA',struct.pack('>I',0)))), ('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
         path.write_bytes(data)
         failure = subprocess.run([str(cli), 'inspect-image', str(path)], capture_output=True, text=True)
         assert failure.returncode != 0, name
+        denied_output = folder / (name + '-denied.png')
+        denied = subprocess.run([str(cli),'convert-image',str(path),str(denied_output)],capture_output=True,text=True)
+        assert denied.returncode != 0 and not denied_output.exists()
         rejected.append(name)
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'scope':'PNG pixel inspection only; no portable image export yet'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

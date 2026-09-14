@@ -257,3 +257,19 @@ Windows and macOS. The gamma/preflight increment needs its own platform CI.
 The user reconfirmed one shared Electron/React and native Rust stack for both
 platforms. The Swift app remains a migration reference, not a separate final
 macOS product. Full parity and release delivery remain the active objective.
+
+## Verified native PNG export
+
+Implemented convert-image in the Rust CLI and worker: normalize orientation/color,
+write a bounded sRGB PNG, reopen and compare all pixels, recheck the source, and
+publish without clobbering. Inspection reports availability for this implemented
+PNG path; extended-color inputs remain unavailable. The Electron app is still
+awaiting image controls, and JPEG/TIFF, crop/resize/fit remain required.
+
+Thirty existing Rust tests and Clippy pass. Expanded independent process tests
+verify successful CLI/worker export agreement, all eight oriented pixel layouts,
+alpha, collisions, stale source and invalid-image denial. Table/cancellation smoke
+and Windows-target checking pass. A macOS comparison using standard Apple ICC
+profiles and Pillow output decoding matched all channels exactly for four opaque
+fixtures; limitations and the synthetic-profile discrepancy are recorded in
+PORTABLE_IMAGES.md and the retained comparison JSON.
