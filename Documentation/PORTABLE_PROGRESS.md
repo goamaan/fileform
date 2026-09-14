@@ -387,3 +387,13 @@ rejected zero, demonstrated no-upscale prediction, combined square cropping with
 an eight-pixel limit, and saved an 8×8 PNG through the native dialog. Its bytes
 matched an independent CLI execution; Pillow confirmed dimensions/alpha/sRGB and
 the source stayed unchanged. Only one replacement preview app was left running.
+
+## Verification routing
+
+Confirmed full Swift-reference matrix 34894538829 passed both macOS 14 and 26.
+Separated Rust-only smoke triggers from reference Tools triggers to prevent
+unrelated edits superseding long pack builds. Added shipped LICENSE/NOTICE to
+both package workflows and a routing/coverage check in both matrices. All build,
+test, E2E and packaging stages remain; manual full verification is required for
+a release candidate. Local routing validation passed 17 change classes and all
+directly invoked Tools scripts. See CI_VERIFICATION.md for scope and limitations.
