@@ -10,6 +10,7 @@ app.setName('Fileform Preview');
 app.setAppUserModelId('app.fileform.DesktopPreview');
 let window:BrowserWindow|null=null;
 let busy=false;
+let cancelCurrent:(()=>void)|null=null;
 let mode:Appearance='system';
 const children=new Set<ChildProcess>();
 const sources=new Map<string,SourceFile & {path:string;sha256:string}>();
@@ -35,12 +36,20 @@ function worker(request:unknown):Promise<any> {
     children.add(child);
     const chunks:Buffer[]=[]; let bytes=0; let stopped=false;
     let hardStop:NodeJS.Timeout|undefined;
-    const timer=setTimeout(()=>{stopped=true;child.kill();hardStop=setTimeout(()=>child.kill('SIGKILL'),2000);},45_000);
+    let cancellationRequested=false;
+    const cancel=()=>{
+      if(cancellationRequested)return;
+      cancellationRequested=true;
+      child.stdin.end('cancel\n');
+      hardStop=setTimeout(()=>{stopped=true;child.kill('SIGKILL');},2000);
+    };
+    cancelCurrent=cancel;
+    const timer=setTimeout(cancel,45_000);
     child.stdout.on('data',(data:Buffer)=>{bytes+=data.length;if(bytes>1_048_576){stopped=true;child.kill();}else chunks.push(data);});
     child.stderr.resume();
-    child.on('error',()=>{clearTimeout(timer);clearTimeout(hardStop);children.delete(child);reject(new Error('The native worker could not start.'));});
+    child.on('error',()=>{clearTimeout(timer);clearTimeout(hardStop);children.delete(child);if(cancelCurrent===cancel)cancelCurrent=null;reject(new Error('The native worker could not start.'));});
     child.on('close',(code)=>{
-      clearTimeout(timer);clearTimeout(hardStop);children.delete(child);
+      clearTimeout(timer);clearTimeout(hardStop);children.delete(child);if(cancelCurrent===cancel)cancelCurrent=null;
       if(stopped){reject(new Error('The worker stopped before returning a receipt. Check the selected output folder.'));return;}
       try {
         const response=JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -50,9 +59,10 @@ function worker(request:unknown):Promise<any> {
       } catch(error){reject(error instanceof Error?error:new Error('Invalid worker response.'));}
     });
     child.stdin.on('error',()=>{});
-    child.stdin.end(JSON.stringify(request));
+    child.stdin.write(JSON.stringify(request)+'\n');
   });
 }
+ipcMain.handle('fileform:cancel',(event)=>{authorize(event);cancelCurrent?.();});
 const count=(x:unknown):x is number=>Number.isSafeInteger(x) && Number(x)>=0;
 ipcMain.handle('fileform:choose',async(event)=>{
   authorize(event);

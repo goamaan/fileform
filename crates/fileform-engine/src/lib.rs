@@ -19,6 +19,36 @@ pub const MAX_INPUT: u64 = 8 * 1024 * 1024;
 const MAX_OUTPUT: u64 = 128 * 1024 * 1024;
 const MAX_ROWS: u64 = 100_000;
 
+#[derive(Clone, Default)]
+pub struct Cancellation(std::sync::Arc<std::sync::atomic::AtomicBool>);
+impl Cancellation {
+    pub fn cancel(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::Release);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::Acquire)
+    }
+    fn check(&self) -> Result<()> {
+        if self.is_cancelled() {
+            Err(fail("cancelled", "Cancelled. No new output was saved."))
+        } else {
+            Ok(())
+        }
+    }
+}
+struct CancellableReader<R> {
+    inner: R,
+    cancellation: Cancellation,
+}
+impl<R: Read> Read for CancellableReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        if self.cancellation.is_cancelled() {
+            return Err(io::Error::other("Cancelled"));
+        }
+        self.inner.read(buffer)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
@@ -94,12 +124,13 @@ fn delimiter(path: &Path) -> Result<Option<u8>> {
         )),
     }
 }
-fn digest(file: &mut File) -> Result<(u64, String)> {
+fn digest(file: &mut File, cancellation: &Cancellation) -> Result<(u64, String)> {
     file.seek(SeekFrom::Start(0))?;
     let mut hash = Sha256::new();
     let mut bytes = 0;
     let mut buffer = [0u8; 65536];
     loop {
+        cancellation.check()?;
         let n = file.read(&mut buffer)?;
         if n == 0 {
             break;
@@ -119,13 +150,19 @@ fn digest(file: &mut File) -> Result<(u64, String)> {
     ))
 }
 struct Source {
+    cancellation: Cancellation,
     input: File,
     snapshot: NamedTempFile,
     identity: same_file::Handle,
     hash: String,
 }
 impl Source {
+    #[cfg(test)]
     fn open(path: &Path) -> Result<Self> {
+        Self::open_cancellable(path, Cancellation::default())
+    }
+    fn open_cancellable(path: &Path, cancellation: Cancellation) -> Result<Self> {
+        cancellation.check()?;
         let mut input = File::open(path)?;
         let metadata = input.metadata()?;
         if !metadata.is_file() {
@@ -136,12 +173,19 @@ impl Source {
         }
         let identity = same_file::Handle::from_file(input.try_clone()?)?;
         let mut snapshot = NamedTempFile::new()?;
-        let copied = io::copy(&mut (&mut input).take(MAX_INPUT + 1), &mut snapshot)?;
+        let copied = io::copy(
+            &mut CancellableReader {
+                inner: (&mut input).take(MAX_INPUT + 1),
+                cancellation: cancellation.clone(),
+            },
+            &mut snapshot,
+        )?;
         if copied > MAX_INPUT {
             return Err(fail("limit", "Table grew beyond 8 MiB."));
         }
-        let (_, hash) = digest(snapshot.as_file_mut())?;
+        let (_, hash) = digest(snapshot.as_file_mut(), &cancellation)?;
         let mut source = Self {
+            cancellation,
             input,
             snapshot,
             identity,
@@ -152,7 +196,8 @@ impl Source {
     }
     fn check(&mut self, path: &Path) -> Result<()> {
         let identity = same_file::Handle::from_path(path)?;
-        if self.identity != identity || digest(&mut self.input)?.1 != self.hash {
+        if self.identity != identity || digest(&mut self.input, &self.cancellation)?.1 != self.hash
+        {
             return Err(fail(
                 "source_changed",
                 "The source changed. Add the file again.",
@@ -160,16 +205,18 @@ impl Source {
         }
         Ok(())
     }
-    fn reader(&mut self, delimiter: Option<u8>) -> Result<InputReader<&mut File>> {
+    fn reader(
+        &mut self,
+        delimiter: Option<u8>,
+    ) -> Result<InputReader<CancellableReader<&mut File>>> {
         self.snapshot.as_file_mut().seek(SeekFrom::Start(0))?;
+        let input = CancellableReader {
+            inner: self.snapshot.as_file_mut(),
+            cancellation: self.cancellation.clone(),
+        };
         match delimiter {
-            Some(separator) => Ok(InputReader::Delimited(TableReader::new(
-                self.snapshot.as_file_mut(),
-                separator,
-            )?)),
-            None => Ok(InputReader::Json(JsonTableReader::new(
-                self.snapshot.as_file_mut(),
-            )?)),
+            Some(separator) => Ok(InputReader::Delimited(TableReader::new(input, separator)?)),
+            None => Ok(InputReader::Json(JsonTableReader::new(input)?)),
         }
     }
 }
@@ -207,11 +254,15 @@ fn check_record(record: &[String], rows: u64) -> Result<()> {
     Ok(())
 }
 struct LimitedWriter<W> {
+    cancellation: Cancellation,
     inner: W,
     bytes: u64,
 }
 impl<W: Write> Write for LimitedWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.cancellation.is_cancelled() {
+            return Err(io::Error::other("Cancelled"));
+        }
         if self.bytes + bytes.len() as u64 > MAX_OUTPUT {
             return Err(io::Error::other("Table output exceeds 128 MiB."));
         }
@@ -225,11 +276,22 @@ impl<W: Write> Write for LimitedWriter<W> {
 }
 
 pub fn execute(request: Request) -> Result<Response> {
+    execute_with_cancellation(request, Cancellation::default())
+}
+pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -> Result<Response> {
+    let result = execute_inner(request, &cancellation);
+    if result.is_err() && cancellation.is_cancelled() {
+        cancellation.check()?;
+    }
+    result
+}
+fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
+    cancellation.check()?;
     let input = match &request {
         Request::Inspect { input } | Request::ConvertTable { input, .. } => input,
     };
     let separator = delimiter(input)?;
-    let mut source = Source::open(input)?;
+    let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
         Request::Inspect { input } => {
             let mut reader = source.reader(separator)?;
@@ -313,6 +375,7 @@ pub fn execute(request: Request) -> Result<Response> {
             let mut rows = 0;
             {
                 let mut writer = LimitedWriter {
+                    cancellation: cancellation.clone(),
                     inner: io::BufWriter::new(temporary.as_file_mut()),
                     bytes: 0,
                 };
@@ -355,12 +418,13 @@ pub fn execute(request: Request) -> Result<Response> {
             } else {
                 verify_table(&mut source, separator, temporary.as_file_mut(), rows)?;
             }
-            let (bytes, sha256) = digest(temporary.as_file_mut())?;
+            let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation)?;
             source.check(&input)?;
             if directory != same_file::Handle::from_path(parent)? {
                 return Err(fail("output_changed", "The output folder changed."));
             }
             temporary.as_file().sync_all()?;
+            cancellation.check()?;
             temporary.persist_noclobber(&output).map_err(|e| {
                 fail(
                     if e.error.kind() == io::ErrorKind::AlreadyExists {
@@ -446,7 +510,7 @@ fn verify_table(
 ) -> Result<()> {
     use serde::de::{self, SeqAccess, Visitor};
     struct Rows<'a> {
-        reader: InputReader<&'a mut File>,
+        reader: InputReader<CancellableReader<&'a mut File>>,
         columns: Vec<String>,
         expected: u64,
     }

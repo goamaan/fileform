@@ -124,3 +124,29 @@ The previous output-format CI run 34886459428 passed both Windows and macOS,
 including the expanded delimited process smoke and Electron installers. The new
 JSON changes require their own Windows CI run. Full app parity, process
 cancellation, performance comparison, signing and secure updates remain open.
+
+## Cooperative cancellation
+
+The engine accepts a shared cancellation token and checks it during snapshot
+copying, input reads, output writes, digest verification and before final
+publication. A cancelled operation unwinds normally, removing its owned snapshot
+and staging files. Cancellation after publication does not revoke a saved file;
+a successful receipt remains authoritative in that race.
+
+The internal worker accepts one compact JSON request line (EOF-terminated requests
+remain supported) and an optional following `cancel` line. Electron keeps stdin
+open, exposes a Cancel action, and uses cooperative cancellation at its 45-second
+limit before a two-second forced-stop fallback. The fallback still reports an
+uncertain outcome; cleanup after a hard kill and future codec process trees remain
+release work. The standalone CLI remains usable without this control channel.
+
+Evidence: all 15 Rust tests, Clippy, Windows-target checking and normal process
+smoke pass. Tools/smoke-cancellation.py starts a real large-table worker, waits
+until output staging exists, sends cancellation, and verifies a cancelled reply,
+no output, no staging or snapshot files, and unchanged source bytes. This check is
+now in both platform CI jobs and retained as portable-cancellation.json.
+The packaged Mac app also completed a normal native-dialog conversion using the
+new open stdin transport, independently verified against the original CSV. Manual
+click-timing acceptance of Cancel itself is not yet recorded.
+
+Flat-JSON CI run 34887093942 passed both Windows and macOS before this change.
