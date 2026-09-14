@@ -1,0 +1,93 @@
+name: Fileform
+options:
+  bundleIdPrefix: app.fileform
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "26.2"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_DEBUG_DYLIB: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  FileformCore:
+    path: ../..
+targets:
+  Fileform:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/FileformApp
+      - path: DesignSystem/Fonts
+        type: folder
+        buildPhase: resources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
+    dependencies:
+      - sdk: AVKit.framework
+        link: true
+      - package: FileformCore
+        product: FileformCore
+      - package: FileformCore
+        product: FileformDomain
+    info:
+      path: Configuration/Info.plist
+      properties:
+        CFBundleDisplayName: Fileform
+        CFBundleName: Fileform
+        CFBundleIdentifier: app.fileform.Fileform
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: Copyright © 2026 Amaan Gokak. All rights reserved.
+        NSHighResolutionCapable: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Convertible files
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.image
+              - public.movie
+              - public.audio
+              - com.adobe.pdf
+              - public.comma-separated-values-text
+              - public.tab-separated-values-text
+              - public.json
+    entitlements:
+      path: Configuration/Fileform.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.fileform.Fileform
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  FileformTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/FileformTests
+    dependencies:
+      - target: Fileform
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.fileform.FileformTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Fileform:
+    build:
+      targets:
+        Fileform: all
+    test:
+      targets:
+        - FileformTests

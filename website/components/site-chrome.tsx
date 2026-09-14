@@ -1,0 +1,10 @@
+const links = [{href:'/#what',label:'What it does'},{href:'/#how',label:'How it works'},{href:'/#direct',label:'Direct edits'},{href:'/#cli',label:'Free CLI'}];
+export function SiteHeader() {
+  return <><a className="skip-link" href="#main-content">Skip to content</a><header className="v2-header"><div className="header-inner wrap"><a className="v2-wordmark" href="/" aria-label="Fileform home"><span aria-hidden="true"/>Fileform</a><nav className="desktop-nav" aria-label="Main navigation">{links.map(link=><a key={link.href} href={link.href}>{link.label}</a>)}</nav><span className="platform-note">macOS</span><a className="header-get" href="/#get-fileform">Get Fileform</a><details className="mobile-nav"><summary>Menu</summary><nav aria-label="Mobile navigation">{links.map(link=><a key={link.href} href={link.href}>{link.label}</a>)}<a href="/formats">Formats</a></nav></details></div></header></>;
+}
+export function SiteFooter() {
+  return <footer className="v2-footer wrap"><div><a className="v2-wordmark" href="/"><span aria-hidden="true"/>Fileform</a></div><nav aria-label="Product"><strong>PRODUCT</strong><a href="/#what">What it does</a><a href="/formats">Formats</a><a href="/download">Get Fileform</a><a href="/releases">Release status</a></nav><nav aria-label="Open source"><strong>OPEN SOURCE</strong><a href="https://github.com/goamaan/fileform-core">fileform-core</a><a href="/docs">CLI docs</a><a href="/licences">Licences &amp; notices</a></nav><nav aria-label="Legal and contact"><strong>LEGAL</strong><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav><small>© 2026 Fileform</small></footer>;
+}
+export function DocumentPage({eyebrow,title,intro,children}:{eyebrow:string;title:string;intro:string;children:React.ReactNode}) {
+  return <><SiteHeader/><main id="main-content" className="document-page wrap"><div className="document-heading">{eyebrow.startsWith("LAST UPDATED") && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1><p>{intro}</p></div><article className="document-content">{children}</article></main><SiteFooter/></>;
+}

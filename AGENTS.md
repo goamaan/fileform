@@ -1,9 +1,28 @@
-# Open-source boundary
+# Fileform
 
-This is the public Apache-2.0 engine/CLI repository. Never add private app code, commercial plans, billing integration, proprietary artwork, signing credentials or customer data.
+Fileform is one completely free, open-source project for macOS and Windows.
+The user's September 14, 2026 decisions supersede all private/paid-app plans.
+No Polar, checkout, trial, activation, entitlement or device-limit work is allowed.
 
-Keep conversion, planning, queue/cancellation, verification, preview generation, pack management, local OCR and provider adapters usable from the open CLI. No GUI-only engine improvements, entitlement checks, SwiftUI imports or implicit cloud fallback in the shared core. Shared file-permission and credential primitives may live here; GUI consent presentation belongs in the app, with equivalent explicit CLI policies.
+Read Documentation/USER_REQUIREMENTS.md and Documentation/CROSS_PLATFORM.md.
+Electron + React is the user-selected desktop stack; Tauri was rejected.
+Preserve the existing Swift engine/CLI and macOS app as tested references while
+porting to the selected cross-platform architecture. Do not remove capabilities
+or claim parity without real evidence. Keep shared processing independent of UI.
 
-Only claim routes verified with the actual engine build. Preserve originals and finalize only verified outputs without clobbering existing files. Treat files as untrusted. Record dependency versions, build flags, licenses and distribution requirements before adding binaries.
+Use safe Rust for new portable control/engine code where appropriate. Heavy
+processing belongs in bounded native workers/tools, not the web renderer. Preserve
+originals, validate outputs, prevent clobbers, bound resources, and cancel process
+trees correctly on both operating systems. Treat input files as untrusted.
 
-Read Documentation/Architecture.md and Documentation/Dependencies.md before changing module or distribution boundaries. Scale verification to the change; run `swift test` and `Tools/smoke-cli.sh`; media verification requires `Tools/build-media-pack.sh`.
+Original source uses Apache-2.0; retain dependency notices. Never import private
+history, secrets, local test artifacts, account data or design handoff archives.
+Use reviewed source snapshots for repository consolidation.
+
+The website follows Vicinae-inspired minimalism with Fileform's own teal identity,
+copy and real screenshots. Keep downloads, docs and contribution paths obvious.
+
+Test end-to-end on macOS. Produce Windows builds and run Windows CI/tests where
+possible; distinguish build success, automated tests and manual GUI acceptance.
+Keep signed downloads and secure updates in scope. Commit verified increments
+on main. New feature breadth follows release stabilization, not the reverse.

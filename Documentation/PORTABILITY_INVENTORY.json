@@ -1,0 +1,148 @@
+{
+  "date": "2026-09-14",
+  "status": "source audit; not Windows compatibility proof",
+  "files": [
+    {
+      "file": "Sources/FileformWorker/WorkerCommand.swift",
+      "importsToReview": [
+        "Darwin"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFPack.swift",
+      "importsToReview": [
+        "CryptoKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/ProcessRunner.swift",
+      "importsToReview": [
+        "Darwin"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/DocumentBackend.swift",
+      "importsToReview": [
+        "AppKit",
+        "PDFKit",
+        "Vision",
+        "CoreGraphics"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/DirectFetchBackend.swift",
+      "importsToReview": [
+        "CryptoKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFEmbeddedImageEncoder.swift",
+      "importsToReview": [
+        "CoreGraphics",
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/ImageTransformationBackend.swift",
+      "importsToReview": [
+        "CoreGraphics"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/NativeWorkerClient.swift",
+      "importsToReview": [
+        "Darwin"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/DirectHTTPClient.swift",
+      "importsToReview": [
+        "CryptoKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFStructuralFingerprint.swift",
+      "importsToReview": [
+        "CoreGraphics",
+        "PDFKit",
+        "CryptoKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/MediaPack.swift",
+      "importsToReview": [
+        "CryptoKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFOptimizationGraphProof.swift",
+      "importsToReview": [
+        "CryptoKit",
+        "CoreFoundation"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/ImageBackend.swift",
+      "importsToReview": [
+        "CoreGraphics",
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFImageGraph.swift",
+      "importsToReview": [
+        "CoreFoundation"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/MediaPreviewService.swift",
+      "importsToReview": [
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFRasterBackend.swift",
+      "importsToReview": [
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFLossyImageEncoder.swift",
+      "importsToReview": [
+        "CoreGraphics",
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/FileSafety.swift",
+      "importsToReview": [
+        "Darwin"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/NativeWorkerOperations.swift",
+      "importsToReview": [
+        "AppKit",
+        "Darwin",
+        "CoreGraphics",
+        "ImageIO",
+        "PDFKit"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/Thumbnails.swift",
+      "importsToReview": [
+        "ImageIO"
+      ]
+    },
+    {
+      "file": "Sources/FileformCore/PDFCompositionBackend.swift",
+      "importsToReview": [
+        "AppKit",
+        "PDFKit",
+        "CoreGraphics",
+        "Darwin"
+      ]
+    }
+  ]
+}

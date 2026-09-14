@@ -1,0 +1,723 @@
+{
+  "engineVersion" : "0.1.0-dev",
+  "platformVersion" : "Version 26.2 (Build 25C56)",
+  "routes" : [
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:imageio:jpeg",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "SDR still images; quality can change.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "jpeg",
+      "verification" : "Reopen container, dimensions and alpha; check byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:imageio:png",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "Lossless output may be larger. Fit-size can be infeasible.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "png",
+      "verification" : "Reopen container, dimensions and alpha; check byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:imageio:tiff",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "Lossless output may be larger. Fit-size can be infeasible.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "tiff",
+      "verification" : "Reopen container, dimensions and alpha; check byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:mp4",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Single-track SDR media; extra metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "mp4",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:mov",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Single-track SDR media; extra metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "mov",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:m4a",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Single-track SDR media; extra metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "m4a",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:wav",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Single-track SDR media; extra metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "wav",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:flac",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Single-track SDR media; extra metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "flac",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:ffmpeg:mp3",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Lossy MP3; one mono/stereo track at 32, 44.1 or 48 kHz; descriptive metadata is removed.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "mp3",
+      "verification" : "Decode all streams; verify codecs, dimensions and duration."
+    },
+    {
+      "available" : true,
+      "backend" : "documents",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:documents:txt",
+      "inputFamilies" : [
+        "image",
+        "pdf"
+      ],
+      "limitation" : "Extract text from all pages, or a selected page. Scans use local OCR.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "txt",
+      "verification" : "Reopen page or text output; verify selected-page properties."
+    },
+    {
+      "available" : true,
+      "backend" : "documents",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:documents:png",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "Choose one page to export; multi-page PDFs are never silently reduced to the first page.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "png",
+      "verification" : "Reopen page or text output; verify selected-page properties."
+    },
+    {
+      "available" : true,
+      "backend" : "documents",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:documents:jpeg",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "Choose one page to export; multi-page PDFs are never silently reduced to the first page.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "jpeg",
+      "verification" : "Reopen page or text output; verify selected-page properties."
+    },
+    {
+      "available" : true,
+      "backend" : "documents",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:documents:tiff",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "Choose one page to export; multi-page PDFs are never silently reduced to the first page.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "tiff",
+      "verification" : "Reopen page or text output; verify selected-page properties."
+    },
+    {
+      "available" : true,
+      "backend" : "documents",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:documents:pdf",
+      "inputFamilies" : [
+        "image",
+        "pdf"
+      ],
+      "limitation" : "Choose one page to export; multi-page PDFs are never silently reduced to the first page.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "pdf",
+      "verification" : "Reopen page or text output; verify selected-page properties."
+    },
+    {
+      "available" : true,
+      "backend" : "tables",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:tables:csv",
+      "inputFamilies" : [
+        "table"
+      ],
+      "limitation" : "Flat tables only. CSV and TSV do not retain JSON value types.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "csv",
+      "verification" : "Reparse and compare every record and cell."
+    },
+    {
+      "available" : true,
+      "backend" : "tables",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:tables:tsv",
+      "inputFamilies" : [
+        "table"
+      ],
+      "limitation" : "Flat tables only. CSV and TSV do not retain JSON value types.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "tsv",
+      "verification" : "Reparse and compare every record and cell."
+    },
+    {
+      "available" : true,
+      "backend" : "tables",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "file.convert:tables:json",
+      "inputFamilies" : [
+        "table"
+      ],
+      "limitation" : "Flat tables only. CSV and TSV do not retain JSON value types.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "json",
+      "verification" : "Reparse and compare every record and cell."
+    },
+    {
+      "available" : true,
+      "backend" : "qpdf",
+      "backendVersion" : "12.4.1-fileform.1",
+      "cardinality" : "file",
+      "goals" : [
+        "compress",
+        "fit"
+      ],
+      "id" : "file.convert:qpdf:pdf",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "All-page structural optimization only. Requires PDF pack and native worker. Signed, encrypted, annotated, forms, outlines, tagged and interactive PDFs are unsupported. No lossy image resampling; size targets may fail.",
+      "localProcessing" : true,
+      "operationID" : "file.convert",
+      "outputFormat" : "pdf",
+      "verification" : "All-page decoded content, text, five boxes, rotation and bounded rendered pixels; strict structural checks and byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "image.crop:imageio:jpeg",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "SDR still images; quality can change.",
+      "localProcessing" : true,
+      "operationID" : "image.crop",
+      "outputFormat" : "jpeg",
+      "verification" : "Oriented crop pixels, dimensions, alpha and exact byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "image.crop:imageio:png",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "Lossless output may be larger. Fit-size can be infeasible.",
+      "localProcessing" : true,
+      "operationID" : "image.crop",
+      "outputFormat" : "png",
+      "verification" : "Oriented crop pixels, dimensions, alpha and exact byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "imageio",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert",
+        "compress",
+        "fit"
+      ],
+      "id" : "image.crop:imageio:tiff",
+      "inputFamilies" : [
+        "image"
+      ],
+      "limitation" : "Lossless output may be larger. Fit-size can be infeasible.",
+      "localProcessing" : true,
+      "operationID" : "image.crop",
+      "outputFormat" : "tiff",
+      "verification" : "Oriented crop pixels, dimensions, alpha and exact byte constraints."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "media.trim:ffmpeg:mp4",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Exact frame/sample trim; eligible H.264/AAC MP4-family fast copy snaps outward. Constant-rate video, explicit audio selection, bounded packet inventory; MP3 unavailable.",
+      "localProcessing" : true,
+      "operationID" : "media.trim",
+      "outputFormat" : "mp4",
+      "verification" : "Measured frame/sample boundaries, copied packet hashes, complete decode, stream and duration checks."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "media.trim:ffmpeg:mov",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Exact frame/sample trim; eligible H.264/AAC MP4-family fast copy snaps outward. Constant-rate video, explicit audio selection, bounded packet inventory; MP3 unavailable.",
+      "localProcessing" : true,
+      "operationID" : "media.trim",
+      "outputFormat" : "mov",
+      "verification" : "Measured frame/sample boundaries, copied packet hashes, complete decode, stream and duration checks."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "media.trim:ffmpeg:m4a",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Exact frame/sample trim; eligible H.264/AAC MP4-family fast copy snaps outward. Constant-rate video, explicit audio selection, bounded packet inventory; MP3 unavailable.",
+      "localProcessing" : true,
+      "operationID" : "media.trim",
+      "outputFormat" : "m4a",
+      "verification" : "Measured frame/sample boundaries, copied packet hashes, complete decode, stream and duration checks."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "media.trim:ffmpeg:wav",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Exact frame/sample trim; eligible H.264/AAC MP4-family fast copy snaps outward. Constant-rate video, explicit audio selection, bounded packet inventory; MP3 unavailable.",
+      "localProcessing" : true,
+      "operationID" : "media.trim",
+      "outputFormat" : "wav",
+      "verification" : "Measured frame/sample boundaries, copied packet hashes, complete decode, stream and duration checks."
+    },
+    {
+      "available" : true,
+      "backend" : "ffmpeg",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "media.trim:ffmpeg:flac",
+      "inputFamilies" : [
+        "media"
+      ],
+      "limitation" : "Exact frame/sample trim; eligible H.264/AAC MP4-family fast copy snaps outward. Constant-rate video, explicit audio selection, bounded packet inventory; MP3 unavailable.",
+      "localProcessing" : true,
+      "operationID" : "media.trim",
+      "outputFormat" : "flac",
+      "verification" : "Measured frame/sample boundaries, copied packet hashes, complete decode, stream and duration checks."
+    },
+    {
+      "available" : true,
+      "backend" : "pdf-composition",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "pdf.compose:pdfkit:pdf",
+      "inputFamilies" : [
+        "image",
+        "pdf"
+      ],
+      "limitation" : "Up to 128 sources and 1000 output pages; document-level metadata, forms, outlines and signatures have declared losses.",
+      "localProcessing" : true,
+      "operationID" : "pdf.compose",
+      "outputFormat" : "pdf",
+      "verification" : "Reopen every PDF; compare page count, order, text, boxes and rotation before atomic publication."
+    },
+    {
+      "available" : true,
+      "backend" : "pdf-composition",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "directory",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "pdf.split:pdfkit:pdf",
+      "inputFamilies" : [
+        "image",
+        "pdf"
+      ],
+      "limitation" : "Up to 128 sources and 1000 output pages; document-level metadata, forms, outlines and signatures have declared losses.",
+      "localProcessing" : true,
+      "operationID" : "pdf.split",
+      "outputFormat" : "pdf",
+      "verification" : "Reopen every PDF; compare page count, order, text, boxes and rotation before atomic publication."
+    },
+    {
+      "available" : true,
+      "backend" : "page-raster",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "directory",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "pdf.rasterize:worker:png",
+      "inputFamilies" : [
+        "pdf",
+        "image"
+      ],
+      "limitation" : "Selected pages at 36–600 DPI; 64 million pixels / 16384-pixel edge, no silent downscale. sRGB rasterization loses editable text, vectors, forms and signatures.",
+      "localProcessing" : true,
+      "operationID" : "pdf.rasterize",
+      "outputFormat" : "png",
+      "verification" : "Worker renders every selected page; complete image decode, container and dimensions checked before atomic folder publication."
+    },
+    {
+      "available" : true,
+      "backend" : "page-raster",
+      "backendVersion" : "Version 26.2 (Build 25C56)",
+      "cardinality" : "directory",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "pdf.rasterize:worker:jpeg",
+      "inputFamilies" : [
+        "pdf",
+        "image"
+      ],
+      "limitation" : "Selected pages at 36–600 DPI; 64 million pixels / 16384-pixel edge, no silent downscale. sRGB rasterization loses editable text, vectors, forms and signatures.",
+      "localProcessing" : true,
+      "operationID" : "pdf.rasterize",
+      "outputFormat" : "jpeg",
+      "verification" : "Worker renders every selected page; complete image decode, container and dimensions checked before atomic folder publication."
+    },
+    {
+      "available" : true,
+      "backend" : "pdf-image-optimize",
+      "backendVersion" : "12.4.1-fileform.1",
+      "cardinality" : "file",
+      "goals" : [
+        "compress",
+        "fit"
+      ],
+      "id" : "pdf.optimize:qpdf:pdf",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "Explicit lossy JPEG recompression, optional intrinsic pixel-edge resampling, bounded quality floor. Unsupported images retained with reasons. Plain PDFs only; all pages retained or target unmet.",
+      "localProcessing" : true,
+      "operationID" : "pdf.optimize",
+      "outputFormat" : "pdf",
+      "verification" : "Exact expected reachable object/stream graph, isolated JPEG decode and geometry, independent page text/content/boxes/rotation and Info/XMP; atomic publication."
+    },
+    {
+      "available" : true,
+      "backend" : "pdf-images",
+      "backendVersion" : "12.4.1-fileform.1",
+      "cardinality" : "directory",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "pdf.extract-images:qpdf:images",
+      "inputFamilies" : [
+        "pdf"
+      ],
+      "limitation" : "Resource-referenced images only, including nested Forms. Eligible original JPEG or 8-bit DeviceRGB/Gray PNG with supported soft masks; explicit skips, no page rendering. Up to 1000 unique images and 512 MiB cumulative decoded/output bytes.",
+      "localProcessing" : true,
+      "operationID" : "pdf.extract-images",
+      "outputFormat" : "images",
+      "verification" : "Bounded object graph, source/object/generation provenance, isolated image decode and exact straight RGBA validation, original JPEG SHA-256, atomic directory publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:mp4",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "mp4",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:mov",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "mov",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:m4a",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "m4a",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:wav",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "wav",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:flac",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "flac",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    },
+    {
+      "available" : true,
+      "backend" : "direct-http",
+      "backendVersion" : "9.0.1-fileform.2",
+      "cardinality" : "file",
+      "goals" : [
+        "convert"
+      ],
+      "id" : "link.fetch:direct-http:mp3",
+      "inputFamilies" : [
+
+      ],
+      "limitation" : "Explicit direct HTTP(S) media only; original bytes kept, no web-page extraction. Byte/redirect/time limits and complete media decode before saving.",
+      "localProcessing" : false,
+      "operationID" : "link.fetch",
+      "outputFormat" : "mp3",
+      "verification" : "Response validators, retained-byte ceiling, forced media container, full decode and SHA-256 before exclusive publication."
+    }
+  ],
+  "schemaVersion" : 1
+}
