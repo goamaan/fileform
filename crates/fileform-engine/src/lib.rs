@@ -49,6 +49,15 @@ impl<R: Read> Read for CancellableReader<R> {
     }
 }
 
+impl<R: Seek> Seek for CancellableReader<R> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        if self.cancellation.is_cancelled() {
+            return Err(io::Error::other("Cancelled"));
+        }
+        self.inner.seek(position)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
@@ -124,7 +133,11 @@ fn delimiter(path: &Path) -> Result<Option<u8>> {
         )),
     }
 }
-fn digest(file: &mut File, cancellation: &Cancellation) -> Result<(u64, String)> {
+fn digest(
+    file: &mut File,
+    cancellation: &Cancellation,
+    maximum_bytes: u64,
+) -> Result<(u64, String)> {
     file.seek(SeekFrom::Start(0))?;
     let mut hash = Sha256::new();
     let mut bytes = 0;
@@ -136,7 +149,7 @@ fn digest(file: &mut File, cancellation: &Cancellation) -> Result<(u64, String)>
             break;
         }
         bytes += n as u64;
-        if bytes > MAX_OUTPUT {
+        if bytes > maximum_bytes {
             return Err(fail("limit", "File exceeds the verification limit."));
         }
         hash.update(&buffer[..n]);
@@ -155,6 +168,7 @@ struct Source {
     snapshot: NamedTempFile,
     identity: same_file::Handle,
     hash: String,
+    maximum_bytes: u64,
 }
 impl Source {
     #[cfg(test)]
@@ -162,41 +176,56 @@ impl Source {
         Self::open_cancellable(path, Cancellation::default())
     }
     fn open_cancellable(path: &Path, cancellation: Cancellation) -> Result<Self> {
+        Self::open_with_limit(path, cancellation, MAX_INPUT)
+    }
+    fn open_with_limit(
+        path: &Path,
+        cancellation: Cancellation,
+        maximum_bytes: u64,
+    ) -> Result<Self> {
         cancellation.check()?;
         let mut input = File::open(path)?;
         let metadata = input.metadata()?;
         if !metadata.is_file() {
             return Err(fail("invalid_input", "Choose a regular file."));
         }
-        if metadata.len() > MAX_INPUT {
-            return Err(fail("limit", "Tables are limited to 8 MiB."));
+        if metadata.len() > maximum_bytes {
+            return Err(fail(
+                "limit",
+                format!(
+                    "Input exceeds the {} MiB limit.",
+                    maximum_bytes / (1024 * 1024)
+                ),
+            ));
         }
         let identity = same_file::Handle::from_file(input.try_clone()?)?;
         let mut snapshot = NamedTempFile::new()?;
         let copied = io::copy(
             &mut CancellableReader {
-                inner: (&mut input).take(MAX_INPUT + 1),
+                inner: (&mut input).take(maximum_bytes.saturating_add(1)),
                 cancellation: cancellation.clone(),
             },
             &mut snapshot,
         )?;
-        if copied > MAX_INPUT {
-            return Err(fail("limit", "Table grew beyond 8 MiB."));
+        if copied > maximum_bytes {
+            return Err(fail("limit", "Input grew beyond its size limit."));
         }
-        let (_, hash) = digest(snapshot.as_file_mut(), &cancellation)?;
+        let (_, hash) = digest(snapshot.as_file_mut(), &cancellation, maximum_bytes)?;
         let mut source = Self {
             cancellation,
             input,
             snapshot,
             identity,
             hash,
+            maximum_bytes,
         };
         source.check(path)?;
         Ok(source)
     }
     fn check(&mut self, path: &Path) -> Result<()> {
         let identity = same_file::Handle::from_path(path)?;
-        if self.identity != identity || digest(&mut self.input, &self.cancellation)?.1 != self.hash
+        if self.identity != identity
+            || digest(&mut self.input, &self.cancellation, self.maximum_bytes)?.1 != self.hash
         {
             return Err(fail(
                 "source_changed",
@@ -209,15 +238,19 @@ impl Source {
         &mut self,
         delimiter: Option<u8>,
     ) -> Result<InputReader<CancellableReader<&mut File>>> {
-        self.snapshot.as_file_mut().seek(SeekFrom::Start(0))?;
-        let input = CancellableReader {
-            inner: self.snapshot.as_file_mut(),
-            cancellation: self.cancellation.clone(),
-        };
+        let input = self.snapshot_reader()?;
         match delimiter {
             Some(separator) => Ok(InputReader::Delimited(TableReader::new(input, separator)?)),
             None => Ok(InputReader::Json(JsonTableReader::new(input)?)),
         }
+    }
+    fn snapshot_reader(&mut self) -> Result<CancellableReader<&mut File>> {
+        self.cancellation.check()?;
+        self.snapshot.as_file_mut().seek(SeekFrom::Start(0))?;
+        Ok(CancellableReader {
+            inner: self.snapshot.as_file_mut(),
+            cancellation: self.cancellation.clone(),
+        })
     }
 }
 enum InputReader<R: Read> {
@@ -418,7 +451,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             } else {
                 verify_table(&mut source, separator, temporary.as_file_mut(), rows)?;
             }
-            let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation)?;
+            let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, MAX_OUTPUT)?;
             source.check(&input)?;
             if directory != same_file::Handle::from_path(parent)? {
                 return Err(fail("output_changed", "The output folder changed."));
@@ -856,6 +889,33 @@ mod tests {
             assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
             assert_eq!(std::fs::read_to_string(input).unwrap(), text);
         }
+    }
+    #[test]
+    fn source_policy_applies_to_open_and_later_growth() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.bin");
+        std::fs::write(&input, b"12345678").unwrap();
+        assert!(Source::open_with_limit(&input, Cancellation::default(), 7).is_err());
+        let mut source = Source::open_with_limit(&input, Cancellation::default(), 8).unwrap();
+        std::fs::write(&input, b"123456789").unwrap();
+        assert_eq!(source.check(&input).unwrap_err().code, "limit");
+    }
+    #[test]
+    fn snapshot_seeks_are_independent_of_original_and_cancellable() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.bin");
+        std::fs::write(&input, b"original").unwrap();
+        let cancellation = Cancellation::default();
+        let mut source = Source::open_with_limit(&input, cancellation.clone(), 8).unwrap();
+        std::fs::write(&input, b"replaced").unwrap();
+        let mut reader = source.snapshot_reader().unwrap();
+        reader.seek(SeekFrom::Start(4)).unwrap();
+        let mut suffix = String::new();
+        reader.read_to_string(&mut suffix).unwrap();
+        assert_eq!(suffix, "inal");
+        cancellation.cancel();
+        assert!(reader.seek(SeekFrom::Start(0)).is_err());
+        assert!(reader.read(&mut [0u8; 1]).is_err());
     }
     #[test]
     fn concurrent_publish_never_overwrites() {

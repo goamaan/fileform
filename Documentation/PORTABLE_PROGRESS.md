@@ -163,3 +163,23 @@ focused regression/round-trip tests and all benchmark output checks passed.
 Cancellation CI run 34887595037 passed Windows and macOS, including cooperative
 cancellation after staging, temporary cleanup and installer packaging. Manual
 Cancel-button timing and forced-stop recovery still require acceptance evidence.
+
+## Image migration groundwork
+
+The shared source layer now supports a caller-selected byte budget for snapshot
+creation and later source verification, plus cancellable seeking over the owned
+snapshot. Tables retain their 8 MiB input policy. This removes the table-specific
+assumption from the common path before adding the 512 MiB image input policy;
+no image route is exposed by this change.
+
+Seventeen Rust tests pass, including growth beyond the selected source budget,
+seek/read cancellation and snapshot independence from later original changes.
+Clippy, Windows-target checking and real conversion/cancellation process smoke
+also pass. The worker protocol and table UI are unchanged in this increment.
+
+Documentation/PORTABLE_IMAGE_RESEARCH.md records reviewed image0.25.10, PNG/TIFF
+metadata and moxcms APIs, and maps them against the native image contract. Next:
+implement bounded format-specific inspection and the ICC-to-sRGB render pipeline,
+then conversion/resize/crop/fit and Electron UI integration. ImageIO input coverage,
+animation/high-depth/HDR rejection, orientation and transparency remain required;
+using a generic decoder alone is not parity.
