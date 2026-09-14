@@ -190,7 +190,7 @@ struct LimitedWriter<W> {
 impl<W: Write> Write for LimitedWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if self.bytes + bytes.len() as u64 > MAX_OUTPUT {
-            return Err(io::Error::other("JSON output exceeds 128 MiB."));
+            return Err(io::Error::other("Table output exceeds 128 MiB."));
         }
         let n = self.inner.write(bytes)?;
         self.bytes += n as u64;
@@ -230,7 +230,7 @@ pub fn execute(request: Request) -> Result<Response> {
                     .take(20)
                     .map(|s| s.chars().take(128).collect())
                     .collect(),
-                outputs: vec!["json"],
+                outputs: vec!["json", "csv", "tsv"],
             }))
         }
         Request::ConvertTable {
@@ -247,15 +247,22 @@ pub fn execute(request: Request) -> Result<Response> {
                     "The inspected file changed. Add it again.",
                 ));
             }
-            if output
+            let output_separator = match output
                 .extension()
                 .and_then(|x| x.to_str())
                 .map(str::to_ascii_lowercase)
                 .as_deref()
-                != Some("json")
             {
-                return Err(fail("invalid_output", "Choose a .json output filename."));
-            }
+                Some("json") => None,
+                Some("csv") => Some(b','),
+                Some("tsv") => Some(b'\t'),
+                _ => {
+                    return Err(fail(
+                        "invalid_output",
+                        "Choose a .json, .csv or .tsv output filename.",
+                    ))
+                }
+            };
             if output.try_exists()? {
                 return Err(fail(
                     "collision",
@@ -276,25 +283,45 @@ pub fn execute(request: Request) -> Result<Response> {
                     inner: io::BufWriter::new(temporary.as_file_mut()),
                     bytes: 0,
                 };
-                writer.write_all(b"[")?;
+                if let Some(separator) = output_separator {
+                    write_record(&mut writer, &columns, separator)?;
+                } else {
+                    writer.write_all(b"[")?;
+                }
                 while let Some(record) = reader.next_record()? {
                     rows += 1;
                     check_record(&record, rows)?;
                     if record.len() != columns.len() {
                         return Err(fail("invalid_table", "Rows have different column counts."));
                     }
-                    if rows > 1 {
-                        writer.write_all(b",")?;
+                    if let Some(separator) = output_separator {
+                        write_record(&mut writer, &record, separator)?;
+                    } else {
+                        if rows > 1 {
+                            writer.write_all(b",")?;
+                        }
+                        let object: std::collections::BTreeMap<_, _> =
+                            columns.iter().zip(record.iter()).collect();
+                        serde_json::to_writer(&mut writer, &object)?;
                     }
-                    let object: std::collections::BTreeMap<_, _> =
-                        columns.iter().zip(record.iter()).collect();
-                    serde_json::to_writer(&mut writer, &object)?;
                 }
-                writer.write_all(b"]\n")?;
+                if output_separator.is_none() {
+                    writer.write_all(b"]\n")?;
+                }
                 writer.flush()?;
             }
             drop(reader);
-            verify_table(&mut source, separator, temporary.as_file_mut(), rows)?;
+            if let Some(output_separator) = output_separator {
+                verify_delimited(
+                    &mut source,
+                    separator,
+                    temporary.as_file_mut(),
+                    output_separator,
+                    rows,
+                )?;
+            } else {
+                verify_table(&mut source, separator, temporary.as_file_mut(), rows)?;
+            }
             let (bytes, sha256) = digest(temporary.as_file_mut())?;
             source.check(&input)?;
             if directory != same_file::Handle::from_path(parent)? {
@@ -319,6 +346,62 @@ pub fn execute(request: Request) -> Result<Response> {
             }))
         }
     }
+}
+
+// Encode one record at a time, including empty single-column records. Quote
+// delimiters, newlines and embedded quotes; never infer spreadsheet value types.
+fn write_record<W: Write>(writer: &mut W, record: &[String], separator: u8) -> Result<()> {
+    for (index, cell) in record.iter().enumerate() {
+        if index > 0 {
+            writer.write_all(&[separator])?;
+        }
+        let quote = cell
+            .as_bytes()
+            .iter()
+            .any(|b| [separator, b'"', b'\r', b'\n'].contains(b));
+        if quote {
+            writer.write_all(b"\"")?;
+        }
+        for part in cell.split_inclusive('"') {
+            writer.write_all(part.as_bytes())?;
+            if quote && part.ends_with('"') {
+                writer.write_all(b"\"")?;
+            }
+        }
+        if quote {
+            writer.write_all(b"\"")?;
+        }
+    }
+    writer.write_all(b"\r\n")?;
+    Ok(())
+}
+
+fn verify_delimited(
+    source: &mut Source,
+    separator: u8,
+    output: &mut File,
+    output_separator: u8,
+    expected_rows: u64,
+) -> Result<()> {
+    let mut original = source.reader(separator)?;
+    output.seek(SeekFrom::Start(0))?;
+    let mut decoded = TableReader::new(output, output_separator)?;
+    let mut records = 0;
+    loop {
+        let left = original.next_record()?;
+        let right = decoded.next_record()?;
+        if left != right {
+            return Err(fail("verification", "Output cells differ from source."));
+        }
+        if left.is_none() {
+            break;
+        }
+        records += 1;
+    }
+    if records != expected_rows + 1 {
+        return Err(fail("verification", "Output row count differs."));
+    }
+    Ok(())
 }
 
 fn verify_table(
@@ -514,6 +597,70 @@ mod tests {
         assert_eq!(error.code, "source_changed");
         assert!(!output.exists());
         assert_eq!(std::fs::read(input).unwrap(), b"a\ntwo\n");
+    }
+    #[test]
+    fn delimited_outputs_preserve_special_cells_and_column_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.csv");
+        let text = "z,a,note\r\n001,日本語,\"comma, tab\t quote \"\" and newline\nend\"\r\n,,\r\n";
+        std::fs::write(&input, text).unwrap();
+        for (index, extension) in ["csv", "tsv", "CSV", "TSV"].iter().enumerate() {
+            let output = dir.path().join(format!("result-{index}.{extension}"));
+            let Response::Saved(receipt) = execute(Request::ConvertTable {
+                input: input.clone(),
+                output: output.clone(),
+                expected_source_sha256: None,
+            })
+            .unwrap() else {
+                panic!("expected receipt")
+            };
+            assert_eq!(receipt.rows, 2);
+            let separator = if extension.eq_ignore_ascii_case("csv") {
+                b','
+            } else {
+                b'\t'
+            };
+            let mut reader = TableReader::new(File::open(&output).unwrap(), separator).unwrap();
+            assert_eq!(reader.next_record().unwrap().unwrap(), ["z", "a", "note"]);
+            assert_eq!(
+                reader.next_record().unwrap().unwrap(),
+                ["001", "日本語", "comma, tab\t quote \" and newline\nend"]
+            );
+            assert_eq!(reader.next_record().unwrap().unwrap(), ["", "", ""]);
+            assert!(reader.next_record().unwrap().is_none());
+            assert_eq!(std::fs::read_to_string(&input).unwrap(), text);
+        }
+    }
+    #[test]
+    fn delimited_blank_rows_and_header_only_tables_survive() {
+        for text in ["name\r\n\r\none\r\n", "name\r\n"] {
+            let dir = tempfile::tempdir().unwrap();
+            let input = dir.path().join("source.tsv");
+            let output = dir.path().join("result.csv");
+            std::fs::write(&input, text).unwrap();
+            execute(Request::ConvertTable {
+                input,
+                output: output.clone(),
+                expected_source_sha256: None,
+            })
+            .unwrap();
+            assert_eq!(std::fs::read_to_string(output).unwrap(), text);
+        }
+    }
+    #[test]
+    fn delimited_verification_rejects_corrupted_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.csv");
+        std::fs::write(&input, "a,b\n1,2\n").unwrap();
+        let mut source = Source::open(&input).unwrap();
+        let mut output = NamedTempFile::new().unwrap();
+        output.write_all(b"a\tb\r\n1\t3\r\n").unwrap();
+        assert_eq!(
+            verify_delimited(&mut source, b',', output.as_file_mut(), b'\t', 1)
+                .unwrap_err()
+                .code,
+            "verification"
+        );
     }
     #[test]
     fn concurrent_publish_never_overwrites() {

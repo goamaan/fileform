@@ -1,9 +1,10 @@
 export type Appearance = 'system'|'light'|'dark';
+export type TableOutput = 'json'|'csv'|'tsv';
 export interface SourceFile { id:string; name:string; bytes:number; rows:number; columns:number }
 export interface SavedFile { id:string; name:string; bytes:number; rows:number }
 export interface FileformAPI {
   chooseTable():Promise<SourceFile|null>;
-  saveJSON(sourceID:string):Promise<SavedFile|null>;
+  saveTable(sourceID:string,format:TableOutput):Promise<SavedFile|null>;
   reveal(savedID:string):Promise<void>;
   appearance(mode?:Appearance):Promise<{mode:Appearance;dark:boolean}>;
 }

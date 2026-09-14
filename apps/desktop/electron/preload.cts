@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { FileformAPI, Appearance } from '../src/contracts.js';
 const api:FileformAPI = {
   chooseTable:()=>ipcRenderer.invoke('fileform:choose'),
-  saveJSON:(id:string)=>ipcRenderer.invoke('fileform:save',id),
+  saveTable:(id,format)=>ipcRenderer.invoke('fileform:save',id,format),
   reveal:(id:string)=>ipcRenderer.invoke('fileform:reveal',id),
   appearance:(mode?:Appearance)=>ipcRenderer.invoke('fileform:appearance',mode)
 };

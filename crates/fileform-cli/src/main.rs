@@ -14,7 +14,9 @@ fn main() {
             expected_source_sha256: None,
         },
         _ => {
-            eprintln!("Usage: fileform-native inspect FILE | convert-table INPUT OUTPUT.json");
+            eprintln!(
+                "Usage: fileform-native inspect FILE | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+            );
             std::process::exit(2);
         }
     };

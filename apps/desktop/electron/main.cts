@@ -66,14 +66,16 @@ ipcMain.handle('fileform:choose',async(event)=>{
     sources.clear();sources.set(source.id,{...source,path,sha256:inspected.sha256});return source;
   });
 });
-ipcMain.handle('fileform:save',async(event,id:unknown)=>{
+ipcMain.handle('fileform:save',async(event,id:unknown,format:unknown)=>{
   authorize(event);
+  if(format!=='json'&&format!=='csv'&&format!=='tsv')throw new Error('Choose JSON, CSV or TSV.');
   if(typeof id!=='string'||!sources.has(id))throw new Error('Choose the source file again.');
   const source=sources.get(id)!;
   return exclusive(async()=>{
-    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.json'),filters:[{name:'JSON table',extensions:['json']}],properties:['createDirectory']});
+    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+format),filters:[{name:format.toUpperCase()+' table',extensions:[format]}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;
     const output=choice.filePath;
+    if(parse(output).ext.toLowerCase()!=='.'+format)throw new Error('Use a .'+format+' filename for the selected format.');
     const receipt=await worker({operation:'convert_table',input:source.path,output,expected_source_sha256:source.sha256});
     if(receipt.kind!=='saved'||receipt.output!==output||receipt.rows!==source.rows||!count(receipt.bytes))throw new Error('The saved receipt could not be validated. Check the output folder.');
     const result:SavedFile={id:randomUUID(),name:basename(output),bytes:receipt.bytes,rows:receipt.rows};

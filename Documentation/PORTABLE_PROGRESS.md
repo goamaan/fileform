@@ -80,3 +80,24 @@ The core/reference matrix passed macOS 26. The newly added macOS 14 app build
 exposed older-SDK Undo callback isolation annotations. Synchronous MainActor
 bridges fix those callbacks; all 63 local native tests pass. A fresh matrix run
 will verify the older compiler. No platform check was removed to hide the failure.
+
+## Delimited output migration
+
+The portable worker and CLI now save CSV and TSV as well as JSON. Electron has
+an output-format selector and native save-dialog filters. The main process
+validates the format and extension, and the engine independently validates the
+output extension. Delimited output streams one record at a time with CRLF and
+quote escaping, then reopens and compares every cell and the complete row count
+before publication. Existing files remain protected by the same no-clobber path.
+
+Verification: 12 Rust tests pass; Clippy and Windows-target type checking pass.
+The process smoke independently parses CSV/TSV with Python, converts them back to
+JSON through the CLI, and rejects output collisions. Packaged Mac Electron saved
+both formats through actual native dialogs; independent parsing matched every
+source cell and the original SHA-256 stayed unchanged. Evidence:
+Artifacts/Verification/electron-table/formats-verified.json.
+JSON input, cancellation and full non-table capability parity are still open.
+The new Windows CI run must verify these output changes on Windows.
+
+Reference CI run 34884604844: the macOS 14 job now passed its complete verification,
+including native compilation and CLI E2E, after the SwiftUI preference fix.

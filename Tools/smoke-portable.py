@@ -26,6 +26,22 @@ with tempfile.TemporaryDirectory(prefix='fileform-smoke-') as directory:
     with source.open(encoding='utf-8', newline='') as file:
         expected = list(csv.DictReader(file))
     assert json.loads(output.read_text(encoding='utf-8')) == expected
+    delimited_outputs = []
+    for extension, delimiter in [('csv', ','), ('tsv', '\t')]:
+        target = folder / ('converted.' + extension)
+        request = {'operation': 'convert_table', 'input': str(source), 'output': str(target),
+                   'expected_source_sha256': inspected['result']['sha256']}
+        reply = subprocess.run([str(worker)], input=json.dumps(request), encoding='utf-8', capture_output=True, check=True)
+        assert json.loads(reply.stdout)['ok']
+        with target.open(encoding='utf-8', newline='') as file:
+            assert list(csv.DictReader(file, delimiter=delimiter)) == expected
+        roundtrip = folder / ('roundtrip-' + extension + '.json')
+        subprocess.run([str(cli), 'convert-table', str(target), str(roundtrip)], capture_output=True, check=True)
+        assert json.loads(roundtrip.read_text(encoding='utf-8')) == expected
+        original_output = target.read_bytes()
+        duplicate_output = subprocess.run([str(worker)], input=json.dumps(request), encoding='utf-8', capture_output=True)
+        assert duplicate_output.returncode != 0 and target.read_bytes() == original_output
+        delimited_outputs.append(extension)
     before = output.read_bytes()
     duplicate = subprocess.run([str(cli), 'convert-table', str(source), str(output)], encoding='utf-8', capture_output=True)
     assert duplicate.returncode != 0 and output.read_bytes() == before
@@ -33,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-smoke-') as directory:
     malformed = subprocess.run([str(worker)], input='{"operation":"unknown"}', encoding='utf-8', capture_output=True)
     assert malformed.returncode != 0 and not json.loads(malformed.stdout)['ok']
     report = {'platform': os.name, 'worker': True, 'cli': True, 'unicodeAndValuesRetained': True,
-              'collisionRejected': True, 'originalUnchanged': True,
+              'delimitedOutputs': delimited_outputs, 'collisionRejected': True, 'originalUnchanged': True,
               'outputSHA256': hashlib.sha256(before).hexdigest(), 'receipt': json.loads(converted.stdout)}
     # The temporary absolute output path is not part of retained evidence.
     report['receipt']['output'] = output.name
