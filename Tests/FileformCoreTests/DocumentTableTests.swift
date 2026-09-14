@@ -134,3 +134,29 @@ func malformedTablesAreRejected(_ text: String) throws {
         await #expect(throws: FileformError.self) { try await engine.inspect(input) }
     }
 }
+
+@Test func expandedTableOutputUsesSeparateVerificationLimit() async throws {
+    let fixture = try Fixture(); defer { fixture.cleanup() }
+    let input = fixture.url("expanded.csv")
+    let column = String(repeating: "column", count: 180)
+    let original = Data((column + "\r\n" + String(repeating: "value\r\n", count: 8_000)).utf8)
+    try original.write(to: input)
+    let engine = ConversionEngine()
+    let plan = try await engine.plan(.init(input: input, destination: fixture.url("expanded.json"), format: .json))
+    let result = try await engine.run(plan)
+    let output = try #require(result.output)
+    #expect(try FileSafety.identity(output).bytes > 8 * 1024 * 1024)
+    let checked = try TableBackend.read(output, maximumBytes: TableBackend.maximumOutputBytes)
+    #expect(checked.columns == [column])
+    #expect(checked.rows.count == 8_000)
+    #expect(checked.rows.allSatisfy { $0 == ["value"] })
+    #expect(try Data(contentsOf: input) == original)
+    #expect(throws: FileformError.self) { try TableBackend.read(output) }
+}
+
+@Test func tableEncodingStopsAtItsOutputBudget() throws {
+    let table = TableData(columns: ["name"], rows: Array(repeating: ["value"], count: 100))
+    for format in [OutputFormat.json, .csv, .tsv] {
+        #expect(throws: FileformError.self) { try TableBackend.encode(table, format: format, maximumBytes: 64) }
+    }
+}

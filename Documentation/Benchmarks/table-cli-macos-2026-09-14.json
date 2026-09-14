@@ -1,0 +1,245 @@
+{
+  "recordedAt": "2026-09-14T19:37:07.842275+00:00",
+  "sourceCommit": "80ebbef6d7bd391132c4b7526df26371d55d7d09",
+  "sourceHadUncommittedChanges": true,
+  "scope": "CSV to JSON CLI conversion, process startup through verified output and receipt; warm filesystem caches",
+  "limitations": [
+    "No Electron or SwiftUI memory measurement",
+    "No claim of identical implementation work",
+    "Sequential local runs; other machine activity is uncontrolled",
+    "Output formatting differs; semantic cells are compared",
+    "Peak RSS is per process, not total system memory"
+  ],
+  "machine": {
+    "os": "macOS-26.2-arm64-arm-64bit",
+    "model": "MacBookPro18,3",
+    "memoryBytes": 17179869184
+  },
+  "versions": {
+    "rust": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "swift": "Apple Swift version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)\nTarget: arm64-apple-macosx26.0"
+  },
+  "binaries": {
+    "swift": {
+      "sha256": "1a0502b911ed592b7645b56d2e8df8de9b0988a234b6babd154ddea10dce1e9c"
+    },
+    "rust": {
+      "sha256": "6cbba5c990db4f683cb34b3b193dd02b323bdadb8850b2d4df2089d685adda6d"
+    }
+  },
+  "cases": [
+    {
+      "name": "small",
+      "rows": 100,
+      "columns": 4,
+      "inputBytes": 5337,
+      "inputSHA256": "876f7e758a307e5233270ee124afaeca548218d94f324764e1109fb56e718cb1",
+      "results": {
+        "swift": {
+          "medianWallSeconds": 0.021176250000000008,
+          "medianPeakRSSBytes": 15220736,
+          "samples": [
+            {
+              "wallSeconds": 0.023217749999999926,
+              "peakRSSBytes": 15187968,
+              "outputBytes": 12703
+            },
+            {
+              "wallSeconds": 0.021176250000000008,
+              "peakRSSBytes": 15253504,
+              "outputBytes": 12703
+            },
+            {
+              "wallSeconds": 0.02035683300000002,
+              "peakRSSBytes": 15204352,
+              "outputBytes": 12703
+            },
+            {
+              "wallSeconds": 0.021899375000000054,
+              "peakRSSBytes": 15220736,
+              "outputBytes": 12703
+            },
+            {
+              "wallSeconds": 0.02062512499999991,
+              "peakRSSBytes": 15237120,
+              "outputBytes": 12703
+            }
+          ]
+        },
+        "rust": {
+          "medianWallSeconds": 0.011978875000000055,
+          "medianPeakRSSBytes": 1900544,
+          "samples": [
+            {
+              "wallSeconds": 0.013115957999999983,
+              "peakRSSBytes": 1900544,
+              "outputBytes": 10502
+            },
+            {
+              "wallSeconds": 0.012561249999999968,
+              "peakRSSBytes": 1884160,
+              "outputBytes": 10502
+            },
+            {
+              "wallSeconds": 0.010919791999999928,
+              "peakRSSBytes": 1900544,
+              "outputBytes": 10502
+            },
+            {
+              "wallSeconds": 0.011978875000000055,
+              "peakRSSBytes": 1884160,
+              "outputBytes": 10502
+            },
+            {
+              "wallSeconds": 0.01146670900000002,
+              "peakRSSBytes": 1916928,
+              "outputBytes": 10502
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "rows",
+      "rows": 50000,
+      "columns": 6,
+      "inputBytes": 3450055,
+      "inputSHA256": "b93c49d40f790d21c85dd744c5025c3114930c8b39437858a798bdb64f04e29d",
+      "results": {
+        "swift": {
+          "medianWallSeconds": 1.4922169170000004,
+          "medianPeakRSSBytes": 342097920,
+          "samples": [
+            {
+              "wallSeconds": 1.5022110410000002,
+              "peakRSSBytes": 342163456,
+              "outputBytes": 8950003
+            },
+            {
+              "wallSeconds": 1.5002185419999998,
+              "peakRSSBytes": 341999616,
+              "outputBytes": 8950003
+            },
+            {
+              "wallSeconds": 1.4817880830000005,
+              "peakRSSBytes": 342097920,
+              "outputBytes": 8950003
+            },
+            {
+              "wallSeconds": 1.4922169170000004,
+              "peakRSSBytes": 341852160,
+              "outputBytes": 8950003
+            },
+            {
+              "wallSeconds": 1.4833176249999998,
+              "peakRSSBytes": 342228992,
+              "outputBytes": 8950003
+            }
+          ]
+        },
+        "rust": {
+          "medianWallSeconds": 0.1540512500000002,
+          "medianPeakRSSBytes": 1916928,
+          "samples": [
+            {
+              "wallSeconds": 0.151748542,
+              "peakRSSBytes": 1900544,
+              "outputBytes": 7350002
+            },
+            {
+              "wallSeconds": 0.1573822500000004,
+              "peakRSSBytes": 1916928,
+              "outputBytes": 7350002
+            },
+            {
+              "wallSeconds": 0.15221649999999975,
+              "peakRSSBytes": 1916928,
+              "outputBytes": 7350002
+            },
+            {
+              "wallSeconds": 0.16053845799999955,
+              "peakRSSBytes": 1933312,
+              "outputBytes": 7350002
+            },
+            {
+              "wallSeconds": 0.1540512500000002,
+              "peakRSSBytes": 1884160,
+              "outputBytes": 7350002
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "wide",
+      "rows": 2000,
+      "columns": 100,
+      "inputBytes": 1822991,
+      "inputSHA256": "9bd20548f7c1a236758c07f28a310952f1238ddba14d18403d932303b2f9dacd",
+      "results": {
+        "swift": {
+          "medianWallSeconds": 0.9854319170000014,
+          "medianPeakRSSBytes": 106496000,
+          "samples": [
+            {
+              "wallSeconds": 0.9881427499999997,
+              "peakRSSBytes": 106496000,
+              "outputBytes": 5606003
+            },
+            {
+              "wallSeconds": 0.9854319170000014,
+              "peakRSSBytes": 104693760,
+              "outputBytes": 5606003
+            },
+            {
+              "wallSeconds": 0.9805297499999988,
+              "peakRSSBytes": 106512384,
+              "outputBytes": 5606003
+            },
+            {
+              "wallSeconds": 0.985232958000001,
+              "peakRSSBytes": 103006208,
+              "outputBytes": 5606003
+            },
+            {
+              "wallSeconds": 0.9896107080000007,
+              "peakRSSBytes": 106496000,
+              "outputBytes": 5606003
+            }
+          ]
+        },
+        "rust": {
+          "medianWallSeconds": 0.10432274999999969,
+          "medianPeakRSSBytes": 2048000,
+          "samples": [
+            {
+              "wallSeconds": 0.10357579200000089,
+              "peakRSSBytes": 2048000,
+              "outputBytes": 4602002
+            },
+            {
+              "wallSeconds": 0.11044908400000075,
+              "peakRSSBytes": 2064384,
+              "outputBytes": 4602002
+            },
+            {
+              "wallSeconds": 0.10432274999999969,
+              "peakRSSBytes": 2048000,
+              "outputBytes": 4602002
+            },
+            {
+              "wallSeconds": 0.10485025000000192,
+              "peakRSSBytes": 2048000,
+              "outputBytes": 4602002
+            },
+            {
+              "wallSeconds": 0.10284454099999962,
+              "peakRSSBytes": 2031616,
+              "outputBytes": 4602002
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

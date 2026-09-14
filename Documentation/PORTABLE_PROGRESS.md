@@ -150,3 +150,16 @@ new open stdin transport, independently verified against the original CSV. Manua
 click-timing acceptance of Cancel itself is not yet recorded.
 
 Flat-JSON CI run 34887093942 passed both Windows and macOS before this change.
+
+## Performance evidence and reference correction
+
+Tools/benchmark-tables.py now performs a repeatable optimized Swift/Rust CLI
+comparison on identical files with independent output/source checks. Results and
+limitations are recorded in Documentation/PERFORMANCE.md and its sample JSON.
+The first run exposed an input/output limit mix-up in the Swift verifier; fixed
+with separate 128 MiB output verification and bounded row-wise encoding. Four
+focused regression/round-trip tests and all benchmark output checks passed.
+
+Cancellation CI run 34887595037 passed Windows and macOS, including cooperative
+cancellation after staging, temporary cleanup and installer packaging. Manual
+Cancel-button timing and forced-stop recovery still require acceptance evidence.

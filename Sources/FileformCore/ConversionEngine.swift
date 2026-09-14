@@ -260,7 +260,7 @@ public actor ConversionEngine {
             } else {
                 let table = try TableBackend.read(request.input)
                 try TableBackend.encode(table, format: request.format).write(to: candidate, options: .withoutOverwriting)
-                let check = try TableBackend.read(candidate, format: request.format.rawValue)
+                let check = try TableBackend.read(candidate, format: request.format.rawValue, maximumBytes: TableBackend.maximumOutputBytes)
                 guard check.records == table.records else { throw FileformError(.verificationFailed, "The converted table did not retain its cell values and rows.") }
                 bytes = try FileSafety.identity(candidate).bytes
             }

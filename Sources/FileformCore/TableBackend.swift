@@ -9,11 +9,12 @@ struct TableData: Equatable, Sendable {
 }
 
 enum TableBackend {
+    static let maximumOutputBytes = 128 * 1024 * 1024
     static let formats: [OutputFormat] = [.csv, .tsv, .json]
     static func recognizes(_ input: URL) -> Bool { ["csv", "tsv", "json"].contains(input.pathExtension.lowercased()) }
-    static func read(_ input: URL, format: String? = nil) throws -> TableData {
+    static func read(_ input: URL, format: String? = nil, maximumBytes: Int = 8 * 1024 * 1024) throws -> TableData {
         let identity = try FileSafety.identity(input)
-        guard identity.bytes <= 8 * 1024 * 1024 else { throw FileformError(.resourceLimit, "The current table workflow accepts files up to 8 MB.") }
+        guard identity.bytes <= maximumBytes else { throw FileformError(.resourceLimit, "The table exceeds its \(maximumBytes / (1024 * 1024)) MiB read limit.") }
         let data = try Data(contentsOf: input)
         guard var text = String(data: data, encoding: .utf8) else { throw FileformError(.unsupported, "This table is not valid UTF-8 text. Save it as UTF-8 and try again.") }
         if text.first == "\u{FEFF}" { text.removeFirst() }
@@ -81,9 +82,22 @@ enum TableBackend {
         return .init(columns: columns, rows: Array(records.dropFirst()))
     }
 
-    static func encode(_ table: TableData, format: OutputFormat) throws -> Data {
+    static func encode(_ table: TableData, format: OutputFormat, maximumBytes: Int = maximumOutputBytes) throws -> Data {
+        var output = Data()
+        func append(_ data: Data) throws {
+            try Task.checkCancellation()
+            guard data.count <= maximumBytes - output.count else { throw FileformError(.resourceLimit, "The converted table exceeds its output size limit.") }
+            output.append(data)
+        }
         if format == .json {
-            return try JSONSerialization.data(withJSONObject: table.records, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+            try append(Data("[\n".utf8))
+            for (index, row) in table.rows.enumerated() {
+                if index > 0 { try append(Data(",\n".utf8)) }
+                let record = Dictionary(uniqueKeysWithValues: zip(table.columns, row))
+                try append(JSONSerialization.data(withJSONObject: record, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]))
+            }
+            try append(Data("\n]\n".utf8))
+            return output
         }
         let separator = format == .csv ? "," : "\t"
         func escaped(_ cell: String) -> String {
@@ -92,8 +106,11 @@ enum TableBackend {
             }
             return cell
         }
-        let lines = ([table.columns] + table.rows).map { $0.map(escaped).joined(separator: separator) }
-        return Data((lines.joined(separator: "\r\n") + "\r\n").utf8)
+        try append(Data((table.columns.map(escaped).joined(separator: separator) + "\r\n").utf8))
+        for row in table.rows {
+            try append(Data((row.map(escaped).joined(separator: separator) + "\r\n").utf8))
+        }
+        return output
     }
 }
 
