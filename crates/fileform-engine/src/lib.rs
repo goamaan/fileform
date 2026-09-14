@@ -13,6 +13,7 @@ use tempfile::NamedTempFile;
 
 mod image_color;
 mod image_crop;
+mod image_resize;
 pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
@@ -76,6 +77,7 @@ pub enum Request {
         background: Option<Background>,
         quality: Option<u8>,
         crop: Option<PixelCrop>,
+        max_dimension: Option<u32>,
         expected_source_sha256: Option<String>,
     },
     InspectImage {
@@ -256,15 +258,31 @@ fn prepare_png(
     Ok((source, inspection, oriented))
 }
 
+struct ImageOptions {
+    background: Option<Background>,
+    quality: Option<u8>,
+    crop: Option<PixelCrop>,
+    max_dimension: Option<u32>,
+}
 fn convert_image(
     input: &Path,
     output: &Path,
     expected_hash: Option<&str>,
     cancellation: &Cancellation,
-    background: Option<Background>,
-    quality: Option<u8>,
-    crop: Option<PixelCrop>,
+    options: ImageOptions,
 ) -> Result<Response> {
+    let ImageOptions {
+        background,
+        quality,
+        crop,
+        max_dimension,
+    } = options;
+    if max_dimension == Some(0) {
+        return Err(fail(
+            "invalid_request",
+            "Maximum image dimension must be positive.",
+        ));
+    }
     let jpeg = match output
         .extension()
         .and_then(|s| s.to_str())
@@ -319,6 +337,11 @@ fn convert_image(
     }
     let pixels = if let Some(crop) = crop {
         image_crop::apply(pixels, crop, cancellation)?
+    } else {
+        pixels
+    };
+    let pixels = if let Some(maximum) = max_dimension {
+        image_resize::limit(pixels, maximum, cancellation)?
     } else {
         pixels
     };
@@ -622,6 +645,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         background,
         quality,
         crop,
+        max_dimension,
     } = &request
     {
         return convert_image(
@@ -629,9 +653,12 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             expected_source_sha256.as_deref(),
             cancellation,
-            *background,
-            *quality,
-            *crop,
+            ImageOptions {
+                background: *background,
+                quality: *quality,
+                crop: *crop,
+                max_dimension: *max_dimension,
+            },
         );
     }
     if let Request::InspectImage { input, preview } = &request {

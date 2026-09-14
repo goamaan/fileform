@@ -361,3 +361,16 @@ Drag 12→10, undo 10→12, redo 12→10, keyboard adjustment and native save al
 The 10×12 output matched an independent oriented-image crop, with alpha and source
 checksum preserved. TypeScript/Vite, packaging and geometry checks passed. Only
 one preview build was left running. This remains partial overall app parity.
+
+## Shared native image downscaling
+
+Implemented no-upscale maximum-dimension resizing after orientation/color/crop,
+using linear-light, alpha-weighted pixel-area resampling and fallible output
+allocation. Worker and CLI validate positive limits. Image execution options now
+use an internal options struct rather than extending positional parameters.
+
+Thirty-nine Rust tests, Clippy, Windows-target checking and image/table/cancellation
+process smoke pass. The real CLI's output matched an independent Pillow decode
+and analytic linear-light expectation. Crop/resize composition and invalid-size
+no-output behavior are covered. Electron's resize controls remain next work; the
+one existing GUI preview was not replaced for this native-only increment.

@@ -166,6 +166,18 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
         target = folder / 'invalid-crop.png'
         rejected_crop = subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(crop_source),'output':str(target),'crop':region}),capture_output=True,text=True)
         assert rejected_crop.returncode!=0 and not target.exists()
+    resized = folder / 'resized.png'
+    subprocess.run([str(cli),'convert-image',str(source),str(resized),'--max-dimension','1'],capture_output=True,text=True,check=True)
+    resize_info = json.loads(subprocess.run([str(cli),'inspect-image',str(resized)],capture_output=True,text=True,check=True).stdout)
+    assert (resize_info['width'],resize_info['height'])==(1,1)
+    assert resize_info['decoded_rgba_sha256']==hashlib.sha256(bytes([0,128,255,64])).hexdigest()
+    combined = folder / 'crop-resize.png'
+    subprocess.run([str(cli),'convert-image',str(crop_source),str(combined),'--crop','1,0,2,2','--max-dimension','1'],capture_output=True,text=True,check=True)
+    combined_info=json.loads(subprocess.run([str(cli),'inspect-image',str(combined)],capture_output=True,text=True,check=True).stdout)
+    assert (combined_info['width'],combined_info['height'])==(1,1)
+    invalid_size=folder/'invalid-size.png'
+    invalid_resize=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_image','input':str(source),'output':str(invalid_size),'max_dimension':0}),capture_output=True,text=True)
+    assert invalid_resize.returncode!=0 and not invalid_size.exists()
     rejected = []
     for name, data in [('bad-color-crc', png(2,1,pixels,extra=gamma_chunk[:-1]+bytes([gamma_chunk[-1]^1]))), ('duplicate-gamma', png(2,1,pixels,extra=gamma_chunk+gamma_chunk)), ('zero-gamma', png(2,1,pixels,extra=chunk(b'gAMA',struct.pack('>I',0)))), ('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
@@ -179,5 +191,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'jpegBackgroundAndContainerChecks':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

@@ -25,7 +25,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
@@ -55,6 +55,7 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
     let mut background = None;
     let mut quality = None;
     let mut crop = None;
+    let mut max_dimension = None;
     for option in options.as_chunks::<2>().0 {
         match option[0].to_str() {
             Some("--background") if background.is_none() => {
@@ -63,6 +64,15 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
                     Some("black") => Background::Black,
                     _ => return Err("Background must be white or black."),
                 })
+            }
+            Some("--max-dimension") if max_dimension.is_none() => {
+                max_dimension = Some(
+                    option[1]
+                        .to_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .filter(|v| *v > 0)
+                        .ok_or("Maximum dimension must be a positive integer.")?,
+                )
             }
             Some("--crop") if crop.is_none() => {
                 let values = option[1]
@@ -100,6 +110,7 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
         background,
         quality,
         crop,
+        max_dimension,
         expected_source_sha256: None,
     })
 }

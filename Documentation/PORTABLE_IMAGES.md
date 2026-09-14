@@ -222,3 +222,24 @@ value; the original checksum was unchanged. An observed drag-history grouping
 failure was fixed before this successful retest. Geometry boundary tests now run
 in both desktop CI jobs. Evidence: electron-image/crop-ui-verified.json under
 Artifacts/Verification. Windows interactive crop acceptance remains pending.
+
+## Native downscaling
+
+The worker and CLI accept `max_dimension` / `--max-dimension` after cropping:
+
+```sh
+target/release/fileform-native convert-image input.png small.png --max-dimension 1200
+```
+
+The longest edge is capped without enlargement. The other dimension is rounded
+to the nearest integer, with a minimum of one pixel. Resampling uses exact pixel
+area overlap in linear sRGB with alpha weighting; transparent hidden colors do
+not tint visible edges. It allocates only the byte output buffer plus small
+working data, not a full-size floating-point image, and checks cancellation.
+This is an area filter, not a claim of pixel-identical ImageIO resampling.
+
+Thirty-nine Rust tests and real process checks pass, including fractional areas,
+no enlargement, alpha, crop-then-resize and invalid limits. Independent Pillow
+decoding matched an analytic linear-light black/white average. Evidence:
+Artifacts/Verification/resize-verified.json. Electron size controls, broader
+resampling/performance comparisons and target-byte fitting are still pending.
