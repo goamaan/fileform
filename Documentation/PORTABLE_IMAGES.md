@@ -260,3 +260,29 @@ acceptance combined a square crop and eight-pixel limit, rejected zero, displaye
 exactly and retained alpha/sRGB metadata, with the source unchanged. Evidence:
 Artifacts/Verification/electron-image/resize-ui-verified.json. The preview remains
 a selection preview; output dimensions describe the saved resampling result.
+
+## Native JPEG input
+
+The CLI/worker now recognizes JPEG content and supports eight-bit baseline and
+progressive RGB/grayscale input. It uses zune-jpeg 0.5.15 directly in strict mode
+on the cancellable snapshot stream, avoiding the image wrapper's compressed-file
+copy. A bounded full-container preflight checks frame dimensions, marker lengths,
+scan/end presence, trailing content, metadata budgets, EXIF orientation and ICC
+segment consistency before decode. Decoded dimensions/layout must match preflight.
+
+JPEG input feeds the same orientation, ICC, crop, resize, PNG/JPEG export and
+publication pipeline. Unrecognized application metadata (including XMP/MPF-style
+segments) sets preservation_pending and disables export. CMYK/YCCK and other
+coding modes are not implemented. This conservative deferral must be replaced
+with format-specific preservation handling before claiming full JPEG parity.
+Inputs without ICC currently use the documented sRGB assumption; EXIF-only color
+hints and wider real-profile/native-renderer comparisons remain verification work.
+Electron's picker still needs to expose the tested JPEG input route.
+
+Forty-two Rust tests pass, including baseline, progressive grayscale, EXIF,
+truncation, trailing content and incomplete ICC. Real CLI tests round-trip JPEG
+through PNG and reject deferred metadata exports. Independently generated baseline
+and progressive color JPEGs decoded/rotated within two code values of Pillow,
+with unchanged originals. Evidence: jpeg-input-independent.json under
+Artifacts/Verification. The progressive grayscale fixture is generated project
+content; its recipe is recorded beside it. Notices remain complete for 62 components.

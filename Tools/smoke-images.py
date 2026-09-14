@@ -122,8 +122,26 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
             if marker==0xe2 and payload.startswith(b'ICC_PROFILE\0'): profile_found=True
             offset+=2+length
         assert dimensions==(2,1) and profile_found
+        jpeg_info=json.loads(subprocess.run([str(cli),'inspect-image',str(jpeg)],capture_output=True,text=True,check=True).stdout)
+        assert not jpeg_info['has_alpha'] and jpeg_info['conversion_available']
+        decoded_png=folder/(background+'-decoded.png')
+        subprocess.run([str(cli),'convert-image',str(jpeg),str(decoded_png)],capture_output=True,text=True,check=True)
+        decoded_info=json.loads(subprocess.run([str(cli),'inspect-image',str(decoded_png)],capture_output=True,text=True,check=True).stdout)
+        assert decoded_info['decoded_rgba_sha256']==jpeg_info['srgb_rgba_sha256']
         repeated=subprocess.run([str(cli),'convert-image',str(source),str(jpeg),'--background',background],capture_output=True,text=True)
         assert repeated.returncode!=0 and jpeg.read_bytes()==data
+    jpeg_original=(folder/'white.jpg').read_bytes()
+    xmp=b'http://ns.adobe.com/xap/1.0/\0<metadata/>'
+    pending_jpeg=folder/'preservation.jpg'
+    pending_jpeg.write_bytes(jpeg_original[:2]+b'\xff\xe1'+struct.pack('>H',len(xmp)+2)+xmp+jpeg_original[2:])
+    pending_info=json.loads(subprocess.run([str(cli),'inspect-image',str(pending_jpeg)],capture_output=True,text=True,check=True).stdout)
+    assert pending_info['preservation_pending'] and not pending_info['conversion_available']
+    pending_output=folder/'preservation.png'
+    denied=subprocess.run([str(cli),'convert-image',str(pending_jpeg),str(pending_output)],capture_output=True,text=True)
+    assert denied.returncode!=0 and not pending_output.exists()
+    progressive=root/'crates/fileform-engine/tests/fixtures/progressive-gray.jpg'
+    progressive_info=json.loads(subprocess.run([str(cli),'inspect-image',str(progressive)],capture_output=True,text=True,check=True).stdout)
+    assert (progressive_info['width'],progressive_info['height'])==(8,4)
     noise_source = folder / 'detail.png'
     noise = bytes(channel for y in range(64) for x in range(64) for channel in [((x*73+y*29)%256),((x*17+y*97)%256),((x*y*13)%256),255])
     noise_source.write_bytes(png(64,64,noise))
@@ -191,5 +209,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'orientedCropPixelsVerified':True,'nativeResizeVerified':True,'jpegBackgroundAndContainerChecks':True,'jpegInputRoundTrip':True,'progressiveGrayInput':True,'unknownMetadataDeferred':True,'qualitySizes':quality_sizes,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

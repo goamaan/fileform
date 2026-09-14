@@ -1,25 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Bounded PNG pixel inspection. Rendering/color conversion is a separate step.
-use crate::{fail, Result};
+use crate::{fail, image_input::DecodedImage, Result};
 use std::io::{BufRead, Seek, SeekFrom};
 
 const MAX_PIXELS: u64 = 80_000_000;
 const SCRATCH_BUDGET: usize = 64 * 1024 * 1024;
-pub(crate) struct DecodedPng {
-    pub pixels: image::RgbaImage,
-    pub orientation: u8,
-    pub has_alpha: bool,
-    pub has_icc: bool,
-    pub icc_profile: Option<Vec<u8>>,
-    pub source_gray: bool,
-    pub srgb: bool,
-    pub gamma: Option<f32>,
-    pub chromaticities: Option<[f64; 8]>,
-    pub has_cicp: bool,
-    pub has_exif: bool,
-    pub has_color_metadata: bool,
-    pub has_hdr_metadata: bool,
-}
 fn pixel_count(width: u32, height: u32) -> Result<usize> {
     let count = u64::from(width) * u64::from(height);
     if count == 0 || count > MAX_PIXELS {
@@ -28,7 +13,7 @@ fn pixel_count(width: u32, height: u32) -> Result<usize> {
     usize::try_from(count)
         .map_err(|_| fail("limit", "Image dimensions exceed this platform's limits."))
 }
-pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
+pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
     if input.seek(SeekFrom::End(0))? < 20 {
         return Err(fail("invalid_image", "PNG is incomplete."));
     }
@@ -175,7 +160,8 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
     };
     let pixels = image::RgbaImage::from_raw(width, height, rgba)
         .ok_or_else(|| fail("invalid_image", "PNG pixel buffer is incomplete."))?;
-    Ok(DecodedPng {
+    Ok(DecodedImage {
+        preservation_pending: false,
         pixels,
         orientation,
         has_alpha,

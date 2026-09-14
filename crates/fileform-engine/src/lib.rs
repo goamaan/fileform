@@ -13,7 +13,9 @@ use tempfile::NamedTempFile;
 
 mod image_color;
 mod image_crop;
+mod image_input;
 mod image_resize;
+mod jpeg_input;
 pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
@@ -162,6 +164,7 @@ pub struct ImageInspection {
     pub srgb_rgba_sha256: Option<String>,
     pub color_interpretation: String,
     pub conversion_available: bool,
+    pub preservation_pending: bool,
     pub preview: Option<image_preview::ImagePreview>,
 }
 #[derive(Debug, Serialize)]
@@ -172,19 +175,25 @@ pub struct ImageReceipt {
     pub width: u32,
     pub height: u32,
 }
-fn inspect_png(input: &Path, cancellation: &Cancellation, preview: bool) -> Result<Response> {
-    let (_, mut inspection, pixels) = prepare_png(input, cancellation)?;
+fn inspect_image(input: &Path, cancellation: &Cancellation, preview: bool) -> Result<Response> {
+    let (_, mut inspection, pixels) = prepare_image(input, cancellation)?;
     if preview && inspection.conversion_available {
         inspection.preview = Some(image_preview::make(&pixels, cancellation)?);
     }
     Ok(Response::ImageInspection(inspection))
 }
-fn prepare_png(
+fn prepare_image(
     input: &Path,
     cancellation: &Cancellation,
 ) -> Result<(Source, ImageInspection, image::RgbaImage)> {
     let mut source = Source::open_with_limit(input, cancellation.clone(), 512 * 1024 * 1024)?;
-    let decoded = png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?;
+    let mut signature = [0u8; 2];
+    source.snapshot_reader()?.read_exact(&mut signature)?;
+    let decoded = if signature == [0xff, 0xd8] {
+        jpeg_input::decode(io::BufReader::new(source.snapshot_reader()?))?
+    } else {
+        png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?
+    };
     cancellation.check()?;
     let decoded_hash = Sha256::digest(decoded.pixels.as_raw())
         .iter()
@@ -197,7 +206,7 @@ fn prepare_png(
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let icc_srgb_rgba_sha256 = if let (false, false, Some(profile)) = (
-        decoded.has_cicp,
+        decoded.has_cicp || decoded.preservation_pending,
         decoded.has_hdr_metadata,
         decoded.icc_profile.as_ref(),
     ) {
@@ -211,27 +220,28 @@ fn prepare_png(
     } else {
         None
     };
-    let (srgb_rgba_sha256, color_interpretation) = if decoded.has_cicp || decoded.has_hdr_metadata {
-        (None, "extended_color_pending")
-    } else if icc_srgb_rgba_sha256.is_some() {
-        (icc_srgb_rgba_sha256.clone(), "icc")
-    } else if decoded.srgb {
-        (Some(oriented_hash.clone()), "srgb")
-    } else if decoded.gamma.is_some() || decoded.chromaticities.is_some() {
-        let profile = image_color::png_gamma_profile(decoded.gamma, decoded.chromaticities)?;
-        image_color::normalize_icc(&mut oriented, &profile, false, cancellation)?;
-        (
-            Some(
-                Sha256::digest(oriented.as_raw())
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect(),
-            ),
-            "gamma_chromaticities",
-        )
-    } else {
-        (Some(oriented_hash.clone()), "assumed_srgb")
-    };
+    let (srgb_rgba_sha256, color_interpretation) =
+        if decoded.has_cicp || decoded.has_hdr_metadata || decoded.preservation_pending {
+            (None, "extended_color_pending")
+        } else if icc_srgb_rgba_sha256.is_some() {
+            (icc_srgb_rgba_sha256.clone(), "icc")
+        } else if decoded.srgb {
+            (Some(oriented_hash.clone()), "srgb")
+        } else if decoded.gamma.is_some() || decoded.chromaticities.is_some() {
+            let profile = image_color::png_gamma_profile(decoded.gamma, decoded.chromaticities)?;
+            image_color::normalize_icc(&mut oriented, &profile, false, cancellation)?;
+            (
+                Some(
+                    Sha256::digest(oriented.as_raw())
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect(),
+                ),
+                "gamma_chromaticities",
+            )
+        } else {
+            (Some(oriented_hash.clone()), "assumed_srgb")
+        };
     source.check(input)?;
     let conversion_available = srgb_rgba_sha256.is_some();
     let inspection = ImageInspection {
@@ -253,6 +263,7 @@ fn prepare_png(
         has_hdr_metadata: decoded.has_hdr_metadata,
         decoded_rgba_sha256: decoded_hash,
         conversion_available,
+        preservation_pending: decoded.preservation_pending,
         preview: None,
     };
     Ok((source, inspection, oriented))
@@ -316,7 +327,7 @@ fn convert_image(
             "The output already exists. Choose another filename.",
         ));
     }
-    let (mut source, inspection, pixels) = prepare_png(input, cancellation)?;
+    let (mut source, inspection, pixels) = prepare_image(input, cancellation)?;
     if !inspection.conversion_available {
         return Err(fail(
             "unsupported",
@@ -662,7 +673,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         );
     }
     if let Request::InspectImage { input, preview } = &request {
-        return inspect_png(input, cancellation, preview.unwrap_or(false));
+        return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
         Request::ConvertImage { input, .. }

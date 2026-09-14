@@ -397,3 +397,18 @@ both package workflows and a routing/coverage check in both matrices. All build,
 test, E2E and packaging stages remain; manual full verification is required for
 a release candidate. Local routing validation passed 17 change classes and all
 directly invoked Tools scripts. See CI_VERIFICATION.md for scope and limitations.
+
+## Strict native JPEG input
+
+Added streaming strict baseline/progressive JPEG decoding, bounded marker/metadata
+preflight, consistent ICC assembly and shared EXIF orientation. The common image
+carrier now serves PNG and JPEG. Supported JPEGs use the existing native render,
+crop/resize and verified export path. Unknown application metadata defers export;
+CMYK/other coding modes and EXIF-only color hints remain parity work. JPEG input
+is currently exposed through CLI/worker, with the Electron picker connection next.
+
+Forty-two Rust tests, Clippy, Windows-target checking and image/table/cancel process
+checks pass. Independent Pillow comparisons on generated baseline/progressive
+color JPEGs verified oriented dimensions and a maximum two-code-value difference,
+with originals unchanged. Dependency notices cover all 62 components. No extra
+GUI application was opened for this native-only increment.
