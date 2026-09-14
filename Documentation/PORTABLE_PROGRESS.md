@@ -335,3 +335,15 @@ decoded pixels matched; only the ICC creation timestamp differed. A detailed
 fixture verified quality 20 output is smaller than quality 95. Invalid quality
 values and PNG misuse produced no output. Earlier JPEG CI run 34893395784 passed
 both platforms. The single old preview was quit before launching its replacement.
+
+## Native exact crop
+
+Ported integer pixel cropping after orientation/color normalization into the
+shared engine, worker request and CLI --crop option. It preserves selected RGBA
+values, rejects invalid/overflowing bounds, checks cancellation and reuses existing
+verified PNG/JPEG publication. Electron's interactive crop UI remains unfinished.
+
+Thirty-six Rust tests, Clippy, Windows-target checking and image/table/cancellation
+process checks pass. The CLI's rotated-image crop matches known independent pixel
+layouts and a Pillow orientation/crop comparison; source bytes are unchanged.
+No extra GUI test build was opened for this native-only increment.

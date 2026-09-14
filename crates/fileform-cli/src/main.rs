@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
-use fileform_engine::{Background, Request};
+use fileform_engine::{Background, PixelCrop, Request};
 use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
@@ -25,7 +25,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] [--quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect FILE | inspect-image FILE.png | convert-image INPUT.png OUTPUT.{{png,jpg}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
@@ -54,6 +54,7 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
     }
     let mut background = None;
     let mut quality = None;
+    let mut crop = None;
     for option in options.as_chunks::<2>().0 {
         match option[0].to_str() {
             Some("--background") if background.is_none() => {
@@ -62,6 +63,24 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
                     Some("black") => Background::Black,
                     _ => return Err("Background must be white or black."),
                 })
+            }
+            Some("--crop") if crop.is_none() => {
+                let values = option[1]
+                    .to_str()
+                    .ok_or("Crop must be x,y,width,height in pixels.")?
+                    .split(',')
+                    .map(str::parse::<u32>)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| "Crop must use non-negative integer pixels.")?;
+                let [x, y, width, height] = values.as_slice() else {
+                    return Err("Crop must be x,y,width,height in pixels.");
+                };
+                crop = Some(PixelCrop {
+                    x: *x,
+                    y: *y,
+                    width: *width,
+                    height: *height,
+                });
             }
             Some("--quality") if quality.is_none() => {
                 quality = Some(
@@ -80,6 +99,7 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
         output: PathBuf::from(output),
         background,
         quality,
+        crop,
         expected_source_sha256: None,
     })
 }

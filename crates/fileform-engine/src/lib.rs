@@ -12,6 +12,8 @@ use std::{
 use tempfile::NamedTempFile;
 
 mod image_color;
+mod image_crop;
+pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
 mod jpeg_output;
@@ -73,6 +75,7 @@ pub enum Request {
         output: PathBuf,
         background: Option<Background>,
         quality: Option<u8>,
+        crop: Option<PixelCrop>,
         expected_source_sha256: Option<String>,
     },
     InspectImage {
@@ -260,6 +263,7 @@ fn convert_image(
     cancellation: &Cancellation,
     background: Option<Background>,
     quality: Option<u8>,
+    crop: Option<PixelCrop>,
 ) -> Result<Response> {
     let jpeg = match output
         .extension()
@@ -313,6 +317,11 @@ fn convert_image(
             "Choose a white or black background for transparent JPEG output.",
         ));
     }
+    let pixels = if let Some(crop) = crop {
+        image_crop::apply(pixels, crop, cancellation)?
+    } else {
+        pixels
+    };
     let parent = output
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -612,6 +621,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         expected_source_sha256,
         background,
         quality,
+        crop,
     } = &request
     {
         return convert_image(
@@ -621,6 +631,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             cancellation,
             *background,
             *quality,
+            *crop,
         );
     }
     if let Request::InspectImage { input, preview } = &request {

@@ -186,3 +186,23 @@ creation timestamp differed, so full-file byte equality is not claimed. The
 quality-85 fixture has different quantization. Evidence: electron-image/
 quality-verified.json under Artifacts/Verification. The preview shows normalized
 source pixels and the chosen matte, not a recompressed JPEG preview.
+
+## Exact pixel cropping
+
+The native worker and CLI now accept an optional crop after orientation/color
+normalization, before PNG/JPEG encoding:
+
+```sh
+target/release/fileform-native convert-image input.png cropped.png --crop 10,20,300,200
+```
+
+Coordinates are x,y,width,height in oriented-image pixels, with a top-left origin.
+The worker uses a crop object with those four integer fields. Empty, overflowing,
+out-of-bounds and malformed rectangles fail without publication. Row copies use
+fallible allocation and cancellation checks; selected RGBA pixels are retained
+exactly before any lossy JPEG encoding. Visual Electron crop controls are pending.
+
+Thirty-six Rust tests and the real image process checks pass. An independent
+Pillow comparison applied EXIF orientation, cropped the selected region and
+matched every output pixel/alpha value; the original bytes stayed unchanged.
+Evidence: Artifacts/Verification/electron-image/crop-verified.json.
