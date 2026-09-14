@@ -160,3 +160,27 @@ hashes; retain the working direct-signing sequence and test the new bundler's or
 
 These sources establish architecture/support facts. The recommendation and
 migration sequencing are Fileform-specific engineering judgments, not benchmarks.
+
+## Electron ecosystem implementation details
+
+Use React + TypeScript with a small Vite build, a separate main/preload build and
+an explicit typed bridge. Evaluate electron-builder/electron-updater first for
+macOS DMG/ZIP, Windows NSIS and GitHub-release update metadata; use a supported,
+pinned Electron release rather than copying T3 Code's version blindly. Playwright's
+Electron support, native OS interaction and engine fixture tests provide different
+levels of evidence and should be used together. Keep native codecs/engines outside
+ASAR, include licenses and verify the exact packaged executables on each platform.
+
+Do not copy the old Swift app's signing entitlements into Electron. Its worker
+currently inherits a macOS App Sandbox from a sandboxed parent. The Electron
+parent/renderer/helper model changes that assumption; explicitly design and test
+worker containment and signing for the new process tree. Hardened runtime,
+renderer sandboxing and macOS App Sandbox are different mechanisms. Preserve
+narrow native file access and test process-tree cancellation on Windows as well.
+
+Use streaming bounded worker messages, throttled progress, lazy previews and
+virtualized file/page lists. Keep parsing, hashing, conversion, validation and
+large allocations in the native worker, not Node's main loop. Treat tool stderr
+as untrusted diagnostics. Review update publisher/signature verification on both
+platforms and delay restart while jobs are active. Old workspace data needs a
+versioned, reversible migration; changing shells must not discard saved results.
