@@ -11,6 +11,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+mod image_orientation;
 mod json_table_reader;
 mod png_pipeline;
 mod table_reader;
@@ -134,6 +135,10 @@ pub struct ImageInspection {
     pub has_color_metadata: bool,
     pub has_hdr_metadata: bool,
     pub decoded_rgba_sha256: String,
+    pub orientation: u8,
+    pub display_width: u32,
+    pub display_height: u32,
+    pub oriented_rgba_sha256: String,
     pub conversion_available: bool,
 }
 fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
@@ -144,12 +149,22 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
+    let (width, height) = decoded.pixels.dimensions();
+    let oriented = image_orientation::apply(decoded.pixels, decoded.orientation, cancellation)?;
+    let oriented_hash = Sha256::digest(oriented.as_raw())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     source.check(input)?;
     Ok(Response::ImageInspection(ImageInspection {
         sha256: source.hash.clone(),
         bytes: source.input.metadata()?.len(),
-        width: decoded.pixels.width(),
-        height: decoded.pixels.height(),
+        width,
+        height,
+        orientation: decoded.orientation,
+        display_width: oriented.width(),
+        display_height: oriented.height(),
+        oriented_rgba_sha256: oriented_hash,
         has_alpha: decoded.has_alpha,
         has_icc: decoded.has_icc,
         has_exif: decoded.has_exif,

@@ -209,3 +209,17 @@ pixel dimensions and 16-bit inputs. Table and cancellation process smoke still
 pass. Tools/smoke-images.py runs in both desktop CI jobs and retains
 Artifacts/Verification/portable-images.json. Notices collected for 62 components;
 new image runtime dependencies are not omitted from distribution notices.
+
+## PNG orientation
+
+Implemented strict bounded TIFF IFD0 EXIF orientation parsing and all eight
+pixel transforms. Inspection now reports raw and oriented dimensions/checksums
+separately. Alpha bytes are retained, allocation is fallible and the transform
+checks cancellation. PNG image conversion remains unavailable pending the rest
+of the render/export pipeline; see Documentation/PORTABLE_IMAGES.md.
+
+Verification: 24 Rust tests, Clippy and Windows-target checking pass. Independent
+PNG/eXIf fixtures sent through the real CLI confirm all eight expected layouts,
+dimension swaps and unchanged original bytes. Normal table and cancellation
+process checks also pass. PNG pipeline CI run 34889052588 has passed macOS;
+Windows was still running when this increment was prepared.

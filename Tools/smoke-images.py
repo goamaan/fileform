@@ -15,8 +15,11 @@ cli = root / 'target/release' / ('fileform-native' + suffix)
 worker = root / 'target/release' / ('fileform-worker' + suffix)
 def chunk(kind, data):
     return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
-def png(width, height, pixels, depth=8):
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b'\x00' + pixels)) + chunk(b'IEND', b'')
+def png(width, height, pixels, depth=8, exif=None):
+    stride = width * 4 * (depth // 8)
+    scanlines = b''.join(b'\x00' + pixels[row * stride:(row + 1) * stride] for row in range(height))
+    metadata = chunk(b'eXIf', exif) if exif is not None else b''
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, 6, 0, 0, 0)) + metadata + chunk(b'IDAT', zlib.compress(scanlines)) + chunk(b'IEND', b'')
 with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     folder = Path(temp)
     source = folder / 'pixels.png'
@@ -31,8 +34,22 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     request = json.dumps({'operation':'inspect_image', 'input':str(source)})
     reply = subprocess.run([str(worker)], input=request, capture_output=True, text=True, check=True)
     assert json.loads(reply.stdout)['result'] == info
+    layouts = ['ABCDEF', 'BADCFE', 'FEDCBA', 'EFCDAB', 'ACEBDF', 'ECAFDB', 'FDBECA', 'BDFACE']
+    orientation_pixels = b''.join(bytes([n, 0, 0, n]) for n in b'ABCDEF')
+    for orientation, layout in enumerate(layouts, 1):
+        exif = b'II' + struct.pack('<HIH', 42, 8, 1) + struct.pack('<HHIHHI', 0x112, 3, 1, orientation, 0, 0)
+        path = folder / f'orientation-{orientation}.png'
+        original = png(2, 3, orientation_pixels, exif=exif)
+        path.write_bytes(original)
+        result = subprocess.run([str(cli), 'inspect-image', str(path)], capture_output=True, text=True, check=True)
+        oriented = json.loads(result.stdout)
+        expected_pixels = b''.join(bytes([n, 0, 0, n]) for n in layout.encode())
+        assert oriented['orientation'] == orientation
+        assert (oriented['display_width'], oriented['display_height']) == ((2, 3) if orientation < 5 else (3, 2))
+        assert oriented['oriented_rgba_sha256'] == hashlib.sha256(expected_pixels).hexdigest()
+        assert path.read_bytes() == original
     rejected = []
-    for name, data in [('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
+    for name, data in [('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
         path.write_bytes(data)
         failure = subprocess.run([str(cli), 'inspect-image', str(path)], capture_output=True, text=True)
@@ -41,5 +58,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'originalUnchanged':True,'rejected':rejected,'scope':'PNG pixel inspection only; no portable image export yet'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'originalUnchanged':True,'rejected':rejected,'scope':'PNG pixel inspection only; no portable image export yet'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

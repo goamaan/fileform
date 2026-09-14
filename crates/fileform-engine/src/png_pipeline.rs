@@ -7,6 +7,7 @@ const MAX_PIXELS: u64 = 80_000_000;
 const SCRATCH_BUDGET: usize = 64 * 1024 * 1024;
 pub(crate) struct DecodedPng {
     pub pixels: image::RgbaImage,
+    pub orientation: u8,
     pub has_alpha: bool,
     pub has_icc: bool,
     pub has_exif: bool,
@@ -74,6 +75,12 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
     let info = reader.info();
     let has_icc = info.icc_profile.is_some();
     let has_exif = info.exif_metadata.is_some();
+    let orientation = info
+        .exif_metadata
+        .as_deref()
+        .map(crate::image_orientation::parse_exif)
+        .transpose()?
+        .unwrap_or(1);
     let has_hdr_metadata =
         info.mastering_display_color_volume.is_some() || info.content_light_level.is_some();
     let has_color_metadata = has_icc
@@ -124,6 +131,7 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
         .ok_or_else(|| fail("invalid_image", "PNG pixel buffer is incomplete."))?;
     Ok(DecodedPng {
         pixels,
+        orientation,
         has_alpha,
         has_icc,
         has_exif,
