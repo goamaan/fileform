@@ -44,7 +44,7 @@ full-size float intermediate. It is not pixel-identical ImageIO resampling.
 
 JPEG transparency requires white/black background selection. Quality/background
 options on PNG/TIFF and unknown/repeated/malformed options are rejected. Target
-byte-size fitting is available in the native CLI/worker; desktop controls are pending.
+byte-size fitting is available in the native CLI/worker and desktop controls.
 
 ## Color and metadata
 
@@ -136,6 +136,21 @@ requires JPEG and a byte limit. A real fixture fit 5,812 bytes under a 6,630-byt
 cap at quality 72 in four attempts. A 3,000-byte test reached quality 20 in eleven
 attempts and was independently decoded with Pillow. A stricter floor correctly
 prevented publication even though a lower-quality version would fit.
-Desktop fit controls, compression-if-smaller behavior and broader format parity
-remain unfinished. Evidence: portable-images.json and image-fit-independent.json
+Compression-if-smaller behavior and broader format parity remain unfinished. Evidence: portable-images.json and image-fit-independent.json
 under Artifacts/Verification.
+
+## Desktop file-size fitting
+
+Electron now exposes a byte/KB/MB limit and JPEG minimum quality. Decimal limits
+are converted with exact integer arithmetic (KB=1000 bytes, MB=1,000,000), rejecting
+fractional bytes and values outside 1 byte–512 MiB. Maximum/minimum quality labels
+make the fitting range explicit. The main process validates the saved byte count,
+actual quality and bounded attempt count before reporting success. Results show
+actual bytes and JPEG quality, rather than just the requested starting quality.
+
+Packaged Mac acceptance saved 6,084 bytes at quality 75 under a 6.63 KB cap, matching
+CLI quantization/pixels. A 1 KB attempt saved nothing and left no staging files;
+its earlier successful result remained available. Minimum quality above maximum
+blocked saving. Cancelling the save dialog preserved the result. Evidence:
+Artifacts/Verification/electron-image/fit-ui-verified.json. These controls do not
+add hidden dimension changes or claim a globally optimal quality search.

@@ -100,7 +100,7 @@ ipcMain.handle('fileform:save-image',async(event,id:unknown,options:unknown)=>{
   authorize(event);
   if(typeof id!=='string'||!images.has(id))throw new Error('Choose the image again.');
   const source=images.get(id)!;
-  const {format,background,quality,crop,maxDimension}=validateImageExport(options,source.width,source.height,source.hasAlpha);
+  const {format,background,quality,crop,maxDimension,maxBytes,minimumQuality}=validateImageExport(options,source.width,source.height,source.hasAlpha);
   if(!source.canConvert)throw new Error('This image requires preservation support that is still being implemented.');
   const expected=outputDimensions(crop?.width??source.width,crop?.height??source.height,maxDimension);
   const extension=format==='jpeg'?'jpg':format;
@@ -109,9 +109,11 @@ ipcMain.handle('fileform:save-image',async(event,id:unknown,options:unknown)=>{
     const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+extension),filters:[{name:format.toUpperCase()+' image',extensions}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;
     if(!extensions.map(value=>'.'+value).includes(parse(choice.filePath).ext.toLowerCase()))throw new Error('Use a filename matching the selected format.');
-    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality,crop,max_dimension:maxDimension});
+    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality,crop,max_dimension:maxDimension,max_bytes:maxBytes,minimum_quality:minimumQuality});
     if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==expected.width||receipt.height!==expected.height||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
-    const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height};
+    const maximumQuality=quality??85;const floor=maxBytes===undefined?maximumQuality:(minimumQuality??Math.min(35,maximumQuality));
+    if(!count(receipt.attempts)||receipt.attempts<1||receipt.attempts>(format==='jpeg'&&maxBytes!==undefined?11:1)||(maxBytes!==undefined&&receipt.bytes>maxBytes)||(format==='jpeg'?(!count(receipt.quality)||receipt.quality<floor||receipt.quality>maximumQuality):receipt.quality!==null))throw new Error('The image receipt does not meet the requested limits. Check the output folder.');
+    const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height,quality:receipt.quality};
     if(saved.size>=100)saved.delete(saved.keys().next().value!);
     saved.set(result.id,choice.filePath);return result;
   });

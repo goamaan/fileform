@@ -469,3 +469,13 @@ A 6,630-byte target produced 5,812 bytes at quality 72 after four attempts. A ti
 with Pillow. Quality-floor and impossible-lossless tests left no output/staging.
 TIFF input CI run 34901453290 passed Windows and macOS. Desktop fitting controls
 remain next work; no additional GUI preview was opened for this native increment.
+
+## Desktop byte-size fitting
+
+Connected exact B/KB/MB limits and JPEG quality floors to native fitting, with
+strict option and receipt validation. Results now display actual bytes and quality.
+Four desktop tests, TypeScript/Vite and packaging pass. The real Mac app saved
+6,084 bytes at quality 75 under 6,630 bytes, then correctly failed a 1 KB target
+without output/staging. CLI quantization/pixels matched, originals matched the
+generated fixture, and invalid quality floors blocked Save. Save-dialog cancellation
+preserved the earlier result. One preview remains open with valid settings.
