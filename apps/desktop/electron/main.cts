@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { basename, dirname, join, parse, resolve, relative, isAbsolute, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Appearance, SourceFile, SavedFile, TableOutput } from '../src/contracts.js';
+import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
 
 app.setName('Fileform Preview');
 app.setAppUserModelId('app.fileform.DesktopPreview');
@@ -15,6 +15,7 @@ let mode:Appearance='system';
 const children=new Set<ChildProcess>();
 const sources=new Map<string,SourceFile & {path:string;sha256:string}>();
 const saved=new Map<string,string>();
+const images=new Map<string,ImageSource & {path:string;sha256:string}>();
 const rendererRoot=resolve(__dirname,'../../dist');
 const page='fileform://app/index.html';
 protocol.registerSchemesAsPrivileged([{scheme:'fileform',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
@@ -75,6 +76,34 @@ ipcMain.handle('fileform:choose',async(event)=>{
     if(!Array.isArray(inspected.outputs)||!inspected.outputs.length||!inspected.outputs.every((x:unknown)=>x==='json'||x==='csv'||x==='tsv'))throw new Error('Invalid output capabilities.');
     const source={outputs:inspected.outputs as TableOutput[],scalarTypesBecomeText:parse(path).ext.toLowerCase()==='.json',id:randomUUID(),name:basename(path),bytes:inspected.bytes,rows:inspected.rows,columns:inspected.columns};
     sources.clear();sources.set(source.id,{...source,path,sha256:inspected.sha256});return source;
+  });
+});
+ipcMain.handle('fileform:choose-image',async(event)=>{
+  authorize(event);
+  return exclusive(async()=>{
+    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'PNG images',extensions:['png']}]});
+    if(result.canceled||result.filePaths.length!==1)return null;
+    const path=await fs.realpath(result.filePaths[0]);
+    const info=await worker({operation:'inspect_image',input:path});
+    if(info.kind!=='image_inspection'||!count(info.display_width)||!count(info.display_height)||info.display_width===0||info.display_height===0||info.display_width*info.display_height>80_000_000||!count(info.bytes)||typeof info.has_alpha!=='boolean'||typeof info.conversion_available!=='boolean'||typeof info.sha256!=='string'||!/^[a-f0-9]{64}$/.test(info.sha256))throw new Error('Invalid image inspection receipt.');
+    const source:ImageSource={id:randomUUID(),name:basename(path),bytes:info.bytes,width:info.display_width,height:info.display_height,hasAlpha:info.has_alpha,canConvert:info.conversion_available};
+    images.clear();images.set(source.id,{...source,path,sha256:info.sha256});return source;
+  });
+});
+ipcMain.handle('fileform:save-image',async(event,id:unknown)=>{
+  authorize(event);
+  if(typeof id!=='string'||!images.has(id))throw new Error('Choose the image again.');
+  const source=images.get(id)!;
+  if(!source.canConvert)throw new Error('This PNG requires color support that is still being implemented.');
+  return exclusive(async()=>{
+    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-normalized.png'),filters:[{name:'PNG image',extensions:['png']}],properties:['createDirectory']});
+    if(choice.canceled||!choice.filePath)return null;
+    if(parse(choice.filePath).ext.toLowerCase()!=='.png')throw new Error('Use a .png output filename.');
+    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256});
+    if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==source.width||receipt.height!==source.height||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
+    const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height};
+    if(saved.size>=100)saved.delete(saved.keys().next().value!);
+    saved.set(result.id,choice.filePath);return result;
   });
 });
 ipcMain.handle('fileform:save',async(event,id:unknown,format:unknown)=>{

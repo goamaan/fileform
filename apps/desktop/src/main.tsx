@@ -2,7 +2,10 @@ import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import type {Appearance,SourceFile,SavedFile,TableOutput} from './contracts';
 import './style.css';
+import {ImageWorkspace} from './image-workspace';
 function App(){
+  const [workspace,setWorkspace]=useState<'tables'|'images'>('tables');
+  const [imageBusy,setImageBusy]=useState(false);
   const [source,setSource]=useState<SourceFile|null>(null);
   const [saved,setSaved]=useState<SavedFile|null>(null);
   const [format,setFormat]=useState<TableOutput>('json');
@@ -16,7 +19,8 @@ function App(){
   const choose=()=>run(async()=>{const file=await window.fileform.chooseTable();if(file){setSource(file);setSaved(null);setFormat(file.outputs[0]);}});
   return <main>
     <header><div className="brand"><span aria-hidden="true">▤</span>Fileform</div><label>Appearance<select aria-label="Appearance" value={appearance} onChange={e=>void applyTheme(e.target.value as Appearance).catch(()=>setError('Appearance could not be saved.'))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></header>
-    <section className="workspace">
+    <nav className="workspace-switch" aria-label="File tools"><button aria-pressed={workspace==='tables'} disabled={busy||imageBusy} onClick={()=>setWorkspace('tables')}>Tables</button><button aria-pressed={workspace==='images'} disabled={busy||imageBusy} onClick={()=>setWorkspace('images')}>Images</button></nav>
+    <ImageWorkspace hidden={workspace!=='images'} onBusyChange={setImageBusy}/><section className="workspace" hidden={workspace!=='tables'}>
       <div className="heading"><h1>Convert a table</h1><span className="format">CSV / TSV / flat JSON</span></div>
       {!source?<button className="dropzone" disabled={busy} onClick={choose}><span className="file-icon" aria-hidden="true">▤</span><strong>{busy?'Reading table…':'Choose a table'}</strong><span>Up to 8 MiB</span></button>:<article className="file"><span className="file-icon" aria-hidden="true">▤</span><div><h2>{source.name}</h2><p>{source.rows.toLocaleString()} {source.rows===1?'row':'rows'} · {source.columns} {source.columns===1?'column':'columns'} · {new Intl.NumberFormat(undefined,{style:'unit',unit:'kilobyte',maximumFractionDigits:1}).format(source.bytes/1000)}</p></div><button disabled={busy} onClick={choose}>Change</button></article>}
       {source?.scalarTypesBecomeText&&<p className="conversion-note">JSON values become text cells. Null becomes an empty cell; numbers keep their exact spelling.</p>}

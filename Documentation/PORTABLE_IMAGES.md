@@ -1,7 +1,8 @@
 # Portable image pipeline
 
 Status: native PNG inspection, orientation, color normalization and verified PNG
-export are implemented. JPEG/TIFF output and Electron image controls are pending.
+export are implemented in the native CLI/worker and the Electron Images workspace.
+JPEG/TIFF output, visual previews and crop/resize controls are pending.
 
 Build with `cargo build --release --workspace`, then run:
 
@@ -111,3 +112,20 @@ fixture compatibility discrepancy is retained as a limitation; standard Apple
 profiles establish the native comparison above, not universal ICC equivalence.
 Additional real profiles, transparency rounding, gamut edges, CICP/HDR and other
 input/output formats remain parity work.
+
+## Electron PNG workspace
+
+The shared Electron app now has Tables and Images workspaces. Images uses native
+open/save dialogs, opaque source/result IDs, validated image receipts and the
+same Rust normalization/export code as the CLI. Unavailable extended-color images
+cannot be exported. Workspace switching retains the selected image and saved
+result during the session; it does not yet persist workspace state across launch.
+
+Packaged macOS acceptance selected an EXIF orientation-6 RGBA PNG, displayed its
+12 × 16 oriented dimensions, saved a new PNG, and retained state when switching
+to Tables and back. Pillow independently confirmed every pixel/alpha value,
+orientation normalization and sRGB tagging; the source checksum was unchanged.
+Light and dark appearance were inspected; the previous Dark setting was restored.
+Evidence is in Artifacts/Verification/electron-image/verified.json.
+The first workspace provides metadata and saving; image previews and the remaining
+editing controls still need to be ported. Windows GUI acceptance remains pending.

@@ -273,3 +273,19 @@ and Windows-target checking pass. A macOS comparison using standard Apple ICC
 profiles and Pillow output decoding matched all channels exactly for four opaque
 fixtures; limitations and the synthetic-profile discrepancy are recorded in
 PORTABLE_IMAGES.md and the retained comparison JSON.
+
+## Electron PNG workflow
+
+Connected shared native image inspection/export to typed Electron preload calls
+and an Images workspace beside Tables. Main-process handlers validate source and
+saved-image receipts, keep paths behind opaque IDs, and retain native save dialogs,
+source hashes, cancellation and output-collision protection. The renderer does
+not perform image transformations. Source/result state survives workspace changes.
+
+Desktop TypeScript/Vite build and packaging passed. Actual packaged Mac app E2E
+opened an oriented transparent PNG, displayed the oriented dimensions, saved it
+through a native dialog, and preserved the result across workspace switching.
+Independent Pillow verification proved exact oriented pixels/alpha, an sRGB tag
+and unchanged original bytes. Light/dark layouts were inspected and Dark restored.
+New Windows CI must build this UI increment; manual Windows UI, image previews,
+other codecs/editing workflows and signed release delivery remain unfinished.
