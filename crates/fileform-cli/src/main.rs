@@ -12,6 +12,7 @@ fn main() {
         },
         [command, input] if command == "inspect-image" => Request::InspectImage {
             input: PathBuf::from(input),
+            preview: None,
         },
         [command, input] if command == "inspect" => Request::Inspect {
             input: PathBuf::from(input),

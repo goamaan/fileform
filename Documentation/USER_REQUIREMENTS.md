@@ -49,3 +49,12 @@ rich product components, workflow widgets and real editor previews from the olde
 site. Minimal must not mean empty. Use restrained transitions, keyboard-accessible
 interactions and reduced-motion support. Inspect both the live reference and its
 website source; keep copy concise and platform availability explicit.
+
+## Desktop identity and development cleanup
+
+The final macOS and Windows product is one Electron application with shared Rust
+processing. The Swift app is a migration reference. Multiple Fileform Preview
+apps left open during QA were not intended product behavior. Keep one development
+build running, enforce single-instance launch behavior, and preserve the existing
+window/workspace on repeated launch. The Preview name and separate app identity
+remain temporary migration safeguards, not a second paid or permanent product.

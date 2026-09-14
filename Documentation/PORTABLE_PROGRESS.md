@@ -289,3 +289,19 @@ Independent Pillow verification proved exact oriented pixels/alpha, an sRGB tag
 and unchanged original bytes. Light/dark layouts were inspected and Dark restored.
 New Windows CI must build this UI increment; manual Windows UI, image previews,
 other codecs/editing workflows and signed release delivery remain unfinished.
+
+## Desktop previews and single-instance behavior
+
+Implemented bounded native-generated PNG previews and connected them to Electron.
+Thirty-two Rust tests, Clippy, Windows-target checking and real image/table/cancel
+process smoke passed. TypeScript/Vite and packaging passed. The packaged Mac app
+visibly displayed the oriented transparent fixture using a native pixel buffer.
+
+The user found six development apps left running. They were all idle test builds;
+all were quit and one current build was launched. Added Electron's single-instance
+lock and a shared show/restore-window path. A real second executable launch exited
+with code 0 while the original PID remained and only one preview app was running.
+The existing image/workspace survived, verified through the native UI. Evidence:
+Artifacts/Verification/single-instance.json. Windows repeat-launch GUI acceptance
+is still pending. AGENTS.md now requires quitting superseded QA builds and keeping
+one current preview app open. Artifact copies on disk are not installed products.

@@ -36,6 +36,11 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     request = json.dumps({'operation':'inspect_image', 'input':str(source)})
     reply = subprocess.run([str(worker)], input=request, capture_output=True, text=True, check=True)
     assert json.loads(reply.stdout)['result'] == info
+    preview_reply = subprocess.run([str(worker)],input=json.dumps({'operation':'inspect_image','input':str(source),'preview':True}),capture_output=True,text=True,check=True)
+    preview = json.loads(preview_reply.stdout)['result']['preview']
+    assert preview['width']==2 and preview['height']==1
+    assert preview['rgba']==[0,0,0,0,0,128,255,127]
+    assert len(preview_reply.stdout.encode()) < 1_048_576
     layouts = ['ABCDEF', 'BADCFE', 'FEDCBA', 'EFCDAB', 'ACEBDF', 'ECAFDB', 'FDBECA', 'BDFACE']
     orientation_pixels = b''.join(bytes([n, 0, 0, n]) for n in b'ABCDEF')
     for orientation, layout in enumerate(layouts, 1):
@@ -121,5 +126,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'verifiedPNGExport':True,'boundedNativePreview':True,'scope':'PNG inspection and normalized PNG export; other image workflows pending'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

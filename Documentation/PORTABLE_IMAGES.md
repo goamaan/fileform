@@ -129,3 +129,19 @@ Light and dark appearance were inspected; the previous Dark setting was restored
 Evidence is in Artifacts/Verification/electron-image/verified.json.
 The first workspace provides metadata and saving; image previews and the remaining
 editing controls still need to be ported. Windows GUI acceptance remains pending.
+
+## Bounded desktop previews
+
+Electron requests an optional preview during native inspection. Rust generates
+an orientation/color-adjusted thumbnail no larger than 128 × 128 pixels, using
+alpha-weighted area averaging so hidden transparent colors do not contaminate
+the result. The pixel payload is at most 64 KiB before JSON encoding. The main
+process validates dimensions, length and byte ranges before exposing it through
+the bridge; the renderer only draws the buffer to a canvas. Preview pixels never
+become export input, and unhandled extended-color images receive no preview.
+
+Unit tests cover payload bounds, transparent-color averaging and cancellation.
+The real worker smoke checks preview values and response size. The packaged Mac
+app displayed the correctly oriented transparent fixture over a checkerboard.
+The preview uses area averages in the encoded display space; higher-quality
+linear-light resampling and larger zoom previews remain refinement work.

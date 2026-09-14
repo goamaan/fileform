@@ -26,3 +26,7 @@ Test end-to-end on macOS. Produce Windows builds and run Windows CI/tests where
 possible; distinguish build success, automated tests and manual GUI acceptance.
 Keep signed downloads and secure updates in scope. Commit verified increments
 on main. New feature breadth follows release stabilization, not the reverse.
+
+During desktop QA, quit superseded test builds before launching a replacement.
+Keep only one active Fileform Preview app; separate artifacts may remain on disk.
+Repeated launches must focus/restore the existing window, preserving active work.

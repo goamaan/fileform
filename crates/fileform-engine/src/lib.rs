@@ -13,6 +13,7 @@ use tempfile::NamedTempFile;
 
 mod image_color;
 mod image_orientation;
+mod image_preview;
 mod json_table_reader;
 mod png_metadata;
 mod png_pipeline;
@@ -72,6 +73,7 @@ pub enum Request {
     },
     InspectImage {
         input: PathBuf,
+        preview: Option<bool>,
     },
     Inspect {
         input: PathBuf,
@@ -151,6 +153,7 @@ pub struct ImageInspection {
     pub srgb_rgba_sha256: Option<String>,
     pub color_interpretation: String,
     pub conversion_available: bool,
+    pub preview: Option<image_preview::ImagePreview>,
 }
 #[derive(Debug, Serialize)]
 pub struct ImageReceipt {
@@ -160,8 +163,11 @@ pub struct ImageReceipt {
     pub width: u32,
     pub height: u32,
 }
-fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
-    let (_, inspection, _) = prepare_png(input, cancellation)?;
+fn inspect_png(input: &Path, cancellation: &Cancellation, preview: bool) -> Result<Response> {
+    let (_, mut inspection, pixels) = prepare_png(input, cancellation)?;
+    if preview && inspection.conversion_available {
+        inspection.preview = Some(image_preview::make(&pixels, cancellation)?);
+    }
     Ok(Response::ImageInspection(inspection))
 }
 fn prepare_png(
@@ -238,6 +244,7 @@ fn prepare_png(
         has_hdr_metadata: decoded.has_hdr_metadata,
         decoded_rgba_sha256: decoded_hash,
         conversion_available,
+        preview: None,
     };
     Ok((source, inspection, oriented))
 }
@@ -555,12 +562,12 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             cancellation,
         );
     }
-    if let Request::InspectImage { input } = &request {
-        return inspect_png(input, cancellation);
+    if let Request::InspectImage { input, preview } = &request {
+        return inspect_png(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
         Request::ConvertImage { input, .. }
-        | Request::InspectImage { input }
+        | Request::InspectImage { input, .. }
         | Request::Inspect { input }
         | Request::ConvertTable { input, .. } => input,
     };

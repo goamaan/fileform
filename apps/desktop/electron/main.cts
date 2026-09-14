@@ -8,7 +8,10 @@ import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, Image
 
 app.setName('Fileform Preview');
 app.setAppUserModelId('app.fileform.DesktopPreview');
+const ownsInstance=app.requestSingleInstanceLock();
+if(!ownsInstance)app.quit();
 let window:BrowserWindow|null=null;
+let windowCreation:Promise<void>|null=null;
 let busy=false;
 let cancelCurrent:(()=>void)|null=null;
 let mode:Appearance='system';
@@ -84,9 +87,11 @@ ipcMain.handle('fileform:choose-image',async(event)=>{
     const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'PNG images',extensions:['png']}]});
     if(result.canceled||result.filePaths.length!==1)return null;
     const path=await fs.realpath(result.filePaths[0]);
-    const info=await worker({operation:'inspect_image',input:path});
+    const info=await worker({operation:'inspect_image',input:path,preview:true});
     if(info.kind!=='image_inspection'||!count(info.display_width)||!count(info.display_height)||info.display_width===0||info.display_height===0||info.display_width*info.display_height>80_000_000||!count(info.bytes)||typeof info.has_alpha!=='boolean'||typeof info.conversion_available!=='boolean'||typeof info.sha256!=='string'||!/^[a-f0-9]{64}$/.test(info.sha256))throw new Error('Invalid image inspection receipt.');
-    const source:ImageSource={id:randomUUID(),name:basename(path),bytes:info.bytes,width:info.display_width,height:info.display_height,hasAlpha:info.has_alpha,canConvert:info.conversion_available};
+    const preview=info.preview;
+    if(preview!==null&&(!preview||!count(preview.width)||!count(preview.height)||preview.width<1||preview.height<1||preview.width>128||preview.height>128||!Array.isArray(preview.rgba)||preview.rgba.length!==preview.width*preview.height*4||!preview.rgba.every((x:unknown)=>count(x)&&x<=255)))throw new Error('Invalid image preview.');
+    const source:ImageSource={id:randomUUID(),name:basename(path),bytes:info.bytes,width:info.display_width,height:info.display_height,hasAlpha:info.has_alpha,canConvert:info.conversion_available,preview};
     images.clear();images.set(source.id,{...source,path,sha256:info.sha256});return source;
   });
 });
@@ -138,6 +143,17 @@ ipcMain.handle('fileform:appearance',async(event,value:unknown)=>{
   }
   return {mode,dark:nativeTheme.shouldUseDarkColors};
 });
+async function showWindow(){
+  if(!ownsInstance)return;
+  await app.whenReady();
+  if(window&&!window.isDestroyed()){
+    if(window.isMinimized())window.restore();
+    window.show();window.focus();return;
+  }
+  if(!windowCreation)windowCreation=createWindow().finally(()=>{windowCreation=null;});
+  await windowCreation;
+}
+if(ownsInstance)app.on('second-instance',()=>{void showWindow();});
 async function createWindow(){
   try{const prefs=JSON.parse(await fs.readFile(join(app.getPath('userData'),'appearance.json'),'utf8'));if(['system','light','dark'].includes(prefs.mode))mode=prefs.mode;}catch{}
   nativeTheme.themeSource=mode;
@@ -150,7 +166,7 @@ async function createWindow(){
   window.on('closed',()=>{window=null;});
   await window.loadURL(page);
 }
-app.whenReady().then(async()=>{
+if(ownsInstance)app.whenReady().then(async()=>{
   protocol.handle('fileform',(request)=>{
     try{
       const url=new URL(request.url);
@@ -161,8 +177,8 @@ app.whenReady().then(async()=>{
       return net.fetch(pathToFileURL(asset).href);
     }catch{return new Response('Not found',{status:404});}
   });
-  await createWindow();
+  await showWindow();
 });
-app.on('activate',()=>{if(!window)void createWindow();});
+app.on('activate',()=>{void showWindow();});
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
 app.on('before-quit',(event)=>{if(children.size){event.preventDefault();dialog.showMessageBoxSync({type:'info',message:'A file is still being processed.',detail:'Please wait for it to finish before quitting.',buttons:['Keep working']});}});
