@@ -78,6 +78,77 @@ pub(crate) fn normalize_icc(
     Ok(())
 }
 
+/// Build a matrix/TRC profile for PNG's lower-priority gAMA/cHRM metadata.
+/// The caller resolves cICP/iCCP/sRGB precedence before calling this function.
+pub(crate) fn png_gamma_profile(
+    gamma: Option<f32>,
+    chromaticities: Option<[f64; 8]>,
+) -> Result<Vec<u8>> {
+    let mut profile = ColorProfile::new_srgb();
+    profile.cicp = None;
+    if let Some(gamma) = gamma {
+        if !gamma.is_finite() || gamma <= 0.0 {
+            return Err(fail("invalid_image", "PNG gamma must be positive."));
+        }
+        let curve = moxcms::ToneReprCurve::Parametric(vec![1.0 / gamma]);
+        profile.red_trc = Some(curve.clone());
+        profile.green_trc = Some(curve.clone());
+        profile.blue_trc = Some(curve);
+    }
+    if let Some(values) = chromaticities {
+        for xy in values.as_chunks::<2>().0 {
+            if !xy.iter().all(|v| v.is_finite())
+                || xy[0] < 0.0
+                || xy[1] <= 0.0
+                || xy[0] + xy[1] > 1.00001
+            {
+                return Err(fail("invalid_image", "PNG chromaticities are invalid."));
+            }
+        }
+        let primaries = moxcms::ColorPrimaries {
+            red: moxcms::Chromaticity {
+                x: values[2] as f32,
+                y: values[3] as f32,
+            },
+            green: moxcms::Chromaticity {
+                x: values[4] as f32,
+                y: values[5] as f32,
+            },
+            blue: moxcms::Chromaticity {
+                x: values[6] as f32,
+                y: values[7] as f32,
+            },
+        };
+        profile.update_rgb_colorimetry(
+            moxcms::XyY {
+                x: values[0],
+                y: values[1],
+                yb: 1.0,
+            },
+            primaries,
+        );
+        let m = profile.rgb_to_xyz_matrix().v;
+        let determinant = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+            - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        if !m.iter().flatten().all(|v| v.is_finite())
+            || !determinant.is_finite()
+            || determinant.abs() < 1e-12
+        {
+            return Err(fail(
+                "invalid_image",
+                "PNG chromaticities do not define a usable color space.",
+            ));
+        }
+    }
+    profile.encode().map_err(|error| {
+        fail(
+            "invalid_image",
+            format!("PNG color profile could not be built: {error}"),
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +206,40 @@ mod tests {
             &Cancellation::default()
         )
         .is_err());
+    }
+    #[test]
+    fn png_linear_gamma_and_p3_chromaticities_transform_correctly() {
+        let mut gray = image::RgbaImage::from_raw(1, 1, vec![128, 128, 128, 42]).unwrap();
+        normalize_icc(
+            &mut gray,
+            &png_gamma_profile(Some(1.0), None).unwrap(),
+            false,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert!(gray.get_pixel(0, 0)[0].abs_diff(188) <= 1);
+        assert_eq!(gray.get_pixel(0, 0)[3], 42);
+        let mut color = image::RgbaImage::from_raw(1, 1, vec![200, 100, 50, 37]).unwrap();
+        let profile = png_gamma_profile(
+            None,
+            Some([0.3127, 0.3290, 0.68, 0.32, 0.265, 0.69, 0.15, 0.06]),
+        )
+        .unwrap();
+        normalize_icc(&mut color, &profile, false, &Cancellation::default()).unwrap();
+        for (actual, expected) in color.get_pixel(0, 0).0[..3].iter().zip([215u8, 93, 31]) {
+            assert!(actual.abs_diff(expected) <= 2);
+        }
+        assert_eq!(color.get_pixel(0, 0)[3], 37);
+    }
+    #[test]
+    fn invalid_gamma_and_degenerate_chromaticities_are_rejected() {
+        for gamma in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(png_gamma_profile(Some(gamma), None).is_err());
+        }
+        assert!(png_gamma_profile(None, Some([0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3])).is_err());
+        assert!(
+            png_gamma_profile(None, Some([0.3, 0.0, 0.64, 0.33, 0.3, 0.6, 0.15, 0.06])).is_err()
+        );
     }
     #[test]
     fn invalid_profiles_and_cancelled_transforms_fail() {

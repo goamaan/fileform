@@ -239,3 +239,21 @@ result within two code values. Grayscale gamma and wrong-profile-space checks
 also pass. Clippy, Windows-target checking and table/cancellation process smoke
 passed; dependency notices still include all 62 components. See PORTABLE_IMAGES.md
 for remaining rendering, metadata and export gates.
+
+## PNG gamma and metadata integrity
+
+Implemented native gamma/chromaticity profile construction and explicit color
+interpretation in image receipts. The pipeline follows color-tag precedence and
+defers extended-color inputs instead of applying a lower-priority ICC/sRGB guess.
+A real malformed-file fixture exposed silent ancillary-metadata rejection in the
+PNG decoder; a bounded independent chunk/CRC/presence preflight now closes that
+fallback path. Tables and other shared file behavior remain unchanged.
+
+Thirty Rust tests, Clippy, Windows-target checking, independent native image
+process fixtures, and table/cancellation process smoke pass. Notices remain
+complete for 62 components. Prior ICC-stage CI run 34889865878 passed both
+Windows and macOS. The gamma/preflight increment needs its own platform CI.
+
+The user reconfirmed one shared Electron/React and native Rust stack for both
+platforms. The Swift app remains a migration reference, not a separate final
+macOS product. Full parity and release delivery remain the active objective.

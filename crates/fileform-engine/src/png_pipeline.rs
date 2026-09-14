@@ -12,6 +12,10 @@ pub(crate) struct DecodedPng {
     pub has_icc: bool,
     pub icc_profile: Option<Vec<u8>>,
     pub source_gray: bool,
+    pub srgb: bool,
+    pub gamma: Option<f32>,
+    pub chromaticities: Option<[f64; 8]>,
+    pub has_cicp: bool,
     pub has_exif: bool,
     pub has_color_metadata: bool,
     pub has_hdr_metadata: bool,
@@ -38,6 +42,7 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
         ));
     }
     input.seek(SeekFrom::Start(0))?;
+    let metadata_mask = crate::png_metadata::preflight(&mut input)?;
     let mut decoder = png::Decoder::new(input);
     decoder.set_limits(png::Limits {
         bytes: SCRATCH_BUDGET,
@@ -79,6 +84,33 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
     // next_frame alone does not prove that the final PNG records are present.
     reader.finish().map_err(png_error)?;
     let info = reader.info();
+    let present = [
+        info.gama_chunk.is_some(),
+        info.chrm_chunk.is_some(),
+        info.srgb.is_some(),
+        info.icc_profile.is_some(),
+        info.exif_metadata.is_some(),
+        info.coding_independent_code_points.is_some(),
+        info.mastering_display_color_volume.is_some(),
+        info.content_light_level.is_some(),
+    ];
+    for (index, exists) in present.iter().enumerate() {
+        if metadata_mask & (1 << index) != 0 && !exists {
+            return Err(fail(
+                "invalid_image",
+                "PNG metadata could not be decoded reliably.",
+            ));
+        }
+    }
+    let srgb = info.srgb.is_some();
+    let gamma = info.gama_chunk.map(|value| value.into_value());
+    let chromaticities = info.chrm_chunk.map(|c| {
+        [
+            c.white.0, c.white.1, c.red.0, c.red.1, c.green.0, c.green.1, c.blue.0, c.blue.1,
+        ]
+        .map(|v| f64::from(v.into_value()))
+    });
+    let has_cicp = info.coding_independent_code_points.is_some();
     let has_icc = info.icc_profile.is_some();
     if info
         .icc_profile
@@ -99,8 +131,8 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
         info.mastering_display_color_volume.is_some() || info.content_light_level.is_some();
     let has_color_metadata = has_icc
         || info.srgb.is_some()
-        || info.source_gamma.is_some()
-        || info.source_chromaticities.is_some()
+        || info.gama_chunk.is_some()
+        || info.chrm_chunk.is_some()
         || info.coding_independent_code_points.is_some()
         || has_hdr_metadata;
     if output.width != width || output.height != height || output.bit_depth != png::BitDepth::Eight
@@ -150,6 +182,10 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
         has_icc,
         icc_profile,
         source_gray,
+        srgb,
+        gamma,
+        chromaticities,
+        has_cicp,
         has_exif,
         has_color_metadata,
         has_hdr_metadata,

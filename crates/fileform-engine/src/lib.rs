@@ -14,6 +14,7 @@ use tempfile::NamedTempFile;
 mod image_color;
 mod image_orientation;
 mod json_table_reader;
+mod png_metadata;
 mod png_pipeline;
 mod table_reader;
 use json_table_reader::JsonTableReader;
@@ -141,6 +142,8 @@ pub struct ImageInspection {
     pub display_height: u32,
     pub oriented_rgba_sha256: String,
     pub icc_srgb_rgba_sha256: Option<String>,
+    pub srgb_rgba_sha256: Option<String>,
+    pub color_interpretation: String,
     pub conversion_available: bool,
 }
 fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
@@ -153,12 +156,16 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         .collect();
     let (width, height) = decoded.pixels.dimensions();
     let mut oriented = image_orientation::apply(decoded.pixels, decoded.orientation, cancellation)?;
-    let oriented_hash = Sha256::digest(oriented.as_raw())
+    let oriented_hash: String = Sha256::digest(oriented.as_raw())
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    let icc_srgb_rgba_sha256 = if let Some(profile) = decoded.icc_profile {
-        image_color::normalize_icc(&mut oriented, &profile, decoded.source_gray, cancellation)?;
+    let icc_srgb_rgba_sha256 = if let (false, false, Some(profile)) = (
+        decoded.has_cicp,
+        decoded.has_hdr_metadata,
+        decoded.icc_profile.as_ref(),
+    ) {
+        image_color::normalize_icc(&mut oriented, profile, decoded.source_gray, cancellation)?;
         Some(
             Sha256::digest(oriented.as_raw())
                 .iter()
@@ -167,6 +174,27 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         )
     } else {
         None
+    };
+    let (srgb_rgba_sha256, color_interpretation) = if decoded.has_cicp || decoded.has_hdr_metadata {
+        (None, "extended_color_pending")
+    } else if icc_srgb_rgba_sha256.is_some() {
+        (icc_srgb_rgba_sha256.clone(), "icc")
+    } else if decoded.srgb {
+        (Some(oriented_hash.clone()), "srgb")
+    } else if decoded.gamma.is_some() || decoded.chromaticities.is_some() {
+        let profile = image_color::png_gamma_profile(decoded.gamma, decoded.chromaticities)?;
+        image_color::normalize_icc(&mut oriented, &profile, false, cancellation)?;
+        (
+            Some(
+                Sha256::digest(oriented.as_raw())
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect(),
+            ),
+            "gamma_chromaticities",
+        )
+    } else {
+        (Some(oriented_hash.clone()), "assumed_srgb")
     };
     source.check(input)?;
     Ok(Response::ImageInspection(ImageInspection {
@@ -179,6 +207,8 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         display_height: oriented.height(),
         oriented_rgba_sha256: oriented_hash,
         icc_srgb_rgba_sha256,
+        srgb_rgba_sha256,
+        color_interpretation: color_interpretation.into(),
         has_alpha: decoded.has_alpha,
         has_icc: decoded.has_icc,
         has_exif: decoded.has_exif,

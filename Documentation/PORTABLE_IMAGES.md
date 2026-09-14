@@ -60,3 +60,26 @@ profiles in PNG files and check their receipts and unchanged source bytes.
 Gamma/chromaticity-only PNG color, metadata precedence/conflicts, HDR/gain maps,
 comparison against the native Apple renderer and output profile embedding remain
 release requirements. `conversion_available` therefore remains false.
+
+## PNG gamma, chromaticity and metadata validation
+
+PNG inspection now builds native matrix/TRC profiles for gAMA/cHRM metadata and
+returns `srgb_rgba_sha256` with a `color_interpretation` label. ICC takes priority
+over sRGB, then gamma/chromaticities. A cICP or HDR-metadata image is marked
+`extended_color_pending` and receives no normalized hash until that path is
+implemented. This follows the [PNG color priority rules](https://www.w3.org/TR/png-3/#colorSpace).
+Untagged inputs are explicitly `assumed_srgb`; missing primaries use sRGB primaries,
+and chromaticities without gamma currently use the sRGB transfer curve. These
+assumptions require native-reference comparison before export is enabled.
+
+A bounded preflight verifies recognized color/EXIF chunk lengths, duplicates,
+CRC checksums and basic value constraints, and rejects metadata the decoder
+silently ignored. It bounds metadata chunks at 1 MiB and the container at 100,000
+chunks. Raw gama_chunk/chrm_chunk fields are used rather than relying on derived
+fields that were not populated in the tested png 0.18.1 decode path.
+
+Independent process fixtures verify linear-gamma normalization, explicit-sRGB
+precedence, extended-color deferral, zero-gamma rejection, metadata CRC rejection
+and duplicate rejection. Unit tests check Display P3 chromaticity conversion,
+invalid gamma and degenerate primaries. These extend the shared Windows/macOS
+worker checks; they do not complete image export or all color-space parity.

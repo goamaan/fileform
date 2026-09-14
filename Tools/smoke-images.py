@@ -15,13 +15,13 @@ cli = root / 'target/release' / ('fileform-native' + suffix)
 worker = root / 'target/release' / ('fileform-worker' + suffix)
 def chunk(kind, data):
     return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
-def png(width, height, pixels, depth=8, exif=None, icc=None):
+def png(width, height, pixels, depth=8, exif=None, icc=None, extra=b''):
     stride = width * 4 * (depth // 8)
     scanlines = b''.join(b'\x00' + pixels[row * stride:(row + 1) * stride] for row in range(height))
     metadata = chunk(b'eXIf', exif) if exif is not None else b''
     if icc is not None:
         metadata += chunk(b'iCCP', b'Fileform QA\x00\x00' + zlib.compress(icc))
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, 6, 0, 0, 0)) + metadata + chunk(b'IDAT', zlib.compress(scanlines)) + chunk(b'IEND', b'')
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, 6, 0, 0, 0)) + metadata + extra + chunk(b'IDAT', zlib.compress(scanlines)) + chunk(b'IEND', b'')
 with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     folder = Path(temp)
     source = folder / 'pixels.png'
@@ -65,8 +65,28 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
             assert checked['icc_srgb_rgba_sha256'] != checked['oriented_rgba_sha256']
         assert path.read_bytes() == tagged
         color_checks[name] = checked['icc_srgb_rgba_sha256']
+    gamma_pixels = bytes([128,128,128,42,0,0,0,0])
+    gamma_chunk = chunk(b'gAMA',struct.pack('>I',100000))
+    color_cases = [
+        ('linear-gamma',gamma_chunk,'gamma_chromaticities'),
+        ('srgb-precedence',gamma_chunk + chunk(b'sRGB',b'\x00'),'srgb'),
+        ('extended-color',chunk(b'cICP',bytes([9,16,0,1])),'extended_color_pending'),
+    ]
+    for name, metadata, interpretation in color_cases:
+        path = folder / (name + '.png')
+        path.write_bytes(png(2,1,gamma_pixels,extra=metadata))
+        checked = json.loads(subprocess.run([str(cli),'inspect-image',str(path)],capture_output=True,text=True,check=True).stdout)
+        assert checked['color_interpretation'] == interpretation, checked
+        if name == 'linear-gamma':
+            # Linear 128/255 maps to sRGB 188, with one code value CMS tolerance.
+            expected_hashes = {hashlib.sha256(bytes([v,v,v,42,0,0,0,0])).hexdigest() for v in [187,188,189]}
+            assert checked['srgb_rgba_sha256'] in expected_hashes, checked
+        elif name == 'srgb-precedence':
+            assert checked['srgb_rgba_sha256'] == hashlib.sha256(gamma_pixels).hexdigest()
+        else:
+            assert checked['srgb_rgba_sha256'] is None and checked['icc_srgb_rgba_sha256'] is None
     rejected = []
-    for name, data in [('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
+    for name, data in [('bad-color-crc', png(2,1,pixels,extra=gamma_chunk[:-1]+bytes([gamma_chunk[-1]^1]))), ('duplicate-gamma', png(2,1,pixels,extra=gamma_chunk+gamma_chunk)), ('zero-gamma', png(2,1,pixels,extra=chunk(b'gAMA',struct.pack('>I',0)))), ('malformed-icc', png(2,1,pixels,icc=b'invalid')), ('malformed-exif', png(2, 1, pixels, exif=b'bad')), ('missing-end', content[:-12]), ('trailing-bytes', content + b'extra'), ('animated', content[:33] + chunk(b'acTL', struct.pack('>II', 2, 0)) + content[33:]), ('oversized-dimensions', png(80_000_001, 1, b'\x00'*4)), ('high-depth', png(2, 1, b'\x00'*16, 16))]:
         path = folder / (name + '.png')
         path.write_bytes(data)
         failure = subprocess.run([str(cli), 'inspect-image', str(path)], capture_output=True, text=True)
@@ -75,5 +95,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-image-') as temp:
     assert source.read_bytes() == content
     evidence = root / 'Artifacts/Verification/portable-images.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'originalUnchanged':True,'rejected':rejected,'scope':'PNG pixel inspection only; no portable image export yet'}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform':os.name,'cliAndWorkerMatch':True,'exactRGBAPixels':True,'allEightOrientationsVerified':True,'iccProfileChecks':color_checks,'gammaAndPrecedenceChecks':True,'originalUnchanged':True,'rejected':rejected,'scope':'PNG pixel inspection only; no portable image export yet'}, indent=2) + '\n')
 print('Native PNG inspection and independent pixel checks passed.')

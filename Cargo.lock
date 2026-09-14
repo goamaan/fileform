@@ -140,6 +140,7 @@ dependencies = [
 name = "fileform-engine"
 version = "0.1.0"
 dependencies = [
+ "crc32fast",
  "image",
  "moxcms",
  "png",
