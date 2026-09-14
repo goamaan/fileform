@@ -14,3 +14,5 @@ xcuserdata/
 *.provisionprofile
 *.keychain-db
 Artifacts/
+
+/target/

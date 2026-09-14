@@ -1,0 +1,13 @@
+[package]
+name = "fileform-cli"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[[bin]]
+name = "fileform-native"
+path = "src/main.rs"
+
+[dependencies]
+fileform-engine = { path = "../fileform-engine" }
+serde_json = "1.0.151"

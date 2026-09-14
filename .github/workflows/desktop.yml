@@ -1,0 +1,66 @@
+name: Portable desktop preview
+on:
+  push:
+    branches: [main]
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Configure portable toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
+          fi
+      - name: Verify native engine
+        run: cargo test --workspace --locked
+      - name: Check native code
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build optimized native worker and CLI
+        run: cargo build --release --workspace --locked
+      - name: Verify worker and CLI processes
+        run: python Tools/smoke-portable.py
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Build desktop
+        working-directory: apps/desktop
+        run: npm run build
+      - name: Package Windows preview
+        if: runner.os == 'Windows'
+        working-directory: apps/desktop
+        run: npx electron-builder --win nsis --x64 --config electron-builder.cjs
+      - name: Package Mac preview
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        run: |
+          npx electron-builder --mac dir --arm64 --config electron-builder.cjs
+          ditto -c -k --keepParent "artifacts/mac-arm64/Fileform Preview.app" "artifacts/Fileform-Preview-mac-arm64.zip"
+      - name: Retain preview artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fileform-preview-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            apps/desktop/artifacts/*.exe
+            apps/desktop/artifacts/*.zip
+            Artifacts/Verification/portable-smoke.json
+          retention-days: 14

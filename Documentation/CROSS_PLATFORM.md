@@ -1,7 +1,7 @@
 # Cross-platform desktop decision and implementation plan
 
-September 14, 2026. Status: researched direction; portable implementation and
-benchmarks are not yet complete. Read USER_REQUIREMENTS.md for the full mandate.
+September 14, 2026. Status: Electron selected; first real table workflow implemented. Full portable
+parity and benchmarks are not yet complete. See PORTABLE_PROGRESS.md. Read USER_REQUIREMENTS.md for the full mandate.
 
 ## Selected architecture
 

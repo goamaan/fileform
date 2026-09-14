@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/fileform-engine", "crates/fileform-worker", "crates/fileform-cli"]
+resolver = "2"

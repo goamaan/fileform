@@ -10,7 +10,9 @@ outputs. No account, trial, activation or payment is required.
 
 The Swift engine/CLI and native macOS application are working reference
 implementations. They are being consolidated here with the website and a new
-macOS/Windows desktop. The portable application is not implemented yet. See the
+macOS/Windows desktop. The first Electron/Rust preview now performs real CSV/TSV-to-JSON conversion.
+The other workflows still use the reference implementation; Windows installer
+verification and full migration parity remain pending. See the
 [cross-platform plan](Documentation/CROSS_PLATFORM.md) and
 [user requirements](Documentation/USER_REQUIREMENTS.md).
 
@@ -23,6 +25,8 @@ and operation documentation describe the implemented routes and limits.
 
 - `Sources/`, `Tests/`, `Package.swift`: working Swift engine and CLI.
 - `apps/macos/`: native SwiftUI reference app, using the root package.
+- `apps/desktop/`: Electron + React migration preview.
+- `crates/`: portable Rust engine, worker and CLI.
 - `website/`: project website; free-project redesign is in progress.
 - `Documentation/`: contracts, architecture, dependencies and migration plan.
 - `Tools/`: pinned native pack builds, CLI checks and packaging.

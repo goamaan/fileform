@@ -1,0 +1,26 @@
+{
+  "name": "fileform-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist-main/electron/main.cjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.json && vite build",
+    "start": "electron .",
+    "package:dir": "npm run build && electron-builder --dir --config electron-builder.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/node": "26.5.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "description": "Free, local file transformations.",
+  "author": "Fileform contributors"
+}
