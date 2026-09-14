@@ -2,8 +2,8 @@
 
 Status: native PNG inspection, orientation, color normalization and verified PNG
 and PNG/JPEG export are implemented in the native CLI/worker and Electron Images
-workspace, with native-generated previews. TIFF output and crop/resize controls
-are pending.
+workspace, with native-generated previews and crop controls. TIFF output and
+resize controls are pending.
 
 Build with `cargo build --release --workspace`, then run:
 
@@ -200,9 +200,25 @@ Coordinates are x,y,width,height in oriented-image pixels, with a top-left origi
 The worker uses a crop object with those four integer fields. Empty, overflowing,
 out-of-bounds and malformed rectangles fail without publication. Row copies use
 fallible allocation and cancellation checks; selected RGBA pixels are retained
-exactly before any lossy JPEG encoding. Visual Electron crop controls are pending.
+exactly before any lossy JPEG encoding. Electron crop controls are now connected to this native operation.
 
 Thirty-six Rust tests and the real image process checks pass. An independent
 Pillow comparison applied EXIF orientation, cropped the selected region and
 matched every output pixel/alpha value; the original bytes stayed unchanged.
 Evidence: Artifacts/Verification/electron-image/crop-verified.json.
+
+## Electron crop controls
+
+Images now provides a visible crop selection, four draggable corner handles,
+keyboard corner adjustment (Shift for larger steps), a centered 1:1 preset,
+exact pixel fields, remove-crop, and bounded undo/redo history. Main-process and
+native validation both enforce a non-empty rectangle within oriented dimensions.
+Export receipts are checked against the selected crop dimensions.
+
+Packaged Mac acceptance applied the square preset, dragged width from 12 to 10,
+undid to 12, redid to 10, adjusted a corner with the keyboard, and saved through a
+native dialog. Independent Pillow decoding matched every selected pixel and alpha
+value; the original checksum was unchanged. An observed drag-history grouping
+failure was fixed before this successful retest. Geometry boundary tests now run
+in both desktop CI jobs. Evidence: electron-image/crop-ui-verified.json under
+Artifacts/Verification. Windows interactive crop acceptance remains pending.

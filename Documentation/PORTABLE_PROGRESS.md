@@ -347,3 +347,17 @@ Thirty-six Rust tests, Clippy, Windows-target checking and image/table/cancellat
 process checks pass. The CLI's rotated-image crop matches known independent pixel
 layouts and a Pillow orientation/crop comparison; source bytes are unchanged.
 No extra GUI test build was opened for this native-only increment.
+
+## Visual Electron cropping
+
+Connected crop requests to the typed bridge and native save path. The preview
+has draggable/keyboard corner controls, numeric bounds, a square preset and
+undo/redo. All crop values and resulting dimensions are checked in main and Rust.
+Node geometry checks cover corner bounds and non-empty integer regions on CI.
+
+The packaged Mac test exposed an undo grouping bug during drag; corrected history
+recording and pointer-capture handling, then retested the complete sequence.
+Drag 12→10, undo 10→12, redo 12→10, keyboard adjustment and native save all passed.
+The 10×12 output matched an independent oriented-image crop, with alpha and source
+checksum preserved. TypeScript/Vite, packaging and geometry checks passed. Only
+one preview build was left running. This remains partial overall app parity.
