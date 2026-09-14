@@ -11,13 +11,13 @@ Reviewed against upstream sources September 8, 2026. These are engineering packa
 | LAME 3.100 encoder | LGPL-2.0-or-later; optional decoder excluded | Hash-pinned static encoder in FFmpeg pack `9.0.1-fileform.2`; source, notices and build flags included. See [MP3 output](MP3-output.md). |
 | libvips | LGPL-2.1 license; codec dependencies have additional terms | Review exact dependency graph and linking/replacement obligations; no arbitrary prebuilt bundle |
 | qpdf 12.4.1 + libjpeg-turbo 3.2.0 | qpdf Apache-2.0 with embedded permissive notices; libjpeg-turbo IJG/BSD/zlib terms | Hash-pinned static CLI pack `12.4.1-fileform.1`; sources, exact CMake caches, licenses and IJG attribution included. Native crypto; only Apple system zlib/libc++/libSystem runtime dependencies. See [PDF optimization](PDF-optimization.md) and [embedded image extraction](PDF-embedded-images.md). |
-| Pandoc | GPL | Optional standalone document tool under its own license; review actual communication/aggregation architecture and source distribution before shipping; do not link/copy it into proprietary app code |
+| Pandoc | GPL | Optional standalone document tool under its own license; review actual communication/aggregation architecture and source distribution before shipping; review copyleft and linking obligations before integration |
 | LibreOffice | MPL-2.0 with numerous separately licensed components | Optional headless pack; preserve full build-specific license inventory and applicable source obligations |
 | Ghostscript | AGPL/commercial | Excluded until an explicit compliant distribution decision; qpdf does not replace every Ghostscript capability |
 
 Before any engine pack is released, record exact version/revision, source archive and hash, build toolchain and flags, patches, transitive components, license texts/notices, binary hashes and signatures, source delivery location, and any replacement/relinking requirements. Verify runtime capabilities using that artifact and retain reproducible build instructions and an SBOM.
 
-Do not assume running an executable separately automatically settles license compatibility. Do not use a developer's Homebrew binary as a distributable release artifact. App commercial terms must preserve recipients' rights to open components. Codec patent questions are separate from source-code licensing and remain a distribution review item.
+Do not assume running an executable separately automatically settles license compatibility. Do not use a developer's Homebrew binary as a distributable release artifact. Fileform distributions must preserve recipients' rights to every component. Codec patent questions are separate from source-code licensing and remain a distribution review item.
 
 Sources:
 

@@ -4,7 +4,7 @@ module.exports = {
   appId:'app.fileform.DesktopPreview',productName:'Fileform Preview',
   directories:{output:'artifacts'},
   files:['dist/**/*','dist-main/**/*','package.json'],
-  extraResources:[{from:path.resolve(__dirname,'../../target/release/fileform-worker'+suffix),to:'native/fileform-worker'+suffix}],
+  extraResources:[{from:path.resolve(__dirname,'../../target/release/fileform-worker'+suffix),to:'native/fileform-worker'+suffix},{from:path.resolve(__dirname,'../../Artifacts/desktop-notices'),to:'notices'}],
   mac:{target:['dir'],identity:null,category:'public.app-category.utilities',icon:'../macos/Resources/Assets.xcassets/AppIcon.appiconset/icon-512@2x.png'},
   win:{target:['nsis'],icon:'../macos/Resources/Assets.xcassets/AppIcon.appiconset/icon-512@2x.png'},
   npmRebuild:false,asar:true,

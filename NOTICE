@@ -1,9 +1,6 @@
-Fileform Core
-Copyright 2026 Amaan Gokak and Fileform Core contributors
+Fileform
+Copyright 2026 Amaan Gokak and contributors.
 
-Original code and documentation in this repository are licensed under the
-Apache License, Version 2.0. Third-party components retain their own licenses.
-
-Optional media pack MP3 encoding uses LAME (https://lame.sourceforge.io/),
-Copyright The LAME Project and its contributors, under LGPL-2.0-or-later.
-The generated pack retains upstream source, copyright notices and license texts.
+Original Fileform application, engine, CLI and website source is available under
+Apache License 2.0. Third-party components retain their own licenses and notices;
+see THIRD_PARTY.md and the notices included with each release.

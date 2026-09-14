@@ -3,8 +3,8 @@ import './globals.css';
 import './v2.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Fileform — File tools for Mac', template: '%s — Fileform' },
-  description: 'Convert images, PDFs, audio, video and tables locally on your Mac. Fileform is in development; its open-source CLI is available now.',
+  title: { default: 'Fileform — Local file tools', template: '%s — Fileform' },
+  description: 'Free, open-source file tools. Convert, organize and transform files locally. The macOS app is working; the Windows desktop is in development.',
   alternates: { canonical: '/' },
   robots: { index: false, follow: false },
   metadataBase: new URL('https://fileform.amaangokak18.chatgpt.site'),

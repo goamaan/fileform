@@ -2,7 +2,9 @@ name: Core verification
 on:
   push:
     branches: [main]
+    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', 'apps/macos/**', '.github/workflows/ci.yml']
   pull_request:
+    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', 'apps/macos/**', '.github/workflows/ci.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,6 +47,11 @@ jobs:
         # Unrelated codec tests must not contend with wall-clock worker teardown checks.
         # Tests that verify concurrency create their own explicit concurrent work.
         run: swift test --no-parallel
+      - name: Verify the native reference app
+        run: |
+          command -v xcodegen || brew install xcodegen
+          xcodegen generate --spec apps/macos/project.yml
+          xcodebuild -project apps/macos/Fileform.xcodeproj -scheme Fileform -configuration Debug -derivedDataPath apps/macos/Artifacts/DerivedData test CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES
       - name: Verify CLI end to end
         run: |
           Tools/smoke-cli.sh

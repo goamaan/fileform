@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-14",
+  "note": "Reference ledger statuses are historical, not proof of portable completion. Commerce requirements were cancelled by the user; all remaining scope is retained here.",
+  "requirements": [
+    {
+      "id": "UX01",
+      "title": "File import through picker, drag/drop, menu and keyboard",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX02",
+      "title": "Task search, navigation and compact layouts",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX03",
+      "title": "Single-file and mixed batch workflows",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX04",
+      "title": "Saved setups and reusable results",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX05",
+      "title": "Local workspace and recent-result persistence",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX06",
+      "title": "Progress, cancellation, errors and retry",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX07",
+      "title": "Open, reveal, share and drag saved results",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX08",
+      "title": "Output folders and filename conflicts",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX09",
+      "title": "Actionable errors and protected-document handling",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX10",
+      "title": "Keyboard access, appearances and accessible visuals",
+      "reference_ledger_status": "implementing",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX11",
+      "title": "Useful application settings",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX12",
+      "title": "Opt-in privacy-reviewed diagnostics",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "UX13",
+      "title": "PDF and media visual editing",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "IMG01",
+      "title": "Image conversion, including existing PNG/JPEG and HEIC input routes",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "IMG02",
+      "title": "Image crop and resize",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "IMG03",
+      "title": "Verified size limits and quality controls",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "IMG04",
+      "title": "Image color profile and metadata policies",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "IMG05",
+      "title": "Additional WebP, HEIC, AVIF and TIFF writing",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "IMG06",
+      "title": "Animated image and video/image workflows",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "MED01",
+      "title": "Audio/video conversion and audio extraction",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "MED02",
+      "title": "MP3 conversion",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "MED03",
+      "title": "Exact and fast media trimming",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "MED04",
+      "title": "Audio/video task routing",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "MED05",
+      "title": "Media size limits and resolution controls",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "MED06",
+      "title": "Broader media editing and joining",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "DATA01",
+      "title": "CSV, TSV and flat JSON conversion",
+      "reference_ledger_status": "planned",
+      "portable_status": "partial",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "DATA02",
+      "title": "Local text extraction and scan recognition",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "DATA03",
+      "title": "Publishing and document formats",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "DATA04",
+      "title": "Office format conversion",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "DATA05",
+      "title": "PDF to editable Office formats",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF01",
+      "title": "Combine PDFs and images",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PDF02",
+      "title": "Organize, rotate, remove and insert pages",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PDF03",
+      "title": "Split PDFs by markers, intervals and ranges",
+      "reference_ledger_status": "verified",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PDF04",
+      "title": "Page image export and embedded-image extraction",
+      "reference_ledger_status": "verified",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PDF05",
+      "title": "Lossless and image-based PDF compression",
+      "reference_ledger_status": "verified",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PDF06",
+      "title": "PDF password protection and unlocking",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF07",
+      "title": "Searchable-PDF OCR",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF08",
+      "title": "PDF annotation, editing and crop",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF09",
+      "title": "PDF forms",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF10",
+      "title": "PDF signatures",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF11",
+      "title": "PDF redaction",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF12",
+      "title": "Document comparison",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF13",
+      "title": "Repair and PDF/A workflows",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "PDF14",
+      "title": "HTML to PDF",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "LINK01",
+      "title": "Direct media URL lookup, save and trim",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "LINK02",
+      "title": "Broader media-service downloads",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "AI01",
+      "title": "Optional transcripts and subtitles",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "AI02",
+      "title": "Optional structured scan extraction",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "AI03",
+      "title": "Optional translation and document intelligence",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "AI04",
+      "title": "Optional image transformations",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "WEB01",
+      "title": "Minimal free-project website",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "WEB02",
+      "title": "Optional community release notifications",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "deferred-roadmap"
+    },
+    {
+      "id": "WEB03",
+      "title": "Accurate platform status, privacy and license information",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "REL01",
+      "title": "Signed application delivery and secure updates",
+      "reference_ledger_status": "planned",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "REL02",
+      "title": "Independent free CLI and reproducible engine packs",
+      "reference_ledger_status": "implementing",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "WIN01",
+      "title": "Real Windows executable and installer builds",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "WIN02",
+      "title": "Windows runtime and UI verification, with manual gaps recorded",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "OSS01",
+      "title": "One reviewed public repository and contributor/security documentation",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "SEC01",
+      "title": "Native worker isolation and cross-platform file-safety hardening",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    },
+    {
+      "id": "PERF01",
+      "title": "Measured startup, memory and transformation performance",
+      "portable_status": "pending",
+      "priority": "release-and-parity"
+    }
+  ]
+}
