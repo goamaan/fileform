@@ -12,6 +12,7 @@ use std::{
 use tempfile::NamedTempFile;
 
 mod json_table_reader;
+mod png_pipeline;
 mod table_reader;
 use json_table_reader::JsonTableReader;
 use table_reader::TableReader;
@@ -61,6 +62,9 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    InspectImage {
+        input: PathBuf,
+    },
     Inspect {
         input: PathBuf,
     },
@@ -113,8 +117,47 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    ImageInspection(ImageInspection),
     Inspection(Inspection),
     Saved(Receipt),
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImageInspection {
+    pub sha256: String,
+    pub bytes: u64,
+    pub width: u32,
+    pub height: u32,
+    pub has_alpha: bool,
+    pub has_icc: bool,
+    pub has_exif: bool,
+    pub has_color_metadata: bool,
+    pub has_hdr_metadata: bool,
+    pub decoded_rgba_sha256: String,
+    pub conversion_available: bool,
+}
+fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
+    let mut source = Source::open_with_limit(input, cancellation.clone(), 512 * 1024 * 1024)?;
+    let decoded = png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?;
+    cancellation.check()?;
+    let decoded_hash = Sha256::digest(decoded.pixels.as_raw())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    source.check(input)?;
+    Ok(Response::ImageInspection(ImageInspection {
+        sha256: source.hash.clone(),
+        bytes: source.input.metadata()?.len(),
+        width: decoded.pixels.width(),
+        height: decoded.pixels.height(),
+        has_alpha: decoded.has_alpha,
+        has_icc: decoded.has_icc,
+        has_exif: decoded.has_exif,
+        has_color_metadata: decoded.has_color_metadata,
+        has_hdr_metadata: decoded.has_hdr_metadata,
+        decoded_rgba_sha256: decoded_hash,
+        conversion_available: false,
+    }))
 }
 
 fn delimiter(path: &Path) -> Result<Option<u8>> {
@@ -320,12 +363,18 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::InspectImage { input } = &request {
+        return inspect_png(input, cancellation);
+    }
     let input = match &request {
-        Request::Inspect { input } | Request::ConvertTable { input, .. } => input,
+        Request::InspectImage { input }
+        | Request::Inspect { input }
+        | Request::ConvertTable { input, .. } => input,
     };
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
+        Request::InspectImage { .. } => unreachable!("handled above"),
         Request::Inspect { input } => {
             let mut reader = source.reader(separator)?;
             let columns = headers(&mut reader)?;

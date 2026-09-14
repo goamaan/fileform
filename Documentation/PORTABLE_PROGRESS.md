@@ -183,3 +183,29 @@ implement bounded format-specific inspection and the ICC-to-sRGB render pipeline
 then conversion/resize/crop/fit and Electron UI integration. ImageIO input coverage,
 animation/high-depth/HDR rejection, orientation and transparency remain required;
 using a generic decoder alone is not parity.
+
+## Native PNG pixel inspection
+
+Pinned image 0.25.10 with explicit PNG/JPEG/TIFF features and direct png 0.18.1.
+The first implemented image operation is `fileform-native inspect-image FILE.png`
+(or the worker's inspect_image request). It snapshots inputs under the 512 MiB
+image budget, enforces 80 million pixels, applies a PNG decoder scratch budget,
+uses fallible pixel-buffer allocations, fully decodes, validates the final IEND
+record and decoder completion, hashes RGBA pixels and rechecks the original.
+RGBA alpha and grayscale values are retained exactly; palette/low-depth expansion
+uses the PNG decoder. Animated PNG and 16-bit input are rejected. Metadata flags
+report ICC/EXIF/color/HDR metadata presence, not validated profiles or HDR absence.
+
+This operation is deliberately inspection-only: conversion_available is false.
+Pixels are not yet orientation-corrected or normalized to sRGB. PNG/JPEG/TIFF
+render/export, full metadata checks, resize/crop/quality/fit and Electron image
+controls remain required. The decoder's scratch budget is not a process RSS cap;
+concurrent buffers and OS containment still need acceptance evidence.
+
+Verification: 21 Rust tests pass, plus Clippy and Windows-target checking. The real
+CLI and worker agree on independently generated PNG fixtures and exact pixel
+hashes. Process checks reject missing IEND, trailing bytes, APNG, excessive
+pixel dimensions and 16-bit inputs. Table and cancellation process smoke still
+pass. Tools/smoke-images.py runs in both desktop CI jobs and retains
+Artifacts/Verification/portable-images.json. Notices collected for 62 components;
+new image runtime dependencies are not omitted from distribution notices.

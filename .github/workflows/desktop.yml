@@ -39,6 +39,8 @@ jobs:
         run: cargo build --release --workspace --locked
       - name: Verify worker and CLI processes
         run: python Tools/smoke-portable.py
+      - name: Verify native image pixels and rejection paths
+        run: python Tools/smoke-images.py
       - name: Verify cooperative cancellation and cleanup
         run: python Tools/smoke-cancellation.py
       - name: Install desktop dependencies
@@ -69,4 +71,5 @@ jobs:
             apps/desktop/artifacts/*.zip
             Artifacts/Verification/portable-smoke.json
             Artifacts/Verification/portable-cancellation.json
+            Artifacts/Verification/portable-images.json
           retention-days: 14
