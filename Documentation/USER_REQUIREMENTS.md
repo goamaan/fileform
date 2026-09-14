@@ -32,7 +32,8 @@ The original workspace app/core/site repositories and all private history remain
 at ../app, ../core and ../app/Website. Notarized macOS baseline candidates and real
 native test evidence remain under ../app/Artifacts. They must not be overwritten.
 The latest batch-preview source was built/notarized and native crop/export tested.
-No Windows application or portable-engine parity has been established yet.
+A Windows Electron preview installer and native table smoke tests now pass CI.
+Full portable-engine parity and manual Windows GUI acceptance remain unfinished.
 
 
 ## Final framework selection
@@ -40,3 +41,11 @@ No Windows application or portable-engine parity has been established yet.
 After reviewing the alternatives, the user explicitly chose Electron, not Tauri,
 because of its ecosystem. Use Electron + React with native worker/CLI processing.
 Do not treat the earlier Tauri recommendation as the implementation decision.
+
+## Website design refinement
+
+Keep the calm Vicinae-inspired typography, spacing and teal identity, but restore
+rich product components, workflow widgets and real editor previews from the older
+site. Minimal must not mean empty. Use restrained transitions, keyboard-accessible
+interactions and reduced-motion support. Inspect both the live reference and its
+website source; keep copy concise and platform availability explicit.
