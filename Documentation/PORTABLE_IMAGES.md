@@ -42,3 +42,21 @@ Next required stages remain those in PORTABLE_IMAGE_RESEARCH.md: ICC-to-sRGB
 normalization, gamma/chromaticity/HDR metadata handling, JPEG/TIFF and other
 reference input formats, verified output encoding, resize/crop/quality/fit,
 transparent JPEG backgrounds, and the Electron workspaces.
+
+## ICC transform stage
+
+The native pipeline now parses embedded ICC profiles (up to 1 MiB), validates
+that RGB/gray profile space matches PNG samples, and transforms color values to
+sRGB with moxcms 0.8.1. It processes at most 4096 pixels per block with fallible
+scratch allocations and cancellation checks. Alpha is kept outside the CMS and
+copied unchanged. The inspection's optional `icc_srgb_rgba_sha256` hashes these
+orientation-adjusted, ICC-transformed pixels; absence means no embedded ICC
+transform was performed. It is not a claim of HDR-safe rendering or export.
+
+Tests cover sRGB identity, a P3-to-sRGB sample checked against an independent
+D65 matrix/transfer calculation, gray gamma conversion, profile/sample mismatch,
+malformed profiles and cancellation. Real CLI tests embed generated standard ICC
+profiles in PNG files and check their receipts and unchanged source bytes.
+Gamma/chromaticity-only PNG color, metadata precedence/conflicts, HDR/gain maps,
+comparison against the native Apple renderer and output profile embedding remain
+release requirements. `conversion_available` therefore remains false.

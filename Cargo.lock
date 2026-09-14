@@ -141,6 +141,7 @@ name = "fileform-engine"
 version = "0.1.0"
 dependencies = [
  "image",
+ "moxcms",
  "png",
  "same-file",
  "serde",

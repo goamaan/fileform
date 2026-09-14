@@ -223,3 +223,19 @@ PNG/eXIf fixtures sent through the real CLI confirm all eight expected layouts,
 dimension swaps and unchanged original bytes. Normal table and cancellation
 process checks also pass. PNG pipeline CI run 34889052588 has passed macOS;
 Windows was still running when this increment was prepared.
+
+## Embedded ICC normalization
+
+Added the native RGB/gray ICC-to-sRGB transform stage using pinned moxcms 0.8.1.
+The transform preserves alpha outside the CMS, uses bounded pixel blocks and
+checks cancellation. Image inspection exposes a separate optional ICC-normalized
+pixel hash, without enabling export or claiming general HDR/color parity.
+
+Verification: 28 Rust tests cover profile transforms and validation alongside
+existing file/table/image contracts. Independent CLI process fixtures embed sRGB
+and Display P3 profiles; malformed ICC is rejected and original bytes are retained.
+The P3 sample matches an independently calculated D65 P3-to-sRGB matrix/transfer
+result within two code values. Grayscale gamma and wrong-profile-space checks
+also pass. Clippy, Windows-target checking and table/cancellation process smoke
+passed; dependency notices still include all 62 components. See PORTABLE_IMAGES.md
+for remaining rendering, metadata and export gates.

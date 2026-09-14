@@ -11,6 +11,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+mod image_color;
 mod image_orientation;
 mod json_table_reader;
 mod png_pipeline;
@@ -139,6 +140,7 @@ pub struct ImageInspection {
     pub display_width: u32,
     pub display_height: u32,
     pub oriented_rgba_sha256: String,
+    pub icc_srgb_rgba_sha256: Option<String>,
     pub conversion_available: bool,
 }
 fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
@@ -150,11 +152,22 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let (width, height) = decoded.pixels.dimensions();
-    let oriented = image_orientation::apply(decoded.pixels, decoded.orientation, cancellation)?;
+    let mut oriented = image_orientation::apply(decoded.pixels, decoded.orientation, cancellation)?;
     let oriented_hash = Sha256::digest(oriented.as_raw())
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
+    let icc_srgb_rgba_sha256 = if let Some(profile) = decoded.icc_profile {
+        image_color::normalize_icc(&mut oriented, &profile, decoded.source_gray, cancellation)?;
+        Some(
+            Sha256::digest(oriented.as_raw())
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
+        )
+    } else {
+        None
+    };
     source.check(input)?;
     Ok(Response::ImageInspection(ImageInspection {
         sha256: source.hash.clone(),
@@ -165,6 +178,7 @@ fn inspect_png(input: &Path, cancellation: &Cancellation) -> Result<Response> {
         display_width: oriented.width(),
         display_height: oriented.height(),
         oriented_rgba_sha256: oriented_hash,
+        icc_srgb_rgba_sha256,
         has_alpha: decoded.has_alpha,
         has_icc: decoded.has_icc,
         has_exif: decoded.has_exif,

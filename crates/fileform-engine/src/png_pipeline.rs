@@ -10,6 +10,8 @@ pub(crate) struct DecodedPng {
     pub orientation: u8,
     pub has_alpha: bool,
     pub has_icc: bool,
+    pub icc_profile: Option<Vec<u8>>,
+    pub source_gray: bool,
     pub has_exif: bool,
     pub has_color_metadata: bool,
     pub has_hdr_metadata: bool,
@@ -56,6 +58,10 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
             "High-bit-depth image preservation is not implemented.",
         ));
     }
+    let source_gray = matches!(
+        info.color_type,
+        png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha
+    );
     let width = info.width;
     let height = info.height;
     let bytes = reader
@@ -74,6 +80,14 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
     reader.finish().map_err(png_error)?;
     let info = reader.info();
     let has_icc = info.icc_profile.is_some();
+    if info
+        .icc_profile
+        .as_ref()
+        .is_some_and(|icc| icc.len() > 1024 * 1024)
+    {
+        return Err(fail("limit", "ICC profile exceeds 1 MiB."));
+    }
+    let icc_profile = info.icc_profile.as_deref().map(<[u8]>::to_vec);
     let has_exif = info.exif_metadata.is_some();
     let orientation = info
         .exif_metadata
@@ -134,6 +148,8 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedPng> {
         orientation,
         has_alpha,
         has_icc,
+        icc_profile,
+        source_gray,
         has_exif,
         has_color_metadata,
         has_hdr_metadata,
