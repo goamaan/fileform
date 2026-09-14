@@ -3,8 +3,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { basename, dirname, join, parse, resolve, relative, isAbsolute, sep } from 'node:path';
+import {validateImageExport,outputDimensions} from '../src/image-export.js';
 import { pathToFileURL } from 'node:url';
-import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile, PixelCrop } from '../src/contracts.js';
+import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
 
 app.setName('Fileform Preview');
 app.setAppUserModelId('app.fileform.DesktopPreview');
@@ -95,30 +96,20 @@ ipcMain.handle('fileform:choose-image',async(event)=>{
     images.clear();images.set(source.id,{...source,path,sha256:info.sha256});return source;
   });
 });
-ipcMain.handle('fileform:save-image',async(event,id:unknown,format:unknown,background:unknown,quality:unknown,cropValue:unknown)=>{
+ipcMain.handle('fileform:save-image',async(event,id:unknown,options:unknown)=>{
   authorize(event);
-  if(quality!==undefined&&(!count(quality)||quality<1||quality>100))throw new Error('JPEG quality must be between 1 and 100.');
-  if(format==='png'&&quality!==undefined)throw new Error('Quality applies to JPEG output.');
-  if(format!=='png'&&format!=='jpeg')throw new Error('Choose PNG or JPEG.');
-  if(background!==undefined&&background!=='white'&&background!=='black')throw new Error('Choose a white or black background.');
   if(typeof id!=='string'||!images.has(id))throw new Error('Choose the image again.');
   const source=images.get(id)!;
-  let crop:PixelCrop|undefined;
-  if(cropValue!==undefined){
-    if(!cropValue||typeof cropValue!=='object'||Object.keys(cropValue).sort().join(',')!=='height,width,x,y')throw new Error('Invalid crop.');
-    const value=cropValue as PixelCrop;
-    if(![value.x,value.y,value.width,value.height].every(count)||value.width<1||value.height<1||value.x+value.width>source.width||value.y+value.height>source.height)throw new Error('Crop must stay inside the image.');
-    crop={x:value.x,y:value.y,width:value.width,height:value.height};
-  }
+  const {format,background,quality,crop,maxDimension}=validateImageExport(options,source.width,source.height,source.hasAlpha);
   if(!source.canConvert)throw new Error('This PNG requires color support that is still being implemented.');
-  if(format==='jpeg'&&source.hasAlpha&&background===undefined)throw new Error('Choose a background for JPEG.');
+  const expected=outputDimensions(crop?.width??source.width,crop?.height??source.height,maxDimension);
   const extension=format==='jpeg'?'jpg':'png';
   return exclusive(async()=>{
     const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(source.path),parse(source.name).name+'-converted.'+extension),filters:[{name:format.toUpperCase()+' image',extensions:format==='jpeg'?['jpg','jpeg']:['png']}],properties:['createDirectory']});
     if(choice.canceled||!choice.filePath)return null;
     if(!(format==='jpeg'?['.jpg','.jpeg']:['.png']).includes(parse(choice.filePath).ext.toLowerCase()))throw new Error('Use a filename matching the selected format.');
-    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality,crop});
-    if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==(crop?.width??source.width)||receipt.height!==(crop?.height??source.height)||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
+    const receipt=await worker({operation:'convert_image',input:source.path,output:choice.filePath,expected_source_sha256:source.sha256,background,quality,crop,max_dimension:maxDimension});
+    if(receipt.kind!=='saved_image'||receipt.output!==choice.filePath||receipt.width!==expected.width||receipt.height!==expected.height||!count(receipt.bytes)||typeof receipt.sha256!=='string'||!/^[a-f0-9]{64}$/.test(receipt.sha256))throw new Error('The image receipt could not be validated. Check the output folder.');
     const result:ImageSavedFile={id:randomUUID(),name:basename(choice.filePath),bytes:receipt.bytes,width:receipt.width,height:receipt.height};
     if(saved.size>=100)saved.delete(saved.keys().next().value!);
     saved.set(result.id,choice.filePath);return result;

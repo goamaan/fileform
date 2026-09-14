@@ -374,3 +374,16 @@ process smoke pass. The real CLI's output matched an independent Pillow decode
 and analytic linear-light expectation. Crop/resize composition and invalid-size
 no-output behavior are covered. Electron's resize controls remain next work; the
 one existing GUI preview was not replaced for this native-only increment.
+
+## Electron image resizing
+
+Connected native maximum-dimension downscaling to desktop controls and predicted
+output dimensions. Refactored the internal image export bridge to a named options
+object with strict validation and receipt dimension checks. Added shared dimension
+and validation tests, including large integer cases matching native rounding.
+
+Three desktop tests, TypeScript/Vite and packaging pass. Actual packaged Mac E2E
+rejected zero, demonstrated no-upscale prediction, combined square cropping with
+an eight-pixel limit, and saved an 8×8 PNG through the native dialog. Its bytes
+matched an independent CLI execution; Pillow confirmed dimensions/alpha/sRGB and
+the source stayed unchanged. Only one replacement preview app was left running.

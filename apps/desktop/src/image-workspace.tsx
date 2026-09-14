@@ -1,6 +1,7 @@
 import {useState,useEffect,useRef} from 'react';
 import type {ImageSource,ImageSavedFile,ImagePreview,PixelCrop} from './contracts';
 
+import {outputDimensions} from './image-export';
 import {resizeCrop,type Corner} from './crop-geometry';
 function Preview({preview,name,background,width,height,crop,disabled,onDraft,onCommit,onCancel}:{preview:ImagePreview;name:string;background?:'white'|'black';width:number;height:number;crop:PixelCrop|null;disabled:boolean;onDraft:(value:PixelCrop|null)=>void;onCommit:(value:PixelCrop|null,previous?:PixelCrop|null)=>void;onCancel:(value:PixelCrop,committed:boolean)=>void}) {
   const canvas=useRef<HTMLCanvasElement>(null);
@@ -19,6 +20,10 @@ export function ImageWorkspace({onBusyChange,hidden}:{onBusyChange:(busy:boolean
   const commitCrop=(value:PixelCrop|null,previous:PixelCrop|null=crop)=>{if(JSON.stringify(value)===JSON.stringify(previous))return;setPast(items=>[...items.slice(-49),previous]);setFuture([]);setCrop(value);};
   const [saved,setSaved]=useState<ImageSavedFile|null>(null);
   const [format,setFormat]=useState<'png'|'jpeg'>('png');
+  const [resizeEnabled,setResizeEnabled]=useState(false);
+  const [maximum,setMaximum]=useState('1280');
+  const invalidMaximum=resizeEnabled&&(!Number.isSafeInteger(Number(maximum))||Number(maximum)<1||Number(maximum)>4294967295);
+  const size=source?outputDimensions(crop?.width??source.width,crop?.height??source.height,resizeEnabled&&!invalidMaximum?Number(maximum):undefined):null;
   const [quality,setQuality]=useState(85);
   const [background,setBackground]=useState<''|'white'|'black'>('');
   const [busy,setBusy]=useState(false);
@@ -38,9 +43,11 @@ export function ImageWorkspace({onBusyChange,hidden}:{onBusyChange:(busy:boolean
     {source&&crop&&<div className="crop-fields">{(['x','y','width','height'] as const).map(field=><label key={field}>{field==='x'?'X':field==='y'?'Y':field==='width'?'Width':'Height'}<input aria-label={`Crop ${field}`} type="number" min={field==='x'||field==='y'?0:1} step="1" disabled={busy} value={crop[field]} onChange={event=>{const number=Number(event.target.value);if(!Number.isFinite(number))return;const maximum=field==='x'?source.width-crop.width:field==='y'?source.height-crop.height:field==='width'?source.width-crop.x:source.height-crop.y;commitCrop({...crop,[field]:Math.max(field==='x'||field==='y'?0:1,Math.min(maximum,Math.round(number)))});}}/></label>)}</div>}
     {source&&<p className="conversion-note">{source.canConvert?(format==='png'?'Save a new sRGB PNG. Transparency is retained.':'JPEG is lossy and does not support transparency.'):'This image needs extended-color support that is still being implemented.'}</p>}
     {source&&<div className="image-options"><label>Format<select disabled={busy} aria-label="Image output format" value={format} onChange={e=>setFormat(e.target.value as 'png'|'jpeg')}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label>{format==='jpeg'&&<label>Quality<input aria-label="JPEG quality" type="range" min="1" max="100" step="1" disabled={busy} value={quality} onChange={e=>setQuality(Number(e.target.value))}/><output>{quality}</output></label>}{format==='jpeg'&&source.hasAlpha&&<label>Background<select disabled={busy} aria-label="JPEG background" value={background} onChange={e=>setBackground(e.target.value as ''|'white'|'black')}><option value="">Choose…</option><option value="white">White</option><option value="black">Black</option></select></label>}</div>}
+    {source&&<div className="resize-options"><label><input type="checkbox" aria-label="Resize image" disabled={busy} checked={resizeEnabled} onChange={e=>setResizeEnabled(e.target.checked)}/>Resize</label>{resizeEnabled&&<label>Longest edge<input type="number" aria-label="Maximum image dimension" min="1" step="1" disabled={busy} value={maximum} onChange={e=>setMaximum(e.target.value)}/>px</label>}<span>{size?.width.toLocaleString()} × {size?.height.toLocaleString()} output</span></div>}
+    {invalidMaximum&&<p className="error" role="alert">Enter a positive whole number of pixels.</p>}
     {busy&&<button disabled={cancelling} onClick={()=>{setCancelling(true);void window.fileform.cancel().catch(()=>{setCancelling(false);setError('Cancellation could not be requested.');});}}>{cancelling?'Cancelling…':'Cancel'}</button>}
     {error&&<p className="error" role="alert">{error}</p>}
-    {source&&<div className="actions"><p>Originals stay untouched.</p><button className="primary" disabled={busy||!source.canConvert||(format==='jpeg'&&source.hasAlpha&&!background)} onClick={()=>run(async()=>{const result=await window.fileform.saveImage(source.id,format,format==='jpeg'&&background?background:undefined,format==='jpeg'?quality:undefined,crop??undefined);if(result)setSaved(result);})}>{busy?'Processing…':'Save '+format.toUpperCase()+'…'}</button></div>}
+    {source&&<div className="actions"><p>Originals stay untouched.</p><button className="primary" disabled={busy||invalidMaximum||!source.canConvert||(format==='jpeg'&&source.hasAlpha&&!background)} onClick={()=>run(async()=>{const result=await window.fileform.saveImage(source.id,{format,background:format==='jpeg'&&background?background:undefined,quality:format==='jpeg'?quality:undefined,crop:crop??undefined,maxDimension:resizeEnabled?Number(maximum):undefined});if(result)setSaved(result);})}>{busy?'Processing…':'Save '+format.toUpperCase()+'…'}</button></div>}
     {saved&&<article className="result" role="status"><span aria-hidden="true">✓</span><div><h2>{saved.name}</h2><p>{saved.width.toLocaleString()} × {saved.height.toLocaleString()} pixels saved</p></div><button disabled={busy} onClick={()=>run(()=>window.fileform.reveal(saved.id))}>Show in folder</button></article>}
   </section>;
 }

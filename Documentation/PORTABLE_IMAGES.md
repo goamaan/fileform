@@ -2,8 +2,8 @@
 
 Status: native PNG inspection, orientation, color normalization and verified PNG
 and PNG/JPEG export are implemented in the native CLI/worker and Electron Images
-workspace, with native-generated previews and crop controls. TIFF output and
-resize controls are pending.
+workspace, with native-generated previews, crop and resize controls. TIFF output
+and target-size fitting are pending.
 
 Build with `cargo build --release --workspace`, then run:
 
@@ -243,3 +243,20 @@ no enlargement, alpha, crop-then-resize and invalid limits. Independent Pillow
 decoding matched an analytic linear-light black/white average. Evidence:
 Artifacts/Verification/resize-verified.json. Electron size controls, broader
 resampling/performance comparisons and target-byte fitting are still pending.
+
+## Electron resize controls and export options
+
+The Images workspace now has an optional longest-edge limit and predicted output
+dimensions. Prediction uses the same integer rounding policy as the native engine,
+after cropping, and never enlarges smaller images. Invalid/empty enabled limits
+show an error and disable saving. The image bridge now takes named export options;
+main validates allowed fields, formats, alpha background, quality, crop and size,
+and checks the receipt against predicted dimensions.
+
+Tests cover invalid export objects, crop copying, large integer rounding and
+no-enlargement behavior; they run on both desktop CI platforms. Packaged Mac
+acceptance combined a square crop and eight-pixel limit, rejected zero, displayed
+8 × 8, and saved via a native dialog. The resulting PNG matched the CLI bytes
+exactly and retained alpha/sRGB metadata, with the source unchanged. Evidence:
+Artifacts/Verification/electron-image/resize-ui-verified.json. The preview remains
+a selection preview; output dimensions describe the saved resampling result.
