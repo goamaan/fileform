@@ -8,10 +8,13 @@ pub struct Stream {
     pub index: u32,
     pub codec_type: String,
     pub codec_name: Option<String>,
+    pub duration: Option<String>,
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub channels: Option<u32>,
     pub sample_rate: Option<String>,
+    pub bits_per_sample: Option<u32>,
+    pub bits_per_raw_sample: Option<String>,
     pub pix_fmt: Option<String>,
     pub color_transfer: Option<String>,
     pub sample_aspect_ratio: Option<String>,
@@ -101,7 +104,7 @@ pub fn inspect(
             command.env("SystemRoot", system);
         }
     }
-    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration:stream=index,codec_type,codec_name,width,height,channels,sample_rate,pix_fmt,color_transfer,sample_aspect_ratio:stream_disposition=attached_pic","-of","json"]);
+    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration:stream=index,codec_type,codec_name,duration,width,height,channels,sample_rate,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,sample_aspect_ratio:stream_disposition=attached_pic","-of","json"]);
     command.arg(source.snapshot.path());
     let bytes = native_process::run(command, cancellation, Duration::from_secs(30), 512 * 1024)?;
     let (probe, duration_seconds, audio_tracks, video_tracks) = parse(&bytes)?;

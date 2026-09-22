@@ -573,3 +573,15 @@ stream counts/duration; invalid input failed and source hashes stayed unchanged.
 All 60 active tests, Clippy, release build and Windows target check passed. See
 PORTABLE_MEDIA.md for process containment, executable-launch race, Windows pack,
 format/metadata and transformation gaps still required for release.
+
+### September 22 — native audio conversion and extraction
+
+Added WAV/FLAC/M4A/MP3 conversion through Rust CLI/worker, including extraction from
+single-audio-track video. Preserved original codec/metadata policies and FLAC/MP3
+limits. Outputs are staged privately, inspected, fully decoded, synced and
+published without overwriting. Added reproducible real-tool smoke coverage for
+all formats, PCM equality, video extraction, collisions, stale source hashes,
+cancellation cleanup and high-bit-depth FLAC rejection. All passed against the
+real Mac pack; 61 active Rust tests, Clippy, release build and Windows target check
+also passed. Media UI, video conversion/trim and Windows media-pack execution
+remain pending. See PORTABLE_MEDIA.md for precision policies and hardening limits.

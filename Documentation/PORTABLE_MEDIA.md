@@ -1,7 +1,8 @@
 # Portable media migration
 
 Status: media-pack verification and bounded media inspection are available in
-Rust/CLI/worker. Conversion, extraction and trimming are not yet ported. Media
+Rust/CLI/worker. WAV/FLAC/M4A/MP3 audio conversion and extraction are implemented;
+video conversion and trimming are not yet ported. Media
 operations are not yet exposed by the portable app. Preserve the original Swift implementations as parity references.
 
 ## Pack verification
@@ -75,3 +76,33 @@ Clippy, release build and Windows MSVC target check pass. Local real-pack CLI an
 worker tests inspect a 2-second WAV and a 64×48, 2-second MP4 (audio + video), reject
 invalid bytes and preserve source hashes. Real Windows media-pack execution is
 still pending; these local fixtures do not establish Windows media parity.
+
+
+## Audio conversion and extraction
+
+`fileform-native convert-audio INPUT OUTPUT.{wav,flac,m4a,mp3} PACK_DIRECTORY`
+and the `convert_audio` worker request convert one audio track or extract it from
+video. Requests may include `expected_source_sha256` to reject stale selections.
+WAV uses 16-bit PCM; FLAC uses its native encoder; M4A/AAC and MP3 use 128 kb/s.
+Descriptive metadata and chapters are removed. WAV's explicit 16-bit format may
+reduce source precision; `lossy_codec` describes the encoder, not a guarantee of
+sample-identical conversion for every source. FLAC rejects floating-point PCM or
+bit depth above 24. MP3 accepts only mono/stereo at 32, 44.1 or 48 kHz. Output
+channel count and sample rate must match; implicit resampling/downmixing is not
+accepted. Multiple audio tracks require a future explicit selection workflow.
+
+Encoding uses a private staging directory, no-clobber publication, a 512 MiB
+output limit and a duration-scaled timeout. The output is inspected for codec,
+container, tracks, duration (0.25-second tolerance), channels and sample rate, then
+fully decoded with error detection before publication. Source hash/identity and
+output-directory identity are checked again, and the staged file is synced.
+Cooperative cancellation removes staging; forced worker-exit cleanup and hostile
+filesystem races remain open hardening requirements. No UI route is added yet.
+
+Run `python3 crates/fileform-engine/tests/smoke-media.py PACK_DIRECTORY` after a
+release workspace build for reproducible real-tool checks. The Mac pack passed
+all four outputs, exact decoded PCM for the 16-bit WAV/FLAC fixture, exact decoded
+video-to-WAV extraction, existing-output preservation, stale-source rejection,
+cancellation cleanup and unsupported 32-bit FLAC rejection. The 61 active Rust
+tests, Clippy, release build and Windows target check passed. The real-tool script
+is not yet run in Windows CI because the Windows media pack is still pending.

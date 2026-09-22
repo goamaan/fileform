@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Real-tool audio parity checks. Run from any cwd with a verified media pack path."""
+import hashlib
+import json
+import math
+from pathlib import Path
+import struct
+import subprocess
+import sys
+import tempfile
+import wave
+
+root = Path(__file__).resolve().parents[3]
+pack = Path(sys.argv[1]).resolve()
+suffix = '.exe' if sys.platform == 'win32' else ''
+cli = root / 'target/release' / ('fileform-native' + suffix)
+worker = root / 'target/release' / ('fileform-worker' + suffix)
+ffmpeg = pack / 'bin' / ('ffmpeg' + suffix)
+
+def run(*args):
+    return subprocess.run([str(x) for x in args], capture_output=True, check=True)
+
+def request(data, ok=True, cancel=False):
+    response = subprocess.run([str(worker)], input=json.dumps(data)+'\n'+('cancel\n' if cancel else ''), text=True, capture_output=True)
+    value = json.loads(response.stdout)
+    assert value['ok'] == ok and (response.returncode == 0) == ok, value
+    return value
+
+run(cli, 'verify-media-pack', pack)
+with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
+    base = Path(folder)
+    source = base/'tone.wav'
+    with wave.open(str(source), 'wb') as audio:
+        audio.setparams((1, 2, 44100, 0, 'NONE', 'not compressed'))
+        audio.writeframes(b''.join(struct.pack('<h', int(12000*math.sin(2*math.pi*440*i/44100))) for i in range(88200)))
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    def pcm(path):
+        return run(ffmpeg, '-v', 'error', '-i', path, '-map', '0:a:0', '-f', 's16le', '-').stdout
+    expected_pcm = pcm(source)
+    receipts = []
+    for extension in ['wav', 'flac', 'm4a', 'mp3']:
+        output = base/('converted.'+extension)
+        result = json.loads(run(cli, 'convert-audio', source, output, pack).stdout)
+        assert result['channels'] == 1 and result['sample_rate'] == '44100'
+        assert abs(result['duration_seconds']-2) <= .25
+        decoded = pcm(output)
+        assert len(decoded) >= len(expected_pcm)-4096
+        if extension in ['wav','flac']:
+            assert decoded == expected_pcm
+        before = output.read_bytes()
+        collision = subprocess.run([str(cli), 'convert-audio', str(source), str(output), str(pack)], capture_output=True)
+        assert collision.returncode != 0 and output.read_bytes() == before
+        receipts.append(result)
+    frames = base/'frames.rgb'
+    frames.write_bytes(b''.join(bytes((x*4%256,y*5%256,i*10%256)) for i in range(20) for y in range(48) for x in range(64)))
+    video = base/'clip.mp4'
+    run(ffmpeg, '-v','error','-f','rawvideo','-pixel_format','rgb24','-video_size','64x48','-framerate','10','-i',frames,'-i',source,'-c:v','mpeg4','-pix_fmt','yuv420p','-c:a','aac','-shortest',video)
+    extracted = base/'extracted.wav'
+    request({'operation':'convert_audio','input':str(video),'output':str(extracted),'directory':str(pack)})
+    assert pcm(extracted) == pcm(video)
+    for name, extras, cancel in [('changed',{'expected_source_sha256':'0'*64},False),('cancelled',{},True)]:
+        output = base/(name+'.wav')
+        failure = request({'operation':'convert_audio','input':str(source),'output':str(output),'directory':str(pack),**extras},ok=False,cancel=cancel)
+        assert failure['error']['code'] == ('cancelled' if cancel else 'source_changed')
+        assert not output.exists()
+    high = base/'high.wav'
+    with wave.open(str(high),'wb') as audio:
+        audio.setparams((1,4,44100,0,'NONE','not compressed'));audio.writeframes(b'\0'*44100*4)
+    unsupported = base/'high.flac'
+    request({'operation':'convert_audio','input':str(high),'output':str(unsupported),'directory':str(pack)},ok=False)
+    assert not unsupported.exists()
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+    assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True}))
