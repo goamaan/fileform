@@ -19,6 +19,7 @@ mod image_input;
 mod image_resize;
 mod jpeg_input;
 mod media_audio;
+pub use media_audio::SampleRange;
 mod media_pack;
 mod media_probe;
 mod native_process;
@@ -81,6 +82,13 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    TrimAudio {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        samples: SampleRange,
+        expected_source_sha256: Option<String>,
+    },
     ConvertAudio {
         input: PathBuf,
         output: PathBuf,
@@ -731,6 +739,24 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::TrimAudio {
+        input,
+        output,
+        directory,
+        samples,
+        expected_source_sha256,
+    } = &request
+    {
+        return media_audio::convert(
+            input,
+            output,
+            directory,
+            expected_source_sha256.as_deref(),
+            Some(*samples),
+            cancellation,
+        )
+        .map(Response::SavedAudio);
+    }
     if let Request::ConvertAudio {
         input,
         output,
@@ -743,6 +769,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             directory,
             expected_source_sha256.as_deref(),
+            None,
             cancellation,
         )
         .map(Response::SavedAudio);
@@ -784,7 +811,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ConvertAudio { .. }
+        Request::TrimAudio { .. }
+        | Request::ConvertAudio { .. }
         | Request::InspectMedia { .. }
         | Request::VerifyMediaPack { .. } => {
             unreachable!("handled above")
@@ -797,7 +825,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ConvertAudio { .. }
+        Request::TrimAudio { .. }
+        | Request::ConvertAudio { .. }
         | Request::InspectMedia { .. }
         | Request::VerifyMediaPack { .. } => {
             unreachable!("handled above")

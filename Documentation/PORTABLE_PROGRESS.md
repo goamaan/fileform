@@ -595,3 +595,13 @@ regression test. Extended real-tool coverage to exact 24-bit FLAC, float rejecti
 unsupported MP3 resampling and multi-track rejection. The audio smoke suite, 62
 active Rust tests, Clippy, release build and Windows target check passed. Windows
 media run 35776416445 moved from tool setup to source compilation and remains live.
+
+### September 22 — exact decoded-sample audio trims
+
+Added CLI/worker trimming to WAV/FLAC using explicit decoded-sample boundaries.
+Verified sample count and decoded source/output PCM hashes before no-clobber
+publication. Real-file tests prove exact standard/24-bit sample slices, one-sample
+output and no publication for invalid/past-end ranges. Existing media smoke tests,
+62 active Rust tests, Clippy, release build and Windows target check pass. This is
+not source-clock/packet-copy/video trim parity; those requirements remain open.
+Windows media run 35776416445 remains actively compiling its tool pack.

@@ -143,3 +143,26 @@ rejects floating-point FLAC input, unsupported MP3 sample-rate conversion and
 multiple audio tracks without publishing output. All checks passed on Mac; 62
 active Rust tests, Clippy and Windows target checking passed. Windows media job
 35776416445 is currently building its source-verified tool pack, not yet accepted.
+
+## Exact audio sample trimming
+
+`fileform-native trim-audio INPUT OUTPUT.{wav,flac} PACK_DIRECTORY START_SAMPLE END_SAMPLE`
+uses a zero-based, half-open interval of **decoded audio samples**. The worker
+accepts `trim_audio` with `samples: {start, end}` and optional
+`expected_source_sha256`. These boundaries are not source-clock timestamps;
+source-time mapping, delayed/discontinuous tracks and fast packet-copy trimming
+remain separate parity work. Do not present this as the complete original trim UI.
+
+The route reuses conversion safety and format policies, applies atrim's sample
+indices, resets output timestamps, and verifies exact output duration ticks against
+the sample rate. It then hashes decoded PCM for the selected source interval and
+the whole output at the output's precision; the hashes must match before saving.
+Only WAV and FLAC are offered for this exact-sample route. WAV retains its explicit
+16-bit output policy. Source ranges beyond the decoded file fail verification and
+never publish a shortened result. Empty/reversed ranges fail validation.
+
+The real-tool smoke suite passed 12,345–54,321 sample WAV/FLAC cuts, a one-sample
+WAV cut, a 24-bit FLAC cut and invalid/end-beyond-source cases. Independent decoded
+PCM slices match exactly. All existing audio conversion checks also passed, along
+with 62 active Rust tests, Clippy, release build and Windows target checking.
+Windows tool-pack runtime validation remains pending in the live CI build.

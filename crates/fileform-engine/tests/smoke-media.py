@@ -89,6 +89,18 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         output = base/(name+'-rejected.'+extension)
         failure = request({'operation':'convert_audio','input':str(input_file),'output':str(output),'directory':str(pack)},ok=False)
         assert failure['error']['code'] == 'unsupported' and not output.exists()
+    for extension, start, end in [('wav',12345,54321),('flac',12345,54321),('wav',0,1)]:
+        output = base/f'trim-{start}-{end}.{extension}'
+        result = json.loads(run(cli,'trim-audio',source,output,pack,start,end).stdout)
+        assert result['trimmed_samples'] == {'start':start,'end':end}
+        assert pcm(output) == expected_pcm[start*2:end*2]
+    trimmed24=base/'trim24.flac'
+    request({'operation':'trim_audio','input':str(precision),'output':str(trimmed24),'directory':str(pack),'samples':{'start':100,'end':12345}})
+    assert pcm32(trimmed24) == pcm32(precision)[100*4:12345*4]
+    for name,start,end in [('empty',1,1),('reversed',2,1),('past-end',88000,89000)]:
+        output=base/(name+'-trim.wav')
+        request({'operation':'trim_audio','input':str(source),'output':str(output),'directory':str(pack),'samples':{'start':start,'end':end}},ok=False)
+        assert not output.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True}))

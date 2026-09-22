@@ -1,8 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{digest, fail, media_pack, media_probe, native_process, Cancellation, Result, Source};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{path::Path, process::Command, time::Duration};
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SampleRange {
+    pub start: u64,
+    pub end: u64,
+}
+impl SampleRange {
+    fn count(self) -> Result<u64> {
+        self.end
+            .checked_sub(self.start)
+            .filter(|v| *v > 0)
+            .ok_or_else(|| {
+                fail(
+                    "invalid_request",
+                    "Choose a nonempty, increasing sample range.",
+                )
+            })
+    }
+    fn filter(self) -> String {
+        format!(
+            "atrim=start_sample={}:end_sample={},asetpts=PTS-STARTPTS",
+            self.start, self.end
+        )
+    }
+}
 const MAX_OUTPUT: u64 = 512 * 1024 * 1024;
 #[derive(Debug, Serialize)]
 pub struct AudioReceipt {
@@ -14,6 +39,7 @@ pub struct AudioReceipt {
     pub channels: u32,
     pub sample_rate: String,
     pub lossy_codec: bool,
+    pub trimmed_samples: Option<SampleRange>,
 }
 fn format(output: &Path) -> Result<(&'static str, &'static str)> {
     match output
@@ -64,9 +90,19 @@ pub fn convert(
     output: &Path,
     directory: &Path,
     expected: Option<&str>,
+    trim: Option<SampleRange>,
     cancellation: &Cancellation,
 ) -> Result<AudioReceipt> {
     let (muxer, encoder) = format(output)?;
+    if let Some(range) = trim {
+        range.count()?;
+        if !matches!(muxer, "wav" | "flac") {
+            return Err(fail(
+                "unsupported",
+                "Exact sample trimming currently writes WAV or FLAC.",
+            ));
+        }
+    }
     let pack = media_pack::verify(directory, cancellation)?;
     if encoder == "libmp3lame" && !pack.supports_mp3 {
         return Err(fail(
@@ -143,12 +179,23 @@ pub fn convert(
     {
         return Err(fail("unsupported","MP3 requires mono/stereo audio at 32, 44.1 or 48 kHz. No implicit downmixing or resampling is performed."));
     }
-    let expected_duration = audio
+    let source_duration = audio
         .duration
         .as_deref()
         .and_then(|v| v.parse::<f64>().ok())
         .filter(|n| n.is_finite() && *n > 0.0)
         .unwrap_or(inspection.duration_seconds);
+    let rate = sample_rate
+        .parse::<u64>()
+        .map_err(|_| fail("unsupported", "Invalid audio sample rate."))?;
+    let expected_duration = if let Some(range) = trim {
+        if range.end > rate.saturating_mul(21600) {
+            return Err(fail("limit", "Trim exceeds the six-hour sample limit."));
+        }
+        range.count()? as f64 / rate as f64
+    } else {
+        source_duration
+    };
     let parent = output
         .parent()
         .filter(|v| !v.as_os_str().is_empty())
@@ -174,6 +221,9 @@ pub fn convert(
         "-c:a",
         encoder,
     ]);
+    if let Some(range) = trim {
+        encode.args(["-af", &range.filter()]);
+    }
     match encoder {
         "libmp3lame" => {
             encode.args([
@@ -243,6 +293,54 @@ pub fn convert(
             "Output codec, tracks, duration or audio layout differ from the requested result.",
         ));
     }
+    if let Some(range) = trim {
+        let track = output_audio.expect("verified audio");
+        if track.duration_ts.and_then(|n| u64::try_from(n).ok()) != Some(range.count()?)
+            || track.time_base.as_deref() != Some(format!("1/{rate}").as_str())
+        {
+            return Err(fail(
+                "verification",
+                "The output does not contain the requested number of audio samples.",
+            ));
+        }
+        let bits = track.bits_per_sample.unwrap_or(0).max(
+            track
+                .bits_per_raw_sample
+                .as_deref()
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0),
+        );
+        let pcm = match bits {
+            8 => "pcm_s8",
+            16 => "pcm_s16le",
+            24 => "pcm_s24le",
+            _ => {
+                return Err(fail(
+                    "verification",
+                    "Unsupported output precision for exact trim verification.",
+                ))
+            }
+        };
+        let hash_audio = |path: &Path, selection: Option<SampleRange>| -> Result<Vec<u8>> {
+            let mut hash = command(&executable);
+            hash.arg("-i")
+                .arg(path)
+                .args(["-map", "0:a:0", "-vn", "-sn", "-dn"]);
+            if let Some(range) = selection {
+                hash.args(["-af", &range.filter()]);
+            }
+            hash.args(["-c:a", pcm, "-f", "hash", "-hash", "sha256", "-"]);
+            native_process::run(hash, cancellation, deadline, 4096)
+        };
+        let expected_hash = hash_audio(source.snapshot.path(), Some(range))?;
+        let actual_hash = hash_audio(temporary.path(), None)?;
+        if expected_hash != actual_hash || !expected_hash.starts_with(b"SHA256=") {
+            return Err(fail(
+                "verification",
+                "Trimmed audio samples do not match the selected source interval.",
+            ));
+        }
+    }
     let mut decode = command(&executable);
     decode
         .args(["-err_detect", "explode"])
@@ -274,6 +372,7 @@ pub fn convert(
         codec: expected_codec.into(),
         channels,
         sample_rate: sample_rate.clone(),
+        trimmed_samples: trim,
         lossy_codec: matches!(encoder, "aac" | "libmp3lame"),
     })
 }
@@ -282,6 +381,17 @@ mod tests {
     use super::*;
     #[test]
     fn formats_are_explicit_and_case_insensitive() {
+        assert!(SampleRange { start: 1, end: 1 }.count().is_err());
+        assert!(SampleRange { start: 2, end: 1 }.count().is_err());
+        assert_eq!(
+            SampleRange {
+                start: 123,
+                end: 456
+            }
+            .count()
+            .unwrap(),
+            333
+        );
         assert_eq!(
             format(Path::new("sound.WAV")).unwrap(),
             ("wav", "pcm_s16le")
