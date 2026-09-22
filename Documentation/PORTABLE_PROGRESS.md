@@ -764,3 +764,12 @@ copied-output generation remains unfinished.
 Windows run 35787219817 at 1ba5522 passed the independent container-display checks
 and prior complete native media suites. This closes the display-dimension
 regression gap; it does not cover the newly added packet-reader entry point or GUI.
+
+### September 22 — fast AAC packet-copy output
+
+Added M4A fast trimming for single AAC tracks in MP4/MOV-family files. Boundaries
+snap outward and are reported; copied payload hashes, timestamps, durations,
+coverage, layout and full decoding are verified before no-clobber publication.
+Real middle/full-recording packet comparisons and invalid-range cleanup pass.
+Rust tests, Clippy, release/Windows target checks and media smoke pass locally.
+Windows execution of this route and fast video output remain pending.

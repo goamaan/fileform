@@ -171,6 +171,20 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     def packets(path):
         value=json.loads(run(ffprobe,'-v','error','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,pts_time,duration_time,data_hash','-of','json',path).stdout)
         return value['packets']
+    for name,start,end in [('middle','.35','1.21'),('whole','0','2')]:
+        copied_audio=base/(name+'-copy.m4a')
+        receipt=json.loads(run(cli,'copy-audio-trim',h264,copied_audio,pack,start,end).stdout)
+        raw=lambda path: json.loads(run(ffprobe,'-v','error','-select_streams','a:0','-show_packets','-show_data_hash','sha256','-show_entries','packet=pts,dts,duration,data_hash','-of','json',path).stdout)['packets']
+        original,copied=raw(h264),raw(copied_audio)
+        selected=receipt['realized_interval']['start']['ticks']
+        first=next(i for i,p in enumerate(original) if p['data_hash']==copied[0]['data_hash'] and abs(p['pts']-selected-copied[0]['pts'])<=44)
+        assert len(copied)==receipt['copied_packets'] and first+len(copied)<=len(original)
+        for a,b in zip(original[first:first+len(copied)],copied):
+            assert a['data_hash']==b['data_hash'] and abs(a['pts']-selected-b['pts'])<=44 and abs(a['duration']-b['duration'])<=44
+        assert len(pcm(copied_audio))>0
+    invalid_copy=base/'invalid-copy.m4a'
+    request({'operation':'copy_audio_trim','input':str(h264),'output':str(invalid_copy),'directory':str(pack),'interval':{'start':{'ticks':0,'timescale':1},'end':{'ticks':3,'timescale':1}}},ok=False)
+    assert not invalid_copy.exists()
     mov=base/'copied.mov'
     request({'operation':'remux_video','input':str(h264),'output':str(mov),'directory':str(pack)})
     roundtrip=base/'roundtrip.mp4'
@@ -188,4 +202,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True}))

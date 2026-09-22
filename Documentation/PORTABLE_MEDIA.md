@@ -533,3 +533,29 @@ at `1ba55220f963a47fb13ac4e3c56a56f8c447ad84` additionally passed the new indepe
 MP4/MOV display-dimension assertions along with the existing native media suites.
 It predates this new packet-reader entry point, whose Windows runtime check remains
 for the next revision. GUI/release acceptance remains separate.
+
+## Fast AAC packet-copy trimming
+
+`fileform-native copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS
+END_SECONDS` and worker `copy_audio_trim` copy one AAC stream from an MP4/MOV-family
+input. Requested times use the normalized stream clock. The start snaps to the
+preceding packet onset and the end to the following packet onset or measured end
+of stream; receipts report both requested/realized intervals and actual duration.
+This preserves encoded packet content, not sample-exact boundaries. Exact WAV/FLAC
+trimming remains the route for sample-onset selection.
+
+Execution snapshots/rechecks the source, requires bounded ordered AAC packet
+timestamps, strips descriptive metadata/chapters, and stages output privately.
+Verification matches each copied packet to a contiguous source sequence by payload
+hash, presentation timestamp and duration, checks decode order, interval coverage,
+codec/container/layout/duration, and fully decodes before synced no-clobber publish.
+Timestamp comparisons allow 1 ms; compressed edge overlap is bounded by the largest
+source packet plus 1 ms. Packets longer than one second are rejected. Existing
+packet-count, source/output-size and process limits apply.
+
+Mac real-tool tests copied the middle and whole recording with independent packet
+hash/timing comparisons, rejected past-end selection and verified staging cleanup.
+The example 0.35–1.21 second request copied 38 packets and reported its actual
+15360/44100–54272/44100 interval. Rust tests, Clippy, release build, Windows target
+check and media smoke pass locally. Windows runtime, fast video trim, explicit
+track selection and final UI integration remain open for this route.

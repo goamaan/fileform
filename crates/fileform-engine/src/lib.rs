@@ -19,6 +19,7 @@ mod image_input;
 mod image_resize;
 mod jpeg_input;
 mod media_audio;
+mod media_audio_copy;
 pub use media_audio::SampleRange;
 mod media_pack;
 mod media_packets;
@@ -92,6 +93,13 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    CopyAudioTrim {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        interval: MediaInterval,
+        expected_source_sha256: Option<String>,
+    },
     InspectMediaPackets {
         input: PathBuf,
         directory: PathBuf,
@@ -234,6 +242,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    CopiedAudioTrim(media_audio_copy::CopyReceipt),
     PacketInspection(media_packets::PacketInspection),
     TrimmedVideo(media_video_trim::VideoTrimReceipt),
     VideoTimeline(media_video_timeline::VideoTimeline),
@@ -810,6 +819,24 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::CopyAudioTrim {
+        input,
+        output,
+        directory,
+        interval,
+        expected_source_sha256,
+    } = &request
+    {
+        return media_audio_copy::trim(
+            input,
+            output,
+            directory,
+            *interval,
+            expected_source_sha256.as_deref(),
+            cancellation,
+        )
+        .map(Response::CopiedAudioTrim);
+    }
     if let Request::InspectMediaPackets {
         input,
         directory,
@@ -1013,7 +1040,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::InspectMediaPackets { .. }
+        Request::CopyAudioTrim { .. }
+        | Request::InspectMediaPackets { .. }
         | Request::TrimVideo { .. }
         | Request::InspectVideoTimeline { .. }
         | Request::TrimAudioTime { .. }
@@ -1036,7 +1064,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::InspectMediaPackets { .. }
+        Request::CopyAudioTrim { .. }
+        | Request::InspectMediaPackets { .. }
         | Request::TrimVideo { .. }
         | Request::InspectVideoTimeline { .. }
         | Request::TrimAudioTime { .. }
