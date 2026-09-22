@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-cancel-') as temp:
     source.write_bytes(content)
     output = outputs / 'result.json'
     env = dict(os.environ, TMPDIR=str(snapshots), TMP=str(snapshots), TEMP=str(snapshots))
-    for mode in ['explicit', 'disconnect']:
+    for mode in ['explicit-lf', 'explicit-crlf', 'disconnect']:
         request = {'operation':'convert_table','input':str(source),'output':str(output)}
         if mode == 'disconnect':
             request = {'request':request,'cancel_on_disconnect':True}
@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-cancel-') as temp:
                 process.stdin.close()
                 process.stdin = None
             else:
-                process.stdin.write(b'cancel\n')
+                process.stdin.write(b'cancel\r\n' if mode == 'explicit-crlf' else b'cancel\n')
                 process.stdin.flush()
             stdout, stderr = process.communicate(timeout=5)
             reply = json.loads(stdout)
@@ -65,5 +65,5 @@ with tempfile.TemporaryDirectory(prefix='fileform-cancel-') as temp:
         process.communicate()
     evidence = root / 'Artifacts/Verification/portable-cancellation.json'
     evidence.parent.mkdir(parents=True, exist_ok=True)
-    evidence.write_text(json.dumps({'platform': os.name, 'cancelledDuringStaging': True, 'outputAbsent': True, 'stagingCleaned': True, 'snapshotsCleaned': True, 'originalUnchanged': True, 'supervisorDisconnectCancelled': True, 'healthySupervisorCompleted': True}, indent=2) + '\n')
+    evidence.write_text(json.dumps({'platform': os.name, 'cancelledDuringStaging': True, 'outputAbsent': True, 'stagingCleaned': True, 'snapshotsCleaned': True, 'originalUnchanged': True, 'supervisorDisconnectCancelled': True, 'healthySupervisorCompleted': True, 'lfAndCrlfCancellation': True}, indent=2) + '\n')
 print('Explicit cancellation, supervisor disconnect and cleanup passed.')

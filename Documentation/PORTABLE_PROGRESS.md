@@ -626,3 +626,16 @@ preservation. A connected-supervisor request and legacy CLI smoke also passed.
 Rust tests, Clippy, release build, Windows target check and desktop TypeScript/Vite
 build passed. Forced worker termination and process-tree containment remain open.
 Windows media job 35776416445 is still actively building its source-verified pack.
+
+### September 22 — Windows cancellation line-ending fix
+
+Windows media run 35776416445 built the verified FFmpeg/LAME pack and Rust tools,
+then passed conversion/extraction assertions before failing the cancellation case.
+Python's Windows text pipe translated `cancel\n` to `cancel\r\n`; the bare worker
+protocol only recognized LF and allowed the conversion to finish. The worker now
+accepts both. Added LF and CRLF staging-cancellation regression cases to the
+cross-platform process smoke suite. Both, supervisor disconnect/healthy completion,
+62 active Rust tests, Clippy, release build and the full local media smoke pass.
+Known-bug media runs 35778405811 and 35778161960 were cancelled deliberately so the
+corrected revision can run; the original failed run is retained as evidence.
+Windows acceptance remains pending the corrected real-tool run.

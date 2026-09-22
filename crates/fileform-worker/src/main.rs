@@ -27,7 +27,9 @@ fn main() {
                 std::thread::spawn(move || {
                     let mut control = Vec::new();
                     let read = input.take(8).read_until(b'\n', &mut control);
-                    if cancel_on_disconnect || (read.is_ok() && control == b"cancel\n") {
+                    if cancel_on_disconnect
+                        || (read.is_ok() && (control == b"cancel\n" || control == b"cancel\r\n"))
+                    {
                         signal.cancel();
                     }
                 });
