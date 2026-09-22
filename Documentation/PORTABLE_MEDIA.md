@@ -7,6 +7,12 @@ re-encoding/resizing are implemented. Audio byte-limit fitting is implemented. A
 trimming remains open. Media operations are not yet exposed by the portable
 app. Preserve the original Swift implementations as parity references.
 
+Current Windows runtime evidence: run 35786756236 at `fa0dd71` passed the full
+native media and video suites, including the small-frame adapter. Earlier pending
+statements below describe historical implementation stages; the dated acceptance
+record at the end identifies exactly what is now verified. Manual GUI and final
+packaged-app/release acceptance remain open.
+
 ## Pack verification
 
 `fileform-native verify-media-pack DIRECTORY` checks the existing schema-1
@@ -484,3 +490,23 @@ FFprobe, MP4 track dimensions and independent AVFoundation naturalSize. Unit che
 cover existing padding and invalid geometry; 71 active Rust tests, Clippy, release
 build, Windows target check and Mac video regressions pass. Actual execution of the
 new Windows adapter is pending the targeted CI rerun.
+
+
+## Windows media acceptance — September 22
+
+[Run 35786756236](https://github.com/goamaan/fileform/actions/runs/35786756236) at
+`fa0dd71d02007380c3da4ae1d9fe5863388d3622` passed using the provenance-checked pack
+from source-build run 35781819917. It verifies current audio conversion/extraction,
+size fitting, clock inspection, exact sample/time trimming, video stream copying,
+clock proofs, native H.264 resize/rotation, fitting and exact trim within the
+covered fixture/format bounds. Invalid inputs/ranges, floor failures, collision
+preservation and cleanup checks also passed.
+
+The native resize produced 32×24 with 20 decoded frames; rotation normalized to
+48×64. The detailed 60-frame video fit reached 173,201 bytes under 200,000 after five
+attempts at a requested 500 kb/s. Exact trimming selected frames [4,13), verified
+picture/audio content and passed explicit muting. This resolves the observed
+Media Foundation small-frame failure without raising visible dimension limits.
+The later independent container-header assertions at 8f909a8 require the subsequent
+current-revision run. This result does not cover GUI acceptance, packaging/signing,
+secure updates, missing parity routes or the overall release goal.

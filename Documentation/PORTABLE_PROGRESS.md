@@ -742,3 +742,13 @@ rectangle as well as correct decoded pixels, preventing stale padded container
 dimensions from passing decoder-only checks. The full Mac video suite passes.
 Windows run 35786756236 remains active on the padding-adapter revision; the new
 container assertions will run on the next current-revision validation.
+
+### September 22 — Windows media adapter and end-to-end suite passed
+
+Run 35786756236 at fa0dd71 passed the full real Windows media/video suites with the
+verified reused MF/D3D11 pack. It proves 32×24 resize, upright 48×64 rotation,
+60-frame fitting at 173,201 bytes after five attempts, exact nine-frame trim with
+picture/audio checks, muting and the broader audio/timeline/cleanup cases. This
+resolves the observed small-frame failure. The newer container-header assertions
+are being run separately at the latest revision; manual GUI and final release
+integration remain unverified.
