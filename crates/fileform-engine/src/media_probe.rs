@@ -10,6 +10,7 @@ pub struct Stream {
     pub codec_name: Option<String>,
     pub duration: Option<String>,
     pub duration_ts: Option<i64>,
+    pub nb_frames: Option<String>,
     pub time_base: Option<String>,
     pub start_time: Option<String>,
     pub color_primaries: Option<String>,
@@ -115,7 +116,7 @@ pub fn inspect(
             command.env("SystemRoot", system);
         }
     }
-    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration:stream=index,codec_type,codec_name,duration,duration_ts,time_base,start_time,width,height,channels,sample_rate,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_side_data=rotation","-of","json"]);
+    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration:stream=index,codec_type,codec_name,duration,duration_ts,nb_frames,time_base,start_time,width,height,channels,sample_rate,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_side_data=rotation","-of","json"]);
     command.arg(source.snapshot.path());
     let bytes = native_process::run(command, cancellation, Duration::from_secs(30), 512 * 1024)?;
     let (probe, duration_seconds, audio_tracks, video_tracks) = parse(&bytes)?;

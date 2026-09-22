@@ -639,3 +639,15 @@ cross-platform process smoke suite. Both, supervisor disconnect/healthy completi
 Known-bug media runs 35778405811 and 35778161960 were cancelled deliberately so the
 corrected revision can run; the original failed run is retained as evidence.
 Windows acceptance remains pending the corrected real-tool run.
+
+### September 22 — native H.264 video encode and resize
+
+Extended the shared transaction/verification route with VideoToolbox/Media
+Foundation H.264 encoding, explicit bounded even-dimension resizing, rotation
+normalization and single-track audio preservation/transcoding. Added real CLI and
+worker tests for output dimensions, full frame decoding/picture comparison,
+rotation, PCM-to-AAC and invalid settings. Corrected the old rotation fixture:
+FFmpeg 9 needs display_rotation rather than the ignored rotate metadata tag.
+All local media smoke checks, 63 active tests, Clippy, release and Windows target
+checks pass. Windows encoding runtime remains pending. No permanent category UI
+was added; size fitting, source-clock/video trimming and complete UI parity remain.

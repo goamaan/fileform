@@ -2,8 +2,10 @@
 
 Status: media-pack verification and bounded media inspection are available in
 Rust/CLI/worker. WAV/FLAC/M4A/MP3 audio conversion and extraction are implemented;
-video conversion and trimming are not yet ported. Media
-operations are not yet exposed by the portable app. Preserve the original Swift implementations as parity references.
+exact decoded-sample WAV/FLAC trimming, MP4/MOV stream copying and H.264 video
+re-encoding/resizing are implemented. Source-clock/fast/video trimming and media
+size fitting remain open. Media operations are not yet exposed by the portable
+app. Preserve the original Swift implementations as parity references.
 
 ## Pack verification
 
@@ -237,10 +239,38 @@ The new `smoke-video-encoder.py` performs a real 128×96 H.264 encode of the gen
 fixture, fully decodes all 20 frames and proves the copied audio is unchanged. It
 requests software Media Foundation encoding on Windows. The same test passes
 locally with the original Mac VideoToolbox backend. Windows build/runtime testing
-is pending; encoder-list presence alone does not establish support. The Rust
-video-transcoding route is not yet implemented, so this is a tool-pack readiness
-check, not completion of video conversion parity.
+is pending; encoder-list presence alone does not establish support. The Rust video-transcoding route is now implemented as described below, but
+Windows runtime and complete video parity remain unverified.
 
 Sources: [FFmpeg Media Foundation encoder documentation](https://www.ffmpeg.org/ffmpeg-codecs.html)
 and the verified FFmpeg 9.0.1 configure source retained in the pack. OpenH264 was
 checked as a possible fallback, but has not been added as a dependency.
+
+
+## Video encoding and resize
+
+`fileform-native convert-video INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY
+[--max-dimension PIXELS]` and worker `convert_video` with `options` use H.264
+VideoToolbox on Mac or software Media Foundation on Windows. Default video bitrate
+is 2 Mb/s; the worker accepts an explicit bitrate from 50 kb/s to 50 Mb/s. Existing
+AAC audio is copied; other single audio tracks are encoded as 128 kb/s AAC. This
+is lossy video encoding, not size fitting or a guaranteed compression ratio.
+
+The route accepts supported 8-bit SDR pixel formats, one video track, up to one
+audio track and no extra streams. It rejects HDR, transparency, non-square pixels
+and non-right-angle rotation. Rotation is baked into upright output. Odd dimensions
+require an explicit resize limit; dimensions are bounded without enlargement and
+rounded down to even values (minimum two pixels). No output is published if codec,
+container, dimensions, rotation, known color interpretation, declared frame count,
+duration, audio layout/alignment or full decoding checks fail. Copied audio is
+additionally checked by decoded hash. Arbitrary VFR/source-clock proofs and total
+process-memory enforcement remain broader release work.
+
+Mac real-tool tests pass re-encoding, 32×24 resize with all 20 frames and bounded
+pixel error, 90-degree display-matrix normalization to 48×64 with picture comparison,
+PCM-to-AAC audio, invalid bitrate rejection and staging cleanup. The rotation
+fixture was corrected to use FFmpeg 9's `-display_rotation`; the old metadata tag
+had not actually produced rotation. The stream-copy suite now asserts that a real
+display matrix exists before testing preservation. All media smoke tests, 63 active
+Rust tests, Clippy, release build and Windows target check pass. Windows execution
+of this route is still pending the Media Foundation pack/test job.

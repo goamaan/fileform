@@ -58,7 +58,7 @@ jobs:
       - name: Verify Windows H264 encoding and decoding
         shell: pwsh
         run: |
-          python crates/fileform-engine/tests/smoke-video-encoder.py Artifacts/MediaPack-Windows h264_mf | Tee-Object -FilePath Artifacts/video-encoder-windows.json
+          python crates/fileform-engine/tests/smoke-video-encoder.py Artifacts/MediaPack-Windows h264_mf | Tee-Object -FilePath Artifacts/video-encoder-windows.jsonl
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain pack, sources and build diagnostics
         if: always()
@@ -68,7 +68,7 @@ jobs:
           path: |
             Artifacts/MediaPack-Windows/
             Artifacts/media-smoke-windows.json
-            Artifacts/video-encoder-windows.json
+            Artifacts/video-encoder-windows.jsonl
             Artifacts/engine-build-windows/*.log
             Artifacts/engine-build-windows/verification.txt
           retention-days: 14

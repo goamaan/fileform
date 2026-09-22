@@ -111,9 +111,12 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     roundtrip=base/'roundtrip.mp4'
     run(cli,'remux-video',mov,roundtrip,pack)
     assert packets(h264)==packets(mov)==packets(roundtrip)
-    for variant,options in [('silent',['-map','0:v:0']),('rotated',['-map','0','-metadata:s:v:0','rotate=90'])]:
+    for variant,options in [('silent',['-map','0:v:0']),('rotated',['-map','0'])]:
         selected=base/(variant+'.mp4')
-        run(ffmpeg,'-v','error','-i',h264,*options,'-c','copy',selected)
+        run(ffmpeg,'-v','error',*(['-display_rotation:v:0','90'] if variant=='rotated' else []),'-i',h264,*options,'-c','copy',selected)
+        if variant=='rotated':
+            info=json.loads(run(ffprobe,'-v','error','-show_streams','-of','json',selected).stdout)
+            assert any(d.get('rotation')==90 for d in info['streams'][0].get('side_data_list',[]))
         request({'operation':'remux_video','input':str(selected),'output':str(base/(variant+'.mov')),'directory':str(pack)})
     rejected=base/'unsupported-video.mov'
     request({'operation':'remux_video','input':str(video),'output':str(rejected),'directory':str(pack)},ok=False)

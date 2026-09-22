@@ -38,3 +38,38 @@ with tempfile.TemporaryDirectory(prefix='fileform-video-encoder-') as folder:
     original_audio=run(ffmpeg,'-v','error','-xerror','-i',source,'-map','0:a:0','-f','s16le','-')
     assert audio_bytes==original_audio
     print(json.dumps({'encoder':encoder,'size':[128,96],'decodedFrames':20,'audioUnchanged':True,'bytes':output.stat().st_size}))
+
+# Exercise the actual Rust route, not only the codec binary.
+cli=root/'target/release'/('fileform-native'+suffix)
+worker=root/'target/release'/('fileform-worker'+suffix)
+with tempfile.TemporaryDirectory(prefix='fileform-video-native-') as folder:
+    base=Path(folder)
+    resized=base/'resized.mp4'
+    receipt=json.loads(run(cli,'convert-video',source,resized,pack,'--max-dimension','32'))
+    assert receipt['stream_copy'] is False and (receipt['width'],receipt['height'])==(32,24)
+    pixels=run(ffmpeg,'-v','error','-i',resized,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    reference=run(ffmpeg,'-v','error','-i',source,'-map','0:v:0','-vf','scale=32:24,setsar=1','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    assert len(pixels)==len(reference)==20*32*24*3//2
+    assert sum(abs(a-b) for a,b in zip(pixels,reference))/len(pixels)<12
+    rotated=base/'rotated.mp4'
+    run(ffmpeg,'-v','error','-display_rotation:v:0','90','-i',source,'-map','0','-c','copy',rotated)
+    rotated_info=json.loads(run(ffprobe,'-v','error','-show_streams','-of','json',rotated))
+    assert any(d.get('rotation')==90 for d in rotated_info['streams'][0].get('side_data_list',[]))
+    output=base/'normalized.mov'
+    response=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_video','input':str(rotated),'output':str(output),'directory':str(pack),'options':{}})+'\n',text=True,capture_output=True,timeout=120)
+    result=json.loads(response.stdout)
+    assert response.returncode==0 and result['ok'],result
+    assert (result['result']['width'],result['result']['height'])==(48,64)
+    def picture(path):
+        return run(ffmpeg,'-v','error','-i',path,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    actual,reference=picture(output),picture(rotated)
+    assert len(actual)==len(reference)==20*48*64*3//2
+    assert sum(abs(a-b) for a,b in zip(actual,reference))/len(actual)<12
+    pcm=base/'pcm.mov'
+    run(ffmpeg,'-v','error','-i',source,'-c:v','copy','-c:a','pcm_s16le',pcm)
+    run(cli,'convert-video',pcm,base/'aac.mp4',pack)
+    invalid=base/'invalid.mp4'
+    result=subprocess.run([str(worker)],input=json.dumps({'operation':'convert_video','input':str(source),'output':str(invalid),'directory':str(pack),'options':{'bitrate':1}})+'\n',text=True,capture_output=True,timeout=120)
+    assert result.returncode!=0 and not invalid.exists()
+    assert not any(p.is_dir() for p in base.iterdir())
+    print(json.dumps({'nativeResize':[32,24],'decodedFrames':20,'rotationNormalized':[48,64],'pcmToAac':True,'invalidBitrateRejected':True}))

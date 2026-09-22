@@ -1,10 +1,38 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
-use fileform_engine::{Background, PixelCrop, Request, SampleRange};
+use fileform_engine::{Background, PixelCrop, Request, SampleRange, VideoEncoding};
 use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, directory, options @ ..] if command == "convert-video" => {
+            let maximum = match options {
+                [] => None,
+                [flag, value] if flag == "--max-dimension" => Some(
+                    value
+                        .to_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .unwrap_or_else(|| {
+                            eprintln!("Video dimension must be an integer.");
+                            std::process::exit(2)
+                        }),
+                ),
+                _ => {
+                    eprintln!("Use --max-dimension PIXELS.");
+                    std::process::exit(2)
+                }
+            };
+            Request::ConvertVideo {
+                input: PathBuf::from(input),
+                output: PathBuf::from(output),
+                directory: PathBuf::from(directory),
+                options: VideoEncoding {
+                    max_dimension: maximum,
+                    bitrate: None,
+                },
+                expected_source_sha256: None,
+            }
+        }
         [command, input, output, directory] if command == "remux-video" => Request::RemuxVideo {
             input: PathBuf::from(input),
             output: PathBuf::from(output),
@@ -67,7 +95,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
