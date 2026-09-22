@@ -69,6 +69,26 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     unsupported = base/'high.flac'
     request({'operation':'convert_audio','input':str(high),'output':str(unsupported),'directory':str(pack)},ok=False)
     assert not unsupported.exists()
+    precision = base/'precision.wav'
+    with wave.open(str(precision),'wb') as audio:
+        audio.setparams((1,3,44100,0,'NONE','not compressed'))
+        audio.writeframes(b''.join(int(4000000*math.sin(2*math.pi*440*i/44100)).to_bytes(3,'little',signed=True) for i in range(44100)))
+    flac24 = base/'precision.flac'
+    request({'operation':'convert_audio','input':str(precision),'output':str(flac24),'directory':str(pack)})
+    def pcm32(path):
+        return run(ffmpeg,'-v','error','-i',path,'-map','0:a:0','-f','s32le','-').stdout
+    assert pcm32(precision) == pcm32(flac24)
+    floating = base/'floating.wav'
+    run(ffmpeg,'-v','error','-i',source,'-c:a','pcm_f32le',floating)
+    lowrate = base/'lowrate.wav'
+    with wave.open(str(lowrate),'wb') as audio:
+        audio.setparams((1,2,8000,0,'NONE','not compressed'));audio.writeframes(b'\0'*16000)
+    multi = base/'multi.mka'
+    run(ffmpeg,'-v','error','-i',source,'-map','0:a:0','-map','0:a:0','-c:a','flac',multi)
+    for name, input_file, extension in [('float',floating,'flac'),('lowrate',lowrate,'mp3'),('multiple',multi,'wav')]:
+        output = base/(name+'-rejected.'+extension)
+        failure = request({'operation':'convert_audio','input':str(input_file),'output':str(output),'directory':str(pack)},ok=False)
+        assert failure['error']['code'] == 'unsupported' and not output.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True}))

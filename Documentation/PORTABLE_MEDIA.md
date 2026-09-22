@@ -127,3 +127,19 @@ The build follows [FFmpeg Windows guidance](https://www.ffmpeg.org/platform.html
 and the pinned [MSYS2 setup action](https://github.com/msys2/setup-msys2/tree/66cd2cce69caa17b53920067426061ca1de3a884).
 Windows video-encoder selection and media packaging into Electron remain separate
 parity work; this job exercises existing WAV/FLAC/M4A/MP3 conversion and extraction.
+
+### Output-size completion safeguard
+
+Audio encoding no longer uses FFmpeg's `-fs` option: it can truncate an encode
+while reporting success. The process runner checks the staged file size while the
+encoder runs and after exit, and kills/reaps the encoder when the size is exceeded.
+The subsequent digest also enforces the publication limit. Temporary disk use can
+briefly exceed the limit between checks; no oversized or limit-truncated result is
+published. A real subprocess regression test covers a successful child that wrote
+an oversized file.
+
+The real-tool smoke suite additionally verifies exact 24-bit FLAC samples and
+rejects floating-point FLAC input, unsupported MP3 sample-rate conversion and
+multiple audio tracks without publishing output. All checks passed on Mac; 62
+active Rust tests, Clippy and Windows target checking passed. Windows media job
+35776416445 is currently building its source-verified tool pack, not yet accepted.

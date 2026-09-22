@@ -196,18 +196,16 @@ pub fn convert(
         _ => {}
     }
     encode
-        .args([
-            "-threads",
-            "2",
-            "-fs",
-            &MAX_OUTPUT.to_string(),
-            "-f",
-            muxer,
-            "-y",
-        ])
+        .args(["-threads", "2", "-f", muxer, "-y"])
         .arg(temporary.path());
     let deadline = Duration::from_secs_f64((expected_duration * 4.0 + 60.0).clamp(120.0, 43200.0));
-    native_process::run(encode, cancellation, deadline, 512 * 1024)?;
+    native_process::run_with_output_limit(
+        encode,
+        cancellation,
+        deadline,
+        512 * 1024,
+        Some((temporary.path(), MAX_OUTPUT)),
+    )?;
     let (bytes, sha256) = digest(temporary.as_file_mut(), cancellation, MAX_OUTPUT)?;
     if bytes == 0 {
         return Err(fail("verification", "The audio output is empty."));

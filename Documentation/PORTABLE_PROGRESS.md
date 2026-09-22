@@ -585,3 +585,13 @@ cancellation cleanup and high-bit-depth FLAC rejection. All passed against the
 real Mac pack; 61 active Rust tests, Clippy, release build and Windows target check
 also passed. Media UI, video conversion/trim and Windows media-pack execution
 remain pending. See PORTABLE_MEDIA.md for precision policies and hardening limits.
+
+### September 22 — prevent size-limited partial audio
+
+Replaced FFmpeg's truncating file-size flag with staged-output monitoring and a
+post-exit size check. Exceeding the limit fails and reaps the encoder rather than
+publishing a possibly shortened recording. Added a successful-but-oversized child
+regression test. Extended real-tool coverage to exact 24-bit FLAC, float rejection,
+unsupported MP3 resampling and multi-track rejection. The audio smoke suite, 62
+active Rust tests, Clippy, release build and Windows target check passed. Windows
+media run 35776416445 moved from tool setup to source compilation and remains live.

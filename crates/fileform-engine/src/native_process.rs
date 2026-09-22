@@ -35,12 +35,34 @@ fn capture(
 /// Private adapter for bundled tools which do not spawn child processes.
 /// Process-tree containment is required before extending this to arbitrary tools.
 pub(crate) fn run(
-    mut command: Command,
+    command: Command,
     cancellation: &Cancellation,
     timeout: Duration,
     limit: usize,
 ) -> Result<Vec<u8>> {
+    run_with_output_limit(command, cancellation, timeout, limit, None)
+}
+fn check_output(output: Option<(&std::path::Path, u64)>) -> Result<()> {
+    if let Some((path, maximum)) = output {
+        let metadata = std::fs::metadata(path)?;
+        if !metadata.is_file() || metadata.len() > maximum {
+            return Err(fail(
+                "limit",
+                "The media output exceeded its size limit. No new output was saved.",
+            ));
+        }
+    }
+    Ok(())
+}
+pub(crate) fn run_with_output_limit(
+    mut command: Command,
+    cancellation: &Cancellation,
+    timeout: Duration,
+    limit: usize,
+    output: Option<(&std::path::Path, u64)>,
+) -> Result<Vec<u8>> {
     cancellation.check()?;
+    check_output(output)?;
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -69,14 +91,17 @@ pub(crate) fn run(
     );
     let started = Instant::now();
     let status = loop {
+        if let Err(error) = check_output(output) {
+            break Err(error);
+        }
         if cancellation.is_cancelled() {
-            break Err(fail("cancelled", "Media inspection cancelled."));
+            break Err(fail("cancelled", "Media processing cancelled."));
         }
         if overflow.load(Ordering::Acquire) {
             break Err(fail("limit", "The media tool returned too much data."));
         }
         if started.elapsed() >= timeout {
-            break Err(fail("timeout", "Media inspection took too long."));
+            break Err(fail("timeout", "Media processing took too long."));
         }
         match child.0.try_wait() {
             Ok(Some(status)) => break Ok(status),
@@ -98,10 +123,11 @@ pub(crate) fn run(
     if overflow.load(Ordering::Acquire) {
         return Err(fail("limit", "The media tool returned too much data."));
     }
+    check_output(output)?;
     if !status?.success() {
         return Err(fail(
             "unsupported",
-            "The media could not be inspected. It may be damaged or unsupported.",
+            "The media operation failed. The input may be damaged or unsupported.",
         ));
     }
     Ok(out)
@@ -119,6 +145,13 @@ mod tests {
                 for _ in 0..1000 {
                     let _ = std::io::stdout().write_all(&[b'x'; 4096]);
                 }
+            }
+            Ok("file") => {
+                std::fs::write(
+                    std::env::var_os("FILEFORM_TEST_OUTPUT").unwrap(),
+                    vec![0; 8192],
+                )
+                .unwrap();
             }
             Ok("wait") => thread::sleep(Duration::from_secs(10)),
             Ok("fail") => std::process::exit(7),
@@ -172,6 +205,20 @@ mod tests {
             .code,
             "limit"
         );
+    }
+    #[test]
+    fn oversized_file_is_rejected_even_when_child_succeeds() {
+        let output = tempfile::NamedTempFile::new().unwrap();
+        let mut command = command("file");
+        command.env("FILEFORM_TEST_OUTPUT", output.path());
+        let result = run_with_output_limit(
+            command,
+            &Cancellation::default(),
+            Duration::from_secs(5),
+            4096,
+            Some((output.path(), 1024)),
+        );
+        assert_eq!(result.unwrap_err().code, "limit");
     }
     #[test]
     fn timeout_and_cancel_reap_waiting_child() {
