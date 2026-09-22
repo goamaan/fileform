@@ -22,6 +22,7 @@ mod media_audio;
 pub use media_audio::SampleRange;
 mod media_pack;
 mod media_probe;
+mod media_video;
 mod native_process;
 pub use image_crop::PixelCrop;
 mod image_orientation;
@@ -82,6 +83,12 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    RemuxVideo {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        expected_source_sha256: Option<String>,
+    },
     TrimAudio {
         input: PathBuf,
         output: PathBuf,
@@ -169,6 +176,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    SavedVideo(media_video::VideoReceipt),
     SavedAudio(media_audio::AudioReceipt),
     MediaInspection(media_probe::MediaInspection),
     MediaPackVerification(media_pack::MediaPackVerification),
@@ -739,6 +747,22 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::RemuxVideo {
+        input,
+        output,
+        directory,
+        expected_source_sha256,
+    } = &request
+    {
+        return media_video::remux(
+            input,
+            output,
+            directory,
+            expected_source_sha256.as_deref(),
+            cancellation,
+        )
+        .map(Response::SavedVideo);
+    }
     if let Request::TrimAudio {
         input,
         output,
@@ -811,7 +835,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::TrimAudio { .. }
+        Request::RemuxVideo { .. }
+        | Request::TrimAudio { .. }
         | Request::ConvertAudio { .. }
         | Request::InspectMedia { .. }
         | Request::VerifyMediaPack { .. } => {
@@ -825,7 +850,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::TrimAudio { .. }
+        Request::RemuxVideo { .. }
+        | Request::TrimAudio { .. }
         | Request::ConvertAudio { .. }
         | Request::InspectMedia { .. }
         | Request::VerifyMediaPack { .. } => {

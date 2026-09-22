@@ -605,3 +605,13 @@ output and no publication for invalid/past-end ranges. Existing media smoke test
 62 active Rust tests, Clippy, release build and Windows target check pass. This is
 not source-clock/packet-copy/video trim parity; those requirements remain open.
 Windows media run 35776416445 remains actively compiling its tool pack.
+
+### September 22 — H.264/AAC MP4/MOV stream-copy route
+
+Ported video remuxing to Rust CLI/worker with staging, size monitoring, source and
+output-folder checks, no-clobber publication and decoded-content verification.
+Verified packet/timing equality on an original synthetic fixture through a
+round trip, plus silent/rotated cases and unsupported-codec rejection. Included
+the small generated fixture/provenance for Windows CI. Full media smoke, 62 active
+Rust tests, Clippy, release and Windows target builds/checks pass locally. Video
+re-encoding, resize/compression, trimming and final UI integration remain open.

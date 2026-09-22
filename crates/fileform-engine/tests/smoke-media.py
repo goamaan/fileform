@@ -101,6 +101,23 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         output=base/(name+'-trim.wav')
         request({'operation':'trim_audio','input':str(source),'output':str(output),'directory':str(pack),'samples':{'start':start,'end':end}},ok=False)
         assert not output.exists()
+    h264=root/'crates/fileform-engine/tests/fixtures/h264-aac.mp4'
+    ffprobe=pack/'bin'/('ffprobe'+suffix)
+    def packets(path):
+        value=json.loads(run(ffprobe,'-v','error','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,pts_time,duration_time,data_hash','-of','json',path).stdout)
+        return value['packets']
+    mov=base/'copied.mov'
+    request({'operation':'remux_video','input':str(h264),'output':str(mov),'directory':str(pack)})
+    roundtrip=base/'roundtrip.mp4'
+    run(cli,'remux-video',mov,roundtrip,pack)
+    assert packets(h264)==packets(mov)==packets(roundtrip)
+    for variant,options in [('silent',['-map','0:v:0']),('rotated',['-map','0','-metadata:s:v:0','rotate=90'])]:
+        selected=base/(variant+'.mp4')
+        run(ffmpeg,'-v','error','-i',h264,*options,'-c','copy',selected)
+        request({'operation':'remux_video','input':str(selected),'output':str(base/(variant+'.mov')),'directory':str(pack)})
+    rejected=base/'unsupported-video.mov'
+    request({'operation':'remux_video','input':str(video),'output':str(rejected),'directory':str(pack)},ok=False)
+    assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True}))

@@ -166,3 +166,27 @@ WAV cut, a 24-bit FLAC cut and invalid/end-beyond-source cases. Independent deco
 PCM slices match exactly. All existing audio conversion checks also passed, along
 with 62 active Rust tests, Clippy, release build and Windows target checking.
 Windows tool-pack runtime validation remains pending in the live CI build.
+
+## Video stream-copy conversion
+
+`fileform-native remux-video INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY` and worker
+`remux_video` copy compatible streams without encoding them again. The current
+route accepts one 8-bit yuv420p SDR H.264 video track and at most one AAC audio
+track, with no additional streams. Other video formats require the still-pending
+transcoding route. Metadata/chapters are removed; tested display rotation survives.
+
+Runtime verification compares dimensions, color fields, pixel aspect ratio,
+rotation, duration, audio layout and relative audio/video start alignment, then
+fully decodes and hashes picture/audio content on both sides. Output size is
+monitored at 2 GiB; source identity/hash and directory identity are rechecked before
+synced no-clobber publication. This inherits the documented direct-process and
+filesystem-race limitations. It is not a formal proof of every packet timestamp
+for arbitrary input; broader timing fixtures and source-clock editing remain open.
+
+The real-tool smoke suite proves identical packet hashes/PTS/durations for the
+included generated H.264/AAC fixture through MP4→MOV→MP4. Silent and 90-degree
+rotated variants pass; unsupported MPEG-4 video is rejected without output.
+Mac CLI/worker checks, 62 active Rust tests, Clippy, release build and Windows target
+checking passed. The generated fixture is checked in with provenance so Windows
+CI can exercise this route without requiring a video encoder. Windows execution
+is not yet established while the tool-pack build remains active.
