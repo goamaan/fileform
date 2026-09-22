@@ -99,6 +99,12 @@ jobs:
         run: |
           python crates/fileform-engine/tests/smoke-media.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/media-smoke-windows.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Probe Media Foundation parameters for diagnostic runs
+        if: inputs.pack_run_id != ''
+        shell: pwsh
+        run: |
+          python crates/fileform-engine/tests/probe-media-foundation.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/media-foundation-probe.jsonl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify Windows H264 encoding and decoding
         env:
           FILEFORM_NATIVE_DIAGNOSTICS: '1'
@@ -114,6 +120,7 @@ jobs:
           path: |
             Artifacts/MediaPack-Windows/
             Artifacts/pack-origin.json
+            Artifacts/media-foundation-probe.jsonl
             Artifacts/media-smoke-windows.json
             Artifacts/video-encoder-windows.jsonl
             Artifacts/engine-build-windows/*.log
