@@ -13,7 +13,13 @@ fn pixel_count(width: u32, height: u32) -> Result<usize> {
     usize::try_from(count)
         .map_err(|_| fail("limit", "Image dimensions exceed this platform's limits."))
 }
-pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
+pub(crate) fn decode<R: BufRead + Seek>(input: R) -> Result<DecodedImage> {
+    decode_bounded(input, u32::MAX)
+}
+pub(crate) fn decode_bounded<R: BufRead + Seek>(
+    mut input: R,
+    maximum: u32,
+) -> Result<DecodedImage> {
     if input.seek(SeekFrom::End(0))? < 20 {
         return Err(fail("invalid_image", "PNG is incomplete."));
     }
@@ -35,6 +41,12 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
     decoder.set_transformations(png::Transformations::EXPAND);
     let mut reader = decoder.read_info().map_err(png_error)?;
     let info = reader.info();
+    if info.width > maximum || info.height > maximum {
+        return Err(fail(
+            "limit",
+            "PNG exceeds the requested preview dimensions.",
+        ));
+    }
     let count = pixel_count(info.width, info.height)?;
     if info.animation_control.is_some() {
         return Err(fail(
@@ -197,6 +209,18 @@ mod tests {
             writer.finish().unwrap();
         }
         bytes
+    }
+    #[test]
+    fn preview_dimensions_are_checked_before_pixel_allocation() {
+        let bytes = encoded(
+            png::ColorType::Rgb,
+            png::BitDepth::Eight,
+            &[1, 2, 3, 4, 5, 6],
+        );
+        assert_eq!(
+            decode_bounded(Cursor::new(bytes), 1).err().unwrap().code,
+            "limit"
+        );
     }
     #[test]
     fn rgba_pixels_and_transparency_round_trip_exactly() {

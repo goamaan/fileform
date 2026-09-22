@@ -186,6 +186,16 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         assert packet_info['last_end_pts']==max(p['pts']+p['duration'] for p in original)
     invalid_stream=request({'operation':'inspect_media_packets','input':str(h264),'directory':str(pack),'stream_index':999},ok=False)
     assert invalid_stream['error']['code']=='invalid_request'
+    poster=base/'poster.png'
+    poster_result=request({'operation':'media_poster','input':str(h264),'output':str(poster),'directory':str(pack),'time':{'ticks':35,'timescale':100},'max_dimension':32})['result']
+    assert poster_result['frame_index']==3 and (poster_result['width'],poster_result['height'])==(32,24)
+    image_pixels=run(ffmpeg,'-v','error','-i',poster,'-pix_fmt','rgba','-f','rawvideo','-').stdout
+    frame_pixels=run(ffmpeg,'-v','error','-i',h264,'-vf',r'select=eq(n\,3),scale=32:32:force_original_aspect_ratio=decrease','-frames:v','1','-pix_fmt','rgba','-f','rawvideo','-').stdout
+    assert image_pixels==frame_pixels
+    assert json.loads(run(cli,'poster',h264,base/'poster-default.png',pack,'.35').stdout)['width']==512
+    bad_poster=base/'end-poster.png'
+    request({'operation':'media_poster','input':str(h264),'output':str(bad_poster),'directory':str(pack),'time':{'ticks':2,'timescale':1}},ok=False)
+    assert not bad_poster.exists()
     video_clock=json.loads(run(cli,'inspect-video-timeline',h264,pack).stdout)
     assert video_clock['decoded_frames']==20 and video_clock['frame_ticks']==1024
     assert video_clock['duration_ticks']==20480 and video_clock['keyframe_indices'][0]==0
@@ -198,6 +208,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     run(ffmpeg,'-v','error','-i',h264,'-map','0:v:0','-c','copy','-bsf:v',r'setts=pts=PTS+gte(N\,10)*1024:dts=DTS+gte(N\,10)*1024',variable)
     failure=request({'operation':'inspect_video_timeline','input':str(variable),'directory':str(pack)},ok=False)
     assert failure['error']['code']=='unsupported' and 'constant-rate' in failure['error']['message']
+    variable_poster=base/'variable-poster.png'
+    variable_result=request({'operation':'media_poster','input':str(variable),'output':str(variable_poster),'directory':str(pack),'time':{'ticks':105,'timescale':100},'max_dimension':32})['result']
+    assert variable_result['frame_index']==9
+
 
     def packets(path):
         value=json.loads(run(ffprobe,'-v','error','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,pts_time,duration_time,data_hash','-of','json',path).stdout)
@@ -246,6 +260,9 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         selected=base/(variant+'.mp4')
         run(ffmpeg,'-v','error',*(['-display_rotation:v:0','90'] if variant=='rotated' else []),'-i',h264,*options,'-c','copy',selected)
         if variant=='rotated':
+            rotated_poster=base/'rotated-poster.png'
+            result=request({'operation':'media_poster','input':str(selected),'output':str(rotated_poster),'directory':str(pack),'time':{'ticks':35,'timescale':100},'max_dimension':32})['result']
+            assert (result['width'],result['height'])==(24,32)
             info=json.loads(run(ffprobe,'-v','error','-show_streams','-of','json',selected).stdout)
             assert any(d.get('rotation')==90 for d in info['streams'][0].get('side_data_list',[]))
         request({'operation':'remux_video','input':str(selected),'output':str(base/(variant+'.mov')),'directory':str(pack)})
@@ -255,4 +272,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True,'fast_video_copy_verified':True,'waveform_channels_and_coverage_verified':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True,'fast_video_copy_verified':True,'waveform_channels_and_coverage_verified':True,'poster_frame_pixels_and_rotation_verified':True,'variable_frame_rate_poster_verified':True}))

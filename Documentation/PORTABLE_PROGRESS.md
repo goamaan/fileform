@@ -802,3 +802,12 @@ coverage and no mixing/padding. Real mono/stereo/short-tail and eight-channel
 Windows target and full media smoke pass locally. Final preview UI and playback
 leases remain open. Windows run 35790570936 verified the prior fast-video route;
 waveform runtime acceptance awaits the next revision.
+
+### September 22 — native video poster rendering
+
+Added timestamp-measured poster selection, including variable frame timing, native
+PNG rendering, bounded pre-allocation dimension checks, full decode/hash checks
+and no-clobber publication. Real frame-pixel, rotation, bounds, default-size and
+end-boundary tests pass. Rust tests, Clippy, release/Windows target checks and media
+smoke pass locally. HDR/extended-color handling, preview caching/playback leases,
+track selection and final UI integration remain open.

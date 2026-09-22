@@ -23,6 +23,7 @@ mod media_audio_copy;
 pub use media_audio::SampleRange;
 mod media_pack;
 mod media_packets;
+mod media_poster;
 mod media_probe;
 mod media_time_trim;
 mod media_timeline;
@@ -95,6 +96,13 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    MediaPoster {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        time: MediaTime,
+        max_dimension: Option<u32>,
+    },
     MediaWaveform {
         input: PathBuf,
         directory: PathBuf,
@@ -256,6 +264,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    MediaPoster(media_poster::Poster),
     MediaWaveform(media_waveform::Waveform),
     CopiedVideoTrim(media_video_copy::CopyReceipt),
     CopiedAudioTrim(media_audio_copy::CopyReceipt),
@@ -835,6 +844,24 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::MediaPoster {
+        input,
+        output,
+        directory,
+        time,
+        max_dimension,
+    } = &request
+    {
+        return media_poster::poster(
+            input,
+            output,
+            directory,
+            *time,
+            max_dimension.unwrap_or(512),
+            cancellation,
+        )
+        .map(Response::MediaPoster);
+    }
     if let Request::MediaWaveform {
         input,
         directory,
@@ -1083,7 +1110,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::MediaWaveform { .. }
+        Request::MediaPoster { .. }
+        | Request::MediaWaveform { .. }
         | Request::CopyVideoTrim { .. }
         | Request::CopyAudioTrim { .. }
         | Request::InspectMediaPackets { .. }
@@ -1109,7 +1137,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::MediaWaveform { .. }
+        Request::MediaPoster { .. }
+        | Request::MediaWaveform { .. }
         | Request::CopyVideoTrim { .. }
         | Request::CopyAudioTrim { .. }
         | Request::InspectMediaPackets { .. }

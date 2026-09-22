@@ -8,6 +8,19 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, directory, time] if command == "poster" => {
+            let time = MediaTime::decimal(time.to_str().unwrap_or("")).unwrap_or_else(|e| {
+                eprintln!("{}", e.message);
+                std::process::exit(2)
+            });
+            Request::MediaPoster {
+                input: PathBuf::from(input),
+                output: PathBuf::from(output),
+                directory: PathBuf::from(directory),
+                time,
+                max_dimension: None,
+            }
+        }
         [command, input, directory] if command == "waveform" => Request::MediaWaveform {
             input: PathBuf::from(input),
             directory: PathBuf::from(directory),
@@ -263,7 +276,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

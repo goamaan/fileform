@@ -627,3 +627,26 @@ explicit multi-track selection and final UI wiring remain open.
 
 Windows run 35790570936 at dc7834b passed the preceding fast-video packet-copy
 route and its broader suite. It predates this waveform increment.
+
+## Verified video posters
+
+`fileform-native poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS` and worker
+`media_poster` select the preceding decoded frame at an exact requested time.
+The worker accepts `max_dimension` from 1 to 4096 (default 512). Unlike trim-clock
+inspection, poster selection supports variable frame timing. Decoded timestamps
+must be ordered and bounded; the selected frame index and realized time accompany
+the source hash and PNG receipt. Display rotation is applied during rendering.
+
+PNG output is staged privately, monitored at 80 MiB, checked against its requested
+dimensions before pixel allocation, fully decoded and hashed, then published
+without overwriting after source/directory rechecks. Audio is not rendered. The
+current renderer supports listed 8-bit SDR formats; extended-color/HDR preview
+handling remains an explicit gap, not a claim of color-preserving HDR support.
+Timeline inspection is capped at 100,000 decoded frames, 16 MiB and 120 seconds.
+Long-recording preview performance and cache/lease integration remain work.
+
+Mac CLI/worker tests prove frame 3 for 0.35 seconds, exact independent RGBA pixels,
+32×24 and rotated 24×32 bounds, default 512-pixel output, variable-rate frame
+selection and rejection of the end boundary. Rust tests, Clippy, release build,
+Windows target check and full media smoke pass. The UI will own temporary preview
+leases; this backend currently writes an explicitly requested PNG destination.
