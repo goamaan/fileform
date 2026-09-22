@@ -711,3 +711,15 @@ mismatch and the 200,000-record parser bound. Rust tests, Clippy, release build,
 Windows target check and media smoke pass locally. This prepares exact/fast video
 trim planning without claiming those output routes are complete. Corrected Windows
 encoder build 35781819917 is still active.
+
+### September 22 — exact video trim and targeted Windows diagnostics
+
+Connected video/audio clock proofs to exact video trim execution, rational frame
+selection, audio sample alignment and explicit muting. Real picture/audio checks,
+invalid-range cleanup, both media smoke suites, 70 active Rust tests, Clippy,
+release build and Windows target check pass locally.
+
+Windows run 35781819917 built the MF/D3D11 pack and directly encoded/decoded H.264,
+but the native 32×24 resize failed with an intentionally generic error. Added
+bounded opt-in stderr diagnostics and a provenance-checked manual pack-reuse mode
+for a targeted rerun. No cause or Windows trim acceptance is claimed yet.

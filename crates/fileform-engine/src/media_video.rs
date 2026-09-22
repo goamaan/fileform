@@ -30,6 +30,20 @@ fn fit_rates(floor: u32) -> Result<Vec<u32>> {
     rates.push(floor);
     Ok(rates)
 }
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct VideoSelection {
+    pub start_frame: u32,
+    pub end_frame: u32,
+    pub audio_samples: Option<crate::SampleRange>,
+    pub duration_seconds: f64,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct VideoOperation {
+    pub encoding: Option<VideoEncoding>,
+    pub encode_audio: bool,
+    pub mute_audio: bool,
+    pub selection: Option<VideoSelection>,
+}
 fn dimensions(width: u32, height: u32, rotation: i32, maximum: Option<u32>) -> Result<(u32, u32)> {
     if rotation % 90 != 0 || width < 2 || height < 2 {
         return Err(fail(
@@ -178,10 +192,20 @@ pub fn transform(
     output: &Path,
     directory: &Path,
     expected: Option<&str>,
-    encoding: Option<VideoEncoding>,
-    encode_audio: bool,
+    operation: VideoOperation,
     cancellation: &Cancellation,
 ) -> Result<VideoReceipt> {
+    let encoding = operation.encoding;
+    let encode_audio = operation.encode_audio;
+    if operation.selection.is_some_and(|s| {
+        s.start_frame >= s.end_frame
+            || !s.duration_seconds.is_finite()
+            || s.duration_seconds <= 0.0
+            || s.duration_seconds > 21600.0
+            || encoding.is_none()
+    }) {
+        return Err(fail("invalid_request", "Invalid verified video selection."));
+    }
     let muxer = match output
         .extension()
         .and_then(|s| s.to_str())
@@ -234,6 +258,14 @@ pub fn transform(
     } else {
         (original.width.unwrap(), original.height.unwrap())
     };
+    let expected_audio_tracks = if operation.mute_audio {
+        0
+    } else {
+        before.audio_tracks
+    };
+    let expected_duration = operation
+        .selection
+        .map_or(before.duration_seconds, |s| s.duration_seconds);
     let copy_audio = !encode_audio
         && before
             .streams
@@ -258,13 +290,25 @@ pub fn transform(
     copy.arg("-i").arg(source.snapshot.path()).args([
         "-map",
         "0:v:0",
-        "-map",
-        "0:a:0?",
         "-map_metadata",
         "-1",
         "-map_chapters",
         "-1",
     ]);
+    if operation.mute_audio {
+        copy.arg("-an");
+    } else {
+        copy.args(["-map", "0:a:0?"]);
+    }
+    if let Some(samples) = operation.selection.and_then(|s| s.audio_samples) {
+        copy.args([
+            "-af",
+            &format!(
+                "atrim=start_sample={}:end_sample={},asetpts=PTS-STARTPTS",
+                samples.start, samples.end
+            ),
+        ]);
+    }
     if let Some(options) = encoding {
         let encoder = if cfg!(target_os = "macos") {
             "h264_videotoolbox"
@@ -279,8 +323,16 @@ pub fn transform(
         copy.args([
             "-vf",
             &format!(
-                "scale={}:{},setsar=1",
-                expected_dimensions.0, expected_dimensions.1
+                "{}scale={}:{},setsar=1",
+                operation
+                    .selection
+                    .map(|s| format!(
+                        "trim=start_frame={}:end_frame={},setpts=PTS-STARTPTS,",
+                        s.start_frame, s.end_frame
+                    ))
+                    .unwrap_or_default(),
+                expected_dimensions.0,
+                expected_dimensions.1
             ),
             "-c:v",
             encoder,
@@ -322,8 +374,8 @@ pub fn transform(
     let after = media_probe::inspect(temporary.path(), directory, cancellation)?;
     let copied = video(&after, true)?;
     if !after.format.split(',').any(|x| x == "mov")
-        || before.audio_tracks != after.audio_tracks
-        || (before.duration_seconds - after.duration_seconds).abs() > 0.25
+        || expected_audio_tracks != after.audio_tracks
+        || (expected_duration - after.duration_seconds).abs() > 0.25
         || Some(expected_dimensions.0) != copied.width
         || Some(expected_dimensions.1) != copied.height
         || (encoding.is_none()
@@ -354,10 +406,15 @@ pub fn transform(
                 "Known video color interpretation changed.",
             ));
         }
-        if let Some(count) = original
-            .nb_frames
-            .as_deref()
-            .and_then(|v| v.parse::<u64>().ok())
+        if let Some(count) = operation
+            .selection
+            .map(|s| u64::from(s.end_frame - s.start_frame))
+            .or_else(|| {
+                original
+                    .nb_frames
+                    .as_deref()
+                    .and_then(|v| v.parse::<u64>().ok())
+            })
         {
             if copied
                 .nb_frames
@@ -372,7 +429,11 @@ pub fn transform(
             }
         }
     }
-    if let Some(audio) = before.streams.iter().find(|s| s.codec_type == "audio") {
+    if let Some(audio) = before
+        .streams
+        .iter()
+        .find(|s| s.codec_type == "audio" && !operation.mute_audio)
+    {
         let result = after
             .streams
             .iter()
@@ -389,7 +450,7 @@ pub fn transform(
             ));
         }
     }
-    for track in if before.audio_tracks == 1 {
+    for track in if expected_audio_tracks == 1 {
         vec!["0:v:0", "0:a:0"]
     } else {
         vec!["0:v:0"]
@@ -504,11 +565,14 @@ pub fn fit(
             &candidate,
             directory,
             Some(&source.hash),
-            Some(VideoEncoding {
-                max_dimension: options.max_dimension,
-                bitrate: Some(rate),
-            }),
-            true,
+            VideoOperation {
+                encoding: Some(VideoEncoding {
+                    max_dimension: options.max_dimension,
+                    bitrate: Some(rate),
+                }),
+                encode_audio: true,
+                ..Default::default()
+            },
             cancellation,
         )?;
         if result.bytes > options.max_bytes {

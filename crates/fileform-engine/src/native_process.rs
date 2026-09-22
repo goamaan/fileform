@@ -116,7 +116,7 @@ pub(crate) fn run_with_output_limit(
     let out = stdout
         .join()
         .map_err(|_| fail("engine_failed", "Media output could not be read."))??;
-    let _err = stderr
+    let err = stderr
         .join()
         .map_err(|_| fail("engine_failed", "Media output could not be read."))??;
     cancellation.check()?;
@@ -125,6 +125,16 @@ pub(crate) fn run_with_output_limit(
     }
     check_output(output)?;
     if !status?.success() {
+        if std::env::var_os("FILEFORM_NATIVE_DIAGNOSTICS").as_deref()
+            == Some(std::ffi::OsStr::new("1"))
+        {
+            let text = String::from_utf8_lossy(&err[..err.len().min(4096)]);
+            let safe: String = text
+                .chars()
+                .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
+                .collect();
+            eprintln!("Native media diagnostic: {safe}");
+        }
         return Err(fail(
             "unsupported",
             "The media operation failed. The input may be damaged or unsupported.",

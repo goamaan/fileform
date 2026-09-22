@@ -98,3 +98,39 @@ with tempfile.TemporaryDirectory(prefix='fileform-video-fit-') as folder:
     assert result.returncode!=0 and failure['error']['code']=='target_unmet' and not missing.exists()
     assert not any(p.is_dir() for p in base.iterdir())
     print(json.dumps({'videoFitBytes':receipt['bytes'],'attempts':receipt['attempts'],'requestedBitrate':receipt['requested_bitrate'],'decodedFrames':60,'unmetTargetClean':True}))
+
+# Exact video trims are checked against independently selected decoded content.
+import math
+import struct
+import wave
+with tempfile.TemporaryDirectory(prefix='fileform-video-trim-') as folder:
+    base=Path(folder)
+    tone=base/'distinct.wav'
+    with wave.open(str(tone),'wb') as audio:
+        audio.setparams((1,2,44100,0,'NONE','not compressed'))
+        audio.writeframes(b''.join(struct.pack('<h',int(12000*math.sin(2*math.pi*437*i/44100))) for i in range(88200)))
+    recording=base/'recording.mp4'
+    run(ffmpeg,'-v','error','-i',source,'-i',tone,'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac',recording)
+    output=base/'trimmed.mp4'
+    receipt=json.loads(run(cli,'trim-video',recording,output,pack,'.35','1.21'))
+    assert (receipt['start_frame'],receipt['end_frame'])==(4,13)
+    assert receipt['audio_samples']=={'start':17640,'end':57330}
+    actual=run(ffmpeg,'-v','error','-i',output,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    reference=run(ffmpeg,'-v','error','-i',recording,'-map','0:v:0','-vf','trim=start_frame=4:end_frame=13,setpts=PTS-STARTPTS','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    assert len(actual)==len(reference)==9*64*48*3//2
+    assert sum(abs(a-b) for a,b in zip(actual,reference))/len(actual)<12
+    actual_audio=run(ffmpeg,'-v','error','-i',output,'-map','0:a:0','-f','s16le','-')
+    expected_audio=run(ffmpeg,'-v','error','-i',recording,'-map','0:a:0','-af','atrim=start_sample=17640:end_sample=57330,asetpts=PTS-STARTPTS','-f','s16le','-')
+    assert len(actual_audio)>=len(expected_audio)
+    a=struct.unpack('<'+'h'*(len(expected_audio)//2),actual_audio[:len(expected_audio)])
+    b=struct.unpack('<'+'h'*(len(expected_audio)//2),expected_audio)
+    assert sum(abs(x-y) for x,y in zip(a,b))/len(a)/32768<.05
+    muted=base/'muted.mov'
+    muted_receipt=json.loads(run(cli,'trim-video',recording,muted,pack,'.35','1.21','--mute-audio'))
+    assert muted_receipt['muted_audio'] and muted_receipt['audio_tracks']==0
+    invalid=base/'past-end.mp4'
+    request={'operation':'trim_video','input':str(recording),'output':str(invalid),'directory':str(pack),'options':{'interval':{'start':{'ticks':0,'timescale':1},'end':{'ticks':3,'timescale':1}}}}
+    failure=subprocess.run([str(worker)],input=json.dumps(request)+'\n',text=True,capture_output=True,timeout=120)
+    assert failure.returncode!=0 and not invalid.exists()
+    assert not any(p.is_dir() for p in base.iterdir())
+    print(json.dumps({'exactVideoTrimFrames':9,'selectedFrames':[4,13],'audioSelectionVerified':True,'mutingVerified':True,'invalidRangeClean':True}))

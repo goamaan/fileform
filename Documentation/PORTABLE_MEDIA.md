@@ -422,3 +422,42 @@ Unit checks cover packet/frame mismatch, gaps/overlaps and parser bounds. The
 existing full Rust suite plus the added parser-limit regression, Clippy, release
 build, Windows target check and complete media smoke pass locally. Windows runtime
 execution remains pending in the corrected pack/build sequence.
+
+## Exact video trimming
+
+`fileform-native trim-video INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY START_SECONDS
+END_SECONDS [--mute-audio]` and worker `trim_video` use a rational `interval` and
+optional `mute_audio`. The planner proves the video clock, selects frame onsets in
+the half-open range, verifies retained audio has a continuous clock aligned within
+one sample, and maps audio to the realized frame interval. A source hash binds the
+plan to execution. Receipts report requested/realized intervals, selected frame
+and sample indices, original clock and explicit muting.
+
+The route re-encodes H.264/AAC through the existing verified transaction. Output
+frame count, duration, dimensions, rotation, audio layout/alignment and full decoding
+must pass before no-clobber publication. It retains the current one-video/at-most-
+one-audio and SDR/even-dimension constraints. Explicit track selection, fast packet
+copy, additional formats and VFR trim remain open; this is not complete trim parity.
+
+Mac real-file checks select frames [4,13) for a 0.35–1.21 second request at 10 fps,
+report the actual 0.4–1.3 second interval, verify all nine decoded pictures against
+the selected source frames and check the selected audio against a distinct-phase
+437 Hz fixture within lossy tolerance. Muting and out-of-range cleanup pass. Full
+media/video smoke, 70 active Rust tests, Clippy, release build and Windows target
+checking pass. The final desktop UI is not wired to this route yet.
+
+## Targeted Windows diagnostics
+
+Run 35781819917 built the corrected Media Foundation/D3D11 pack and passed a direct
+128×96 software encode/decode, but the native 32×24 resize test failed. Its actual
+encoder error is needed before assigning a cause. `FILEFORM_NATIVE_DIAGNOSTICS=1`
+now prints at most 4096 bytes of control-character-filtered native stderr locally;
+normal messages are unchanged. Diagnostics can include local paths, are opt-in,
+and are not uploaded by the application. CI uses only generated fixtures.
+
+A manual media workflow may provide `pack_run_id` to reuse a diagnostic pack. It
+requires a completed push-to-main run from this repository/workflow, a successful
+source-pack build step and the identical Git blob for the current build recipe.
+Artifact digests and current native integrity checks still apply. The reused pack
+origin is retained; this is not a fresh reproducible-build claim. Diagnostic runs
+use a separate concurrency group so they do not wait for an unnecessary recompile.

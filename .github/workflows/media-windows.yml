@@ -6,10 +6,17 @@ on:
   pull_request:
     paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/media-windows.yml']
   workflow_dispatch:
+    inputs:
+      pack_run_id:
+        description: 'Optional completed main source-build run to reuse for diagnostics'
+        type: string
+        required: false
+        default: ''
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: media-windows-${{ github.ref }}
+  group: media-windows-${{ github.ref }}${{ inputs.pack_run_id && format('-diagnostic-{0}', inputs.pack_run_id) || '' }}
   cancel-in-progress: false
 jobs:
   media:
@@ -17,7 +24,42 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate diagnostic pack provenance
+        if: inputs.pack_run_id != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILEFORM_PACK_RUN_ID: ${{ inputs.pack_run_id }}
+        run: |
+          if ($env:FILEFORM_PACK_RUN_ID -notmatch '^\d+$') { throw 'Invalid run id' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:FILEFORM_PACK_RUN_ID" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($run.head_repository.full_name -ne $env:GITHUB_REPOSITORY -or $run.head_branch -ne 'main' -or $run.event -ne 'push' -or $run.path -ne '.github/workflows/media-windows.yml' -or $run.status -ne 'completed') { throw 'Use a completed main source-build run from this repository' }
+          $jobs = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:FILEFORM_PACK_RUN_ID/jobs" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $built = $jobs.jobs.steps | Where-Object { $_.name -eq 'Build source-verified media pack' -and $_.conclusion -eq 'success' }
+          if (-not $built) { throw 'The selected run did not successfully build the media pack' }
+          $recipe = 'crates/fileform-engine/tools/build-media-windows.sh'
+          $remote = gh api "repos/$env:GITHUB_REPOSITORY/contents/${recipe}?ref=$($run.head_sha)" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $local = git rev-parse "HEAD:$recipe"
+          if ($local -ne $remote.sha) { throw 'The pack build recipe has changed; rebuild from source' }
+          New-Item -ItemType Directory -Force Artifacts | Out-Null
+          @{runId=$env:FILEFORM_PACK_RUN_ID;sourceSha=$run.head_sha} | ConvertTo-Json | Set-Content Artifacts/pack-origin.json
+      - name: Download validated diagnostic pack
+        if: inputs.pack_run_id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: fileform-media-windows-x64
+          run-id: ${{ inputs.pack_run_id }}
+          github-token: ${{ github.token }}
+          path: Artifacts/reused-media
+      - name: Place diagnostic pack
+        if: inputs.pack_run_id != ''
+        shell: pwsh
+        run: Copy-Item Artifacts/reused-media/MediaPack-Windows Artifacts/MediaPack-Windows -Recurse
       - name: Set up Windows build tools
+        if: inputs.pack_run_id == ''
         uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
           msystem: UCRT64
@@ -30,17 +72,19 @@ jobs:
             mingw-w64-ucrt-x86_64-zlib
             mingw-w64-ucrt-x86_64-python
       - name: Fingerprint installed build toolchain
+        if: inputs.pack_run_id == ''
         id: toolchain
         shell: msys2 {0}
         run: echo "fingerprint=$(pacman -Q | LC_ALL=C sort | sha256sum | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
       - name: Reuse exact verified media pack
+        if: inputs.pack_run_id == ''
         id: media-cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: Artifacts/MediaPack-Windows
           key: media-ucrt64-v1-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('crates/fileform-engine/tools/build-media-windows.sh') }}
       - name: Build source-verified media pack
-        if: steps.media-cache.outputs.cache-hit != 'true'
+        if: inputs.pack_run_id == '' && steps.media-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: bash crates/fileform-engine/tools/build-media-windows.sh
       - name: Build native CLI and worker
@@ -56,6 +100,8 @@ jobs:
           python crates/fileform-engine/tests/smoke-media.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/media-smoke-windows.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify Windows H264 encoding and decoding
+        env:
+          FILEFORM_NATIVE_DIAGNOSTICS: '1'
         shell: pwsh
         run: |
           python crates/fileform-engine/tests/smoke-video-encoder.py Artifacts/MediaPack-Windows h264_mf | Tee-Object -FilePath Artifacts/video-encoder-windows.jsonl
@@ -67,6 +113,7 @@ jobs:
           name: fileform-media-windows-x64
           path: |
             Artifacts/MediaPack-Windows/
+            Artifacts/pack-origin.json
             Artifacts/media-smoke-windows.json
             Artifacts/video-encoder-windows.jsonl
             Artifacts/engine-build-windows/*.log

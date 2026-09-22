@@ -10,7 +10,7 @@ pub struct MediaTime {
     pub timescale: u32,
 }
 impl MediaTime {
-    fn validate(self) -> Result<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         if self.timescale == 0 || u128::from(self.ticks) > 21600 * u128::from(self.timescale) {
             return Err(fail(
                 "invalid_request",
@@ -61,7 +61,7 @@ impl MediaTime {
         time.validate()?;
         Ok(time)
     }
-    fn ceil_samples(self, rate: u32) -> Result<u64> {
+    pub(crate) fn ceil_samples(self, rate: u32) -> Result<u64> {
         self.validate()?;
         let value =
             (u128::from(self.ticks) * u128::from(rate)).div_ceil(u128::from(self.timescale));
@@ -80,7 +80,7 @@ pub struct MediaInterval {
     pub end: MediaTime,
 }
 impl MediaInterval {
-    fn validate(self) -> Result<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         self.start.validate()?;
         self.end.validate()?;
         if u128::from(self.start.ticks) * u128::from(self.end.timescale)
