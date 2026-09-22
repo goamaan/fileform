@@ -26,6 +26,7 @@ mod media_time_trim;
 mod media_timeline;
 pub use media_time_trim::{MediaInterval, MediaTime};
 mod media_video;
+mod media_video_padding;
 mod media_video_timeline;
 mod media_video_trim;
 pub use media_video::{VideoEncoding, VideoFit};

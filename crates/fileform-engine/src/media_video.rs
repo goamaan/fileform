@@ -82,7 +82,7 @@ fn rotation(video: &media_probe::Stream) -> i32 {
         .and_then(|items| items.iter().find_map(|v| v.rotation))
         .unwrap_or(0)
 }
-const MAX_OUTPUT: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const MAX_OUTPUT: u64 = 2 * 1024 * 1024 * 1024;
 #[derive(Debug, Serialize)]
 pub struct VideoReceipt {
     pub output: std::path::PathBuf,
@@ -96,7 +96,7 @@ pub struct VideoReceipt {
     pub requested_bitrate: Option<u32>,
     pub attempts: u32,
 }
-fn command(executable: &Path) -> Command {
+pub(crate) fn command(executable: &Path) -> Command {
     let mut command = Command::new(executable);
     command.env_clear();
     #[cfg(windows)]
@@ -258,6 +258,11 @@ pub fn transform(
     } else {
         (original.width.unwrap(), original.height.unwrap())
     };
+    let padding = if cfg!(windows) && encoding.is_some() {
+        crate::media_video_padding::Padding::required(expected_dimensions.0, expected_dimensions.1)
+    } else {
+        None
+    };
     let expected_audio_tracks = if operation.mute_audio {
         0
     } else {
@@ -320,10 +325,13 @@ pub fn transform(
                 "Video encoding is implemented for macOS and Windows.",
             ));
         };
+        let padding_filter = padding
+            .map(|p| format!(",pad={}:{}:0:0", p.encoded_width, p.encoded_height))
+            .unwrap_or_default();
         copy.args([
             "-vf",
             &format!(
-                "{}scale={}:{},setsar=1",
+                "{}scale={}:{},setsar=1{}",
                 operation
                     .selection
                     .map(|s| format!(
@@ -332,7 +340,8 @@ pub fn transform(
                     ))
                     .unwrap_or_default(),
                 expected_dimensions.0,
-                expected_dimensions.1
+                expected_dimensions.1,
+                padding_filter
             ),
             "-c:v",
             encoder,
@@ -371,6 +380,16 @@ pub fn transform(
         512 * 1024,
         Some((temporary.path(), MAX_OUTPUT)),
     )?;
+    if let Some(padding) = padding {
+        temporary = crate::media_video_padding::restore(
+            temporary,
+            directory,
+            muxer,
+            padding,
+            cancellation,
+            deadline,
+        )?;
+    }
     let after = media_probe::inspect(temporary.path(), directory, cancellation)?;
     let copied = video(&after, true)?;
     if !after.format.split(',').any(|x| x == "mov")

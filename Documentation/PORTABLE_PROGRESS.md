@@ -723,3 +723,13 @@ Windows run 35781819917 built the MF/D3D11 pack and directly encoded/decoded H.2
 but the native 32×24 resize failed with an intentionally generic error. Added
 bounded opt-in stderr diagnostics and a provenance-checked manual pack-reuse mode
 for a targeted rerun. No cause or Windows trim acceptance is claimed yet.
+
+### September 22 — preserve small output sizes on Windows
+
+The MF diagnostic matrix isolated the native 32×24 failure to small dimensions,
+not environment or passthrough timing. Added internal padding plus measured SPS
+cropping and a display-dimension remux for small Windows encodes. Output dimensions
+remain the requested values; no test or public constraint was weakened. Prototype
+verification includes FFprobe, MP4 track headers and AVFoundation at 32×24. Unit,
+Clippy, release/Windows target checks and Mac regressions pass; Windows runtime
+validation of the adapter is pending the targeted rerun.

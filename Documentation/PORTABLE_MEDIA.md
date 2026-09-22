@@ -461,3 +461,26 @@ source-pack build step and the identical Git blob for the current build recipe.
 Artifact digests and current native integrity checks still apply. The reused pack
 origin is retained; this is not a fresh reproducible-build claim. Diagnostic runs
 use a separate concurrency group so they do not wait for an unnecessary recompile.
+
+## Small Windows video dimensions
+
+Diagnostic run 35785398183 compared 32×24, 64×48 and 128×96 under full/restricted
+environments and default/passthrough timing. The 32×24 output type was rejected in
+both environments; the larger sizes worked. This isolates the observed failure to
+small dimensions rather than the worker environment or passthrough timing. No
+unsupported claim about a universal Media Foundation minimum is made.
+
+For Windows encodes below the tested 64×48 boundary, the adapter now pads internally
+to at least 128×96, measures the encoder's actual un-cropped frame geometry, and
+adds only the padding crop to H.264 SPS metadata. Existing encoder crop offsets are
+preserved. A subsequent stream-copy remux rebuilds MP4/MOV display dimensions from
+the corrected SPS, then all normal dimension/content/layout checks run before
+publication. Requested visible dimensions are not enlarged or rounded to a new
+minimum. Regular-size Windows encodes and Mac encoding are unchanged.
+
+The prototype revealed extra padding from VideoToolbox, which is why blindly
+setting crop offsets was rejected. Corrected prototype output reports 32×24 in
+FFprobe, MP4 track dimensions and independent AVFoundation naturalSize. Unit checks
+cover existing padding and invalid geometry; 71 active Rust tests, Clippy, release
+build, Windows target check and Mac video regressions pass. Actual execution of the
+new Windows adapter is pending the targeted CI rerun.
