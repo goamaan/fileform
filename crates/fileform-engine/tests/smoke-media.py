@@ -115,6 +115,19 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         output = base/(name+'-rejected.'+extension)
         failure = request({'operation':'convert_audio','input':str(input_file),'output':str(output),'directory':str(pack)},ok=False)
         assert failure['error']['code'] == 'unsupported' and not output.exists()
+    for name,input_file,extension in [('normal',source,'flac'),('offset',offset,'wav')]:
+        output=base/(name+'-timed.'+extension)
+        result=json.loads(run(cli,'trim-audio-time',input_file,output,pack,'.25','1.001').stdout)
+        assert result['trimmed_samples']=={'start':11025,'end':44145}
+        assert result['realized_interval']['end']=={'ticks':44145,'timescale':44100}
+        assert result['source_origin_ticks']==(44100 if name=='offset' else 0)
+        assert pcm(output)==expected_pcm[11025*2:44145*2]
+    interval={'start':{'ticks':250,'timescale':1000},'end':{'ticks':1001,'timescale':1000}}
+    for name,input_file,options in [('gap',gap,{}),('stale',source,{'expected_source_sha256':'0'*64}),('past-end',source,{'interval':{'start':{'ticks':0,'timescale':1},'end':{'ticks':3,'timescale':1}}})]:
+        output=base/(name+'-timed-rejected.wav')
+        failure=request({'operation':'trim_audio_time','input':str(input_file),'output':str(output),'directory':str(pack),'interval':interval,**options},ok=False)
+        assert failure['error']['code']=={'gap':'unsupported','stale':'source_changed','past-end':'invalid_request'}[name]
+        assert not output.exists()
     for extension, start, end in [('wav',12345,54321),('flac',12345,54321),('wav',0,1)]:
         output = base/f'trim-{start}-{end}.{extension}'
         result = json.loads(run(cli,'trim-audio',source,output,pack,start,end).stdout)
@@ -149,4 +162,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True}))

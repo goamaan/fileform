@@ -373,3 +373,28 @@ enables D3D11VA alongside Media Foundation. D3D11/DXGI system DLLs are listed in
 import audit. This does not enable hardware encoding in the runtime test, which
 still requests software encoding. Known-bad run 35781000000 was cancelled for this
 confirmed configuration failure; the corrected build is pending verification.
+
+## Time-based exact audio trimming
+
+`fileform-native trim-audio-time INPUT OUTPUT.{wav,flac} PACK_DIRECTORY
+START_SECONDS END_SECONDS` parses decimal seconds exactly (up to nine fractional
+digits), without float conversion. Worker `trim_audio_time` takes an `interval`
+whose start/end contain integer `ticks` and positive `timescale`. Selections are
+relative to the selected audio stream's normalized playback origin, not absolute
+container timestamps. The verified source origin is reported in the receipt.
+
+The route first proves a continuous audio clock, validates the half-open interval
+against the declared duration, maps both boundaries upward to sample onsets, and
+checks the decoded sample bound. It binds conversion to the proven source hash and
+uses existing exact-sample verification/no-clobber publication. Receipts include
+requested and realized rational intervals, source clock and selected sample range.
+Empty, reversed, zero-timescale, excessive-precision and out-of-duration ranges
+fail. This currently writes WAV/FLAC; lossy/fast/video trimming and track selection
+remain separate parity requirements.
+
+Mac CLI/worker tests prove that 0.25–1.001 seconds maps to samples [11025,44145) at
+44.1 kHz and matches the exact PCM slice in both normal and one-second-offset
+recordings. Real timestamp gaps, stale source hashes and past-end selections are
+rejected without artifacts. Full media smoke, 67 active Rust tests, Clippy, release
+build and Windows target check pass. Windows execution of this new command remains
+pending in the corrected media build/test sequence.

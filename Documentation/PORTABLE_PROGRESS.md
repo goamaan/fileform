@@ -690,3 +690,14 @@ Foundation source. Enabled its D3D11VA dependency explicitly and updated system-
 checks. Cancelled the remaining known-bad build 35781000000; corrected runtime
 verification is not yet complete. This does not invalidate the earlier passing
 Windows audio/stream-copy baseline, which did not enable this encoder.
+
+### September 22 — source-time WAV/FLAC trimming
+
+Connected verified audio clock inspection to exact rational time selection and
+sample trimming through CLI/worker. Decimal seconds retain up to nanosecond input
+precision; boundaries use half-open sample-onset semantics. Receipts report both
+requested/realized intervals and source origin. Real normal/offset recordings
+produce exact PCM slices; gaps, stale bindings and invalid ranges publish nothing.
+Full media smoke, 67 active Rust tests, Clippy, release build and Windows target
+check pass. Lossy/fast/video trim, track selection and final UI remain open.
+The corrected Windows Media Foundation/D3D11 build is still active.
