@@ -701,3 +701,13 @@ produce exact PCM slices; gaps, stale bindings and invalid ranges publish nothin
 Full media smoke, 67 active Rust tests, Clippy, release build and Windows target
 check pass. Lossy/fast/video trim, track selection and final UI remain open.
 The corrected Windows Media Foundation/D3D11 build is still active.
+
+### September 22 — decoded video timeline proofs
+
+Added bounded CLI/worker video timeline inspection comparing packet and decoded
+frame clocks, with confirmed keyframes and reorder detection. Real CFR/reordered/
+variable-timing fixtures pass their expected outcomes. Unit coverage checks clock
+mismatch and the 200,000-record parser bound. Rust tests, Clippy, release build,
+Windows target check and media smoke pass locally. This prepares exact/fast video
+trim planning without claiming those output routes are complete. Corrected Windows
+encoder build 35781819917 is still active.

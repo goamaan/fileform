@@ -142,6 +142,19 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         assert not output.exists()
     h264=root/'crates/fileform-engine/tests/fixtures/h264-aac.mp4'
     ffprobe=pack/'bin'/('ffprobe'+suffix)
+    video_clock=json.loads(run(cli,'inspect-video-timeline',h264,pack).stdout)
+    assert video_clock['decoded_frames']==20 and video_clock['frame_ticks']==1024
+    assert video_clock['duration_ticks']==20480 and video_clock['keyframe_indices'][0]==0
+    assert not video_clock['has_reordered_packets']
+    reordered=base/'reordered.mp4'
+    run(ffmpeg,'-v','error','-i',h264,'-map','0:v:0','-c:v','mpeg4','-bf','2','-g','10',reordered)
+    reordered_clock=request({'operation':'inspect_video_timeline','input':str(reordered),'directory':str(pack)})['result']
+    assert reordered_clock['decoded_frames']==20 and reordered_clock['has_reordered_packets']
+    variable=base/'variable.mp4'
+    run(ffmpeg,'-v','error','-i',h264,'-map','0:v:0','-c','copy','-bsf:v',r'setts=pts=PTS+gte(N\,10)*1024:dts=DTS+gte(N\,10)*1024',variable)
+    failure=request({'operation':'inspect_video_timeline','input':str(variable),'directory':str(pack)},ok=False)
+    assert failure['error']['code']=='unsupported' and 'constant-rate' in failure['error']['message']
+
     def packets(path):
         value=json.loads(run(ffprobe,'-v','error','-show_packets','-show_data_hash','sha256','-show_entries','packet=stream_index,pts_time,duration_time,data_hash','-of','json',path).stdout)
         return value['packets']
@@ -162,4 +175,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True}))

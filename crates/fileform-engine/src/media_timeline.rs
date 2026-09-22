@@ -47,20 +47,20 @@ pub struct TimeBase {
     pub denominator: u32,
 }
 impl TimeBase {
-    fn parse(value: Option<&str>) -> Result<Self> {
+    pub(crate) fn parse(value: Option<&str>) -> Result<Self> {
         let (n, d) = value
             .and_then(|s| s.split_once('/'))
-            .ok_or_else(|| fail("unsupported", "Missing rational audio time base."))?;
+            .ok_or_else(|| fail("unsupported", "Missing rational media time base."))?;
         let numerator = n
             .parse::<u32>()
             .ok()
             .filter(|n| *n > 0)
-            .ok_or_else(|| fail("unsupported", "Invalid audio time base."))?;
+            .ok_or_else(|| fail("unsupported", "Invalid media time base."))?;
         let denominator = d
             .parse::<u32>()
             .ok()
             .filter(|d| *d > 0 && *d <= i32::MAX as u32)
-            .ok_or_else(|| fail("unsupported", "Invalid audio time base."))?;
+            .ok_or_else(|| fail("unsupported", "Invalid media time base."))?;
         Ok(Self {
             numerator,
             denominator,

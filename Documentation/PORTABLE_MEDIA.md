@@ -398,3 +398,27 @@ recordings. Real timestamp gaps, stale source hashes and past-end selections are
 rejected without artifacts. Full media smoke, 67 active Rust tests, Clippy, release
 build and Windows target check pass. Windows execution of this new command remains
 pending in the corrected media build/test sequence.
+
+## Verified video timeline inspection
+
+`fileform-native inspect-video-timeline FILE PACK_DIRECTORY` and worker
+`inspect_video_timeline` compare encoded packets with decoded frames for one video
+track. Both must have matching, complete, continuous constant-rate presentation
+timestamps and durations. The result reports a source hash, origin/time base,
+frame duration/count, jointly confirmed keyframe indices and whether packet decode
+order differs from presentation order. Reordered packets remain valid for exact
+planning but cannot be assumed safe for the reference fast-copy route.
+
+The reader limits timing data to 100,000 packets plus 100,000 frames, 32 MiB of tool
+output, 120 seconds and six hours. Its JSON array is bounded during parsing, clock
+arithmetic is checked, and the source is rechecked after inspection. This is a
+trim-planning prerequisite, not a completed video/fast trim command or proof of
+all stream synchronization requirements. Decode cost on long recordings still
+needs performance measurement.
+
+Mac real-tool checks establish 20 frames and keyframes for the H.264 fixture,
+identify reordered MPEG-4 packets and reject a genuine variable-timing fixture.
+Unit checks cover packet/frame mismatch, gaps/overlaps and parser bounds. The
+existing full Rust suite plus the added parser-limit regression, Clippy, release
+build, Windows target check and complete media smoke pass locally. Windows runtime
+execution remains pending in the corrected pack/build sequence.
