@@ -206,3 +206,11 @@ of published/staged output. It also proves that a connected supervisor completes
 normally. These checks run in both existing desktop CI jobs. This closes an
 unexpected-Electron-exit gap while the worker remains alive; it does not establish
 cleanup after forcibly killing the worker itself or full process-tree containment.
+
+The Windows recipe also copies installed MSYS2 license files into package-labelled
+folders and retains full package metadata. This includes build-tool notices as
+well as runtime notices, so the inventory is deliberately broader than the linked
+binary set. Final distribution still requires auditing the resulting imports,
+static dependencies, source/relinking materials and exact generated pack; copying
+license files alone is not a completed release compliance review. The notice
+collection step awaits execution in the next Windows pack build.

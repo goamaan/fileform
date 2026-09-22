@@ -88,6 +88,19 @@ for name in ['ffmpeg','ffprobe']:
     assert dlls, 'No imported DLLs were inspected'
     assert all(x in allowed or x.startswith('api-ms-win-') for x in dlls), dlls
 CHECK
+# Include installed toolchain/runtime notices, including GCC runtime exceptions,
+# MinGW headers/CRT and zlib. Keep package provenance for the static-link audit.
+pacman -Qi > "$FILEFORM_PACK/toolchain-packages.txt"
+FILEFORM_LICENSE_COUNT=0
+while read -r FILEFORM_PACKAGE FILEFORM_LICENSE_PATH; do
+    if [[ "$FILEFORM_LICENSE_PATH" == */share/licenses/* && -f "$FILEFORM_LICENSE_PATH" ]]; then
+        FILEFORM_LICENSE_DEST="$FILEFORM_PACK/licenses/msys2/$FILEFORM_PACKAGE/${FILEFORM_LICENSE_PATH#*/share/licenses/}"
+        mkdir -p "$(dirname "$FILEFORM_LICENSE_DEST")"
+        cp "$FILEFORM_LICENSE_PATH" "$FILEFORM_LICENSE_DEST"
+        FILEFORM_LICENSE_COUNT=$((FILEFORM_LICENSE_COUNT + 1))
+    fi
+done < <(pacman -Ql)
+[[ "$FILEFORM_LICENSE_COUNT" -gt 0 ]] || { echo 'No MSYS2 dependency notices were collected.' >&2; exit 1; }
 gcc --version > "$FILEFORM_PACK/toolchain.txt"
 pacman -Q >> "$FILEFORM_PACK/toolchain.txt"
 cp "$FILEFORM_ROOT/crates/fileform-engine/tools/build-media-windows.sh" "$FILEFORM_PACK/sources/build-media-windows.sh"
