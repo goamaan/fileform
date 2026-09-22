@@ -54,7 +54,7 @@ FILEFORM_FLAGS=(
     --prefix=/ --disable-autodetect --disable-network --disable-doc --disable-debug
     --disable-ffplay --disable-avdevice --disable-shared --enable-static
     --disable-protocols --enable-protocol=file,pipe
-    --enable-w32threads --enable-zlib
+    --enable-w32threads --enable-zlib --enable-mediafoundation
     --enable-libmp3lame
     "--extra-cflags=-I$FILEFORM_LAME_PREFIX/include"
     "--extra-ldflags=-static -L$FILEFORM_LAME_PREFIX/lib"
@@ -74,6 +74,7 @@ printf '%s\n' "${FILEFORM_FLAGS[@]}" > "$FILEFORM_PACK/build-flags.txt"
 if grep -Eq -- '--enable-(gpl|nonfree)|GNU General Public License' "$FILEFORM_PACK/license-report.txt"; then
     echo 'Unexpected FFmpeg license configuration.' >&2; exit 1
 fi
+grep -q 'h264_mf' "$FILEFORM_PACK/encoders.txt" || { echo 'H.264 Media Foundation encoder missing.' >&2; exit 1; }
 grep -q 'libmp3lame' "$FILEFORM_PACK/encoders.txt" || { echo 'MP3 encoder missing.' >&2; exit 1; }
 for executable in ffmpeg ffprobe; do
     objdump -p "$FILEFORM_PACK/bin/$executable.exe" | sed -n 's/.*DLL Name: //p' > "$FILEFORM_PACK/$executable-dlls.txt"
@@ -82,7 +83,7 @@ python3 - "$FILEFORM_PACK" <<'CHECK'
 import sys
 from pathlib import Path
 p=Path(sys.argv[1])
-allowed={'kernel32.dll','advapi32.dll','user32.dll','gdi32.dll','ole32.dll','oleaut32.dll','shell32.dll','shlwapi.dll','ws2_32.dll','secur32.dll','bcrypt.dll','winmm.dll','avrt.dll','msvcrt.dll','ucrtbase.dll','combase.dll','ntdll.dll'}
+allowed={'kernel32.dll','advapi32.dll','user32.dll','gdi32.dll','ole32.dll','oleaut32.dll','shell32.dll','shlwapi.dll','ws2_32.dll','secur32.dll','bcrypt.dll','winmm.dll','avrt.dll','msvcrt.dll','ucrtbase.dll','combase.dll','ntdll.dll','mfplat.dll'}
 for name in ['ffmpeg','ffprobe']:
     dlls=[x.strip().lower() for x in (p/(name+'-dlls.txt')).read_text().splitlines()]
     assert dlls, 'No imported DLLs were inspected'
@@ -109,12 +110,13 @@ import hashlib, json, os, platform
 from pathlib import Path
 p=Path(os.environ['FILEFORM_PACK_PATH'])
 manifest={
-    'schemaVersion':1, 'id':'app.fileform.media', 'version':'9.0.1-fileform.2',
+    'schemaVersion':1, 'id':'app.fileform.media', 'version':'9.0.1-fileform.3',
     'architecture':'x86_64', 'platform':'windows',
     'upstreamVersion':'9.0.1', 'license':'LGPL-2.1-or-later',
     'sourceSHA256':'cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635',
     'upstreamSignatureVerified':True, 'networkProtocols':False,
     'audioEncoders':['aac','pcm_s16le','flac','libmp3lame'],
+    'videoEncoders':['h264_mf'],
     'components':[{'name':'LAME','version':'3.100','license':'LGPL-2.0-or-later',
         'sourceSHA256':'ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e',
         'sourceURL':'https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz',

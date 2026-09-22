@@ -222,3 +222,25 @@ media tests run; test results are never cached. The cache is saved only after a
 successful job. Changes to the source pins, flags, notices recipe or installed
 toolchain invalidate it. A cache miss remains a supported clean source build.
 The workflow also retains the JSON smoke summary with its pack artifacts.
+
+## Windows video encoder verification
+
+Inspection of the built Windows pack from run 35776416445 confirmed file/pipe-only
+protocols and system DLL imports, but no H.264 encoder. With autodetection disabled,
+Media Foundation must be explicitly enabled. The Windows recipe now requests
+`--enable-mediafoundation`, requires `h264_mf` in the encoder inventory and declares
+it in pack revision `9.0.1-fileform.3`. `mfplat.dll` is an explicitly permitted
+Windows system dependency. This backend depends on OS Media Foundation components;
+availability on Windows variants without those components is not yet established.
+
+The new `smoke-video-encoder.py` performs a real 128×96 H.264 encode of the generated
+fixture, fully decodes all 20 frames and proves the copied audio is unchanged. It
+requests software Media Foundation encoding on Windows. The same test passes
+locally with the original Mac VideoToolbox backend. Windows build/runtime testing
+is pending; encoder-list presence alone does not establish support. The Rust
+video-transcoding route is not yet implemented, so this is a tool-pack readiness
+check, not completion of video conversion parity.
+
+Sources: [FFmpeg Media Foundation encoder documentation](https://www.ffmpeg.org/ffmpeg-codecs.html)
+and the verified FFmpeg 9.0.1 configure source retained in the pack. OpenH264 was
+checked as a possible fallback, but has not been added as a dependency.
