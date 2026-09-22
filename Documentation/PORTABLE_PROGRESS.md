@@ -615,3 +615,14 @@ round trip, plus silent/rotated cases and unsupported-codec rejection. Included
 the small generated fixture/provenance for Windows CI. Full media smoke, 62 active
 Rust tests, Clippy, release and Windows target builds/checks pass locally. Video
 re-encoding, resize/compression, trimming and final UI integration remain open.
+
+### September 22 — cancel desktop jobs when their supervisor disconnects
+
+Added an explicit supervised worker envelope and switched Electron to it. Closing
+or invalidating the control pipe now cancels an active desktop job; bare requests
+still support one-shot CLI use. Real process checks observed staging, disconnected
+the parent pipe, and verified cancellation/no output/temporary cleanup/source
+preservation. A connected-supervisor request and legacy CLI smoke also passed.
+Rust tests, Clippy, release build, Windows target check and desktop TypeScript/Vite
+build passed. Forced worker termination and process-tree containment remain open.
+Windows media job 35776416445 is still actively building its source-verified pack.

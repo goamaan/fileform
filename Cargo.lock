@@ -159,6 +159,7 @@ name = "fileform-worker"
 version = "0.1.0"
 dependencies = [
  "fileform-engine",
+ "serde",
  "serde_json",
 ]
 

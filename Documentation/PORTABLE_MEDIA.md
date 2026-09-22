@@ -190,3 +190,19 @@ Mac CLI/worker checks, 62 active Rust tests, Clippy, release build and Windows t
 checking passed. The generated fixture is checked in with provenance so Windows
 CI can exercise this route without requiring a video encoder. Windows execution
 is not yet established while the tool-pack build remains active.
+
+## Desktop supervisor lifetime
+
+Electron submits `{request: <engine request>, cancel_on_disconnect: true}` and
+keeps the worker's stdin open. The worker treats control-pipe EOF, read failure or
+an invalid control message as cancellation for these supervised jobs. A normal
+`cancel\n` also cancels. Bare engine requests preserve the previous one-shot CLI
+semantics: EOF alone does not cancel them. No arbitrary IPC event or shell API is
+exposed to the renderer.
+
+The process smoke suite now closes a real supervisor pipe after output staging
+starts and checks cancellation, source preservation, snapshot cleanup and absence
+of published/staged output. It also proves that a connected supervisor completes
+normally. These checks run in both existing desktop CI jobs. This closes an
+unexpected-Electron-exit gap while the worker remains alive; it does not establish
+cleanup after forcibly killing the worker itself or full process-tree containment.

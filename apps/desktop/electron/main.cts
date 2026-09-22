@@ -64,7 +64,7 @@ function worker(request:unknown):Promise<any> {
       } catch(error){reject(error instanceof Error?error:new Error('Invalid worker response.'));}
     });
     child.stdin.on('error',()=>{});
-    child.stdin.write(JSON.stringify(request)+'\n');
+    child.stdin.write(JSON.stringify({request,cancel_on_disconnect:true})+'\n');
   });
 }
 ipcMain.handle('fileform:cancel',(event)=>{authorize(event);cancelCurrent?.();});

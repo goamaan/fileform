@@ -2,24 +2,32 @@
 #![forbid(unsafe_code)]
 use fileform_engine::{Cancellation, Request};
 use std::io::{self, BufRead, Read, Write};
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SupervisedRequest {
+    request: Request,
+    cancel_on_disconnect: bool,
+}
 fn main() {
     let mut data = Vec::new();
-    // One compact JSON line starts a job. EOF remains supported for CLI callers.
-    // A following "cancel" line requests cooperative cleanup without killing it.
+    // Bare requests retain one-shot CLI semantics. Desktop requests opt into
+    // cancellation when their supervising control pipe closes or becomes invalid.
     let mut input = io::BufReader::new(io::stdin());
     let read = input.by_ref().take(1_048_577).read_until(b'\n', &mut data);
     let cancellation = Cancellation::default();
     let reply = if read.is_err() || data.len() > 1_048_576 {
         serde_json::json!({"version":1,"ok":false,"error":{"code":"invalid_request","message":"Request exceeds 1 MiB or cannot be read."}})
     } else {
-        match serde_json::from_slice::<Request>(&data) {
-            Ok(request) => {
+        let parsed = serde_json::from_slice::<SupervisedRequest>(&data)
+            .map(|envelope| (envelope.request, envelope.cancel_on_disconnect))
+            .or_else(|_| serde_json::from_slice::<Request>(&data).map(|request| (request, false)));
+        match parsed {
+            Ok((request, cancel_on_disconnect)) => {
                 let signal = cancellation.clone();
                 std::thread::spawn(move || {
                     let mut control = Vec::new();
-                    if input.take(8).read_until(b'\n', &mut control).is_ok()
-                        && control == b"cancel\n"
-                    {
+                    let read = input.take(8).read_until(b'\n', &mut control);
+                    if cancel_on_disconnect || (read.is_ok() && control == b"cancel\n") {
                         signal.cancel();
                     }
                 });
