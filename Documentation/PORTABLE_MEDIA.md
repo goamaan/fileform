@@ -214,3 +214,11 @@ binary set. Final distribution still requires auditing the resulting imports,
 static dependencies, source/relinking materials and exact generated pack; copying
 license files alone is not a completed release compliance review. The notice
 collection step awaits execution in the next Windows pack build.
+
+Windows CI caches only an exact pack match keyed by the build-recipe hash and a
+fingerprint of installed MSYS2 package versions. No fallback/prefix cache is used.
+A restored pack is still verified by the current Rust CLI and all current real
+media tests run; test results are never cached. The cache is saved only after a
+successful job. Changes to the source pins, flags, notices recipe or installed
+toolchain invalidate it. A cache miss remains a supported clean source build.
+The workflow also retains the JSON smoke summary with its pack artifacts.
