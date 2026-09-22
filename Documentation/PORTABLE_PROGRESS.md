@@ -479,3 +479,20 @@ Four desktop tests, TypeScript/Vite and packaging pass. The real Mac app saved
 without output/staging. CLI quantization/pixels matched, originals matched the
 generated fixture, and invalid quality floors blocked Save. Save-dialog cancellation
 preserved the earlier result. One preview remains open with valid settings.
+
+### September 22 — desktop workspace design
+
+Reworked the Electron shell with compact navigation, system typography, subdued
+surfaces, a central image canvas and a separate export inspector. Grouped format,
+resize and file-size controls; kept crop controls beside the preview. Added
+120ms control feedback and 180ms workspace/result entrances, disabled for reduced
+motion. The generated App v2 HTML informed the layout; no private design archive
+or paid settings were imported.
+
+Verification: TypeScript/Vite build and all four crop/export contract tests pass.
+Packaged macOS app manually checked in dark and light appearance, maximized and
+restored 1180px window. Native picker → Orientation.png → square crop → 8px resize
+→ Save completed as UI-polish-crop.png (129 bytes). Independent CLI inspection
+confirmed 8×8 sRGB with alpha. Only one preview app is running. Windows manual UI
+acceptance remains unavailable; these changes use the shared renderer. This is a
+preview increment, not a signed or feature-complete release.

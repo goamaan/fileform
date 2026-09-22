@@ -58,3 +58,12 @@ apps left open during QA were not intended product behavior. Keep one developmen
 build running, enforce single-instance launch behavior, and preserve the existing
 window/workspace on repeated launch. The Preview name and separate app identity
 remain temporary migration safeguards, not a second paid or permanent product.
+
+### Desktop design refinement — September 22, 2026
+
+Follow the generated HTML app designs as a reference, with freedom to improve
+execution. Use a modern, minimal Linear-like interface: deliberate typography,
+quiet navigation, simple workflows, and snappy, restrained transitions. Preserve
+teal identity, light/dark/system appearance, keyboard access and reduced motion.
+Only expose implemented tools. This applies to the shared Electron UI on both
+macOS and Windows and remains part of release acceptance.
