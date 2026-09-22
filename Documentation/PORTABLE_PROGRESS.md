@@ -651,3 +651,18 @@ FFmpeg 9 needs display_rotation rather than the ignored rotate metadata tag.
 All local media smoke checks, 63 active tests, Clippy, release and Windows target
 checks pass. Windows encoding runtime remains pending. No permanent category UI
 was added; size fitting, source-clock/video trimming and complete UI parity remain.
+
+### September 22 — audio byte-limit fitting and Windows media baseline
+
+Added bounded AAC/MP3 bitrate fitting and single-attempt WAV/FLAC size checks to
+CLI/worker. Candidates are fully verified, oversized candidates removed, floors
+respected and only measured fits published. Receipts report requested bitrate and
+attempt count. Full Mac media smoke includes actual fits, floor failures and
+lossless successes/failures with cleanup; Rust tests, Clippy, release build and
+Windows target checks pass.
+
+Corrected Windows run 35778556255 at 60d82c2 passed real tool builds and its media
+suite, establishing audio/extraction/sample-trim and stream-copy baseline runtime.
+Newer video encoding/resize/rotation fixes and audio fitting are not covered by
+that result. See PORTABLE_MEDIA.md for exact evidence boundaries and remaining
+manual GUI/signing/integration requirements.

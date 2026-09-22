@@ -3,8 +3,8 @@
 Status: media-pack verification and bounded media inspection are available in
 Rust/CLI/worker. WAV/FLAC/M4A/MP3 audio conversion and extraction are implemented;
 exact decoded-sample WAV/FLAC trimming, MP4/MOV stream copying and H.264 video
-re-encoding/resizing are implemented. Source-clock/fast/video trimming and media
-size fitting remain open. Media operations are not yet exposed by the portable
+re-encoding/resizing are implemented. Audio byte-limit fitting is implemented. Source-clock/fast/video trimming and
+video size fitting remain open. Media operations are not yet exposed by the portable
 app. Preserve the original Swift implementations as parity references.
 
 ## Pack verification
@@ -274,3 +274,41 @@ had not actually produced rotation. The stream-copy suite now asserts that a rea
 display matrix exists before testing preservation. All media smoke tests, 63 active
 Rust tests, Clippy, release build and Windows target check pass. Windows execution
 of this route is still pending the Media Foundation pack/test job.
+
+
+## Audio byte-limit fitting
+
+`fileform-native fit-audio INPUT OUTPUT.{wav,flac,m4a,mp3} PACK_DIRECTORY BYTES`
+and worker `fit_audio` accept a positive limit up to 512 MiB. AAC/MP3 try descending
+requested rates of 128, 112, 96, 80, 64, 56 and 48 kb/s, respecting an optional
+`minimum_bitrate` between 48 and 128 kb/s. AAC additionally tests a nonstandard
+chosen floor; MP3 stays on its supported discrete rates. WAV/FLAC receive one
+lossless-codec attempt with their existing precision policies. No trim, downmix,
+resampling or source replacement is used to satisfy the byte limit.
+
+Every candidate passes the complete conversion verification before its actual
+bytes are checked. Oversized candidates are removed. The first verified fit is
+published without overwriting; an unmet target leaves no final output. Receipts
+include attempt count and `requested_bitrate` (an encoder setting, not a measured
+bitrate claim). This bounded search does not promise the mathematically highest
+possible bitrate. Each attempt retains native timeout/cancellation limits; long
+recording performance and whole-job scheduling budgets still require measurement.
+
+Mac real-tool checks passed MP3/M4A fitting under 20,000 bytes with full duration,
+minimum-rate rejection, and WAV/FLAC fitting/unmet cases with exact fixture PCM and
+no leftover staging. The complete media smoke suite, Rust tests, Clippy, release
+build and Windows target check pass locally. Windows execution of this new fitting
+route awaits the next media job.
+
+## Verified Windows baseline
+
+Run [35778556255](https://github.com/goamaan/fileform/actions/runs/35778556255) at
+`60d82c21f2177b7098811a89a7602748598bf8a0` passed the source build, DLL audit, Rust
+build and real media suite on Windows 2025. It proves WAV/FLAC/M4A/MP3 conversion,
+video-audio extraction, PCM preservation, collision/stale-source/cancellation
+behavior, high-depth rejection, exact sample trims and MP4/MOV packet/timing
+round trips covered by that revision. Its old rotation fixture did not establish
+real display-matrix preservation; the corrected fixture is in newer tests.
+H.264 re-encoding, resizing, corrected rotation and audio fitting were added later
+and remain pending Windows runtime verification. Manual Windows GUI testing,
+Windows signing and final downloadable app integration are still open.

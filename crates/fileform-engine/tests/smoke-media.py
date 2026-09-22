@@ -51,6 +51,22 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         collision = subprocess.run([str(cli), 'convert-audio', str(source), str(output), str(pack)], capture_output=True)
         assert collision.returncode != 0 and output.read_bytes() == before
         receipts.append(result)
+    for extension in ['mp3','m4a']:
+        output=base/('fitted.'+extension)
+        result=json.loads(run(cli,'fit-audio',source,output,pack,20000).stdout)
+        assert result['bytes']==output.stat().st_size<=20000
+        assert result['attempts']>1 and result['requested_bitrate']>=48000
+        assert len(expected_pcm)<=len(pcm(output))<=len(expected_pcm)+4096
+        too_high=base/('floor-unmet.'+extension)
+        failure=request({'operation':'fit_audio','input':str(source),'output':str(too_high),'directory':str(pack),'max_bytes':20000,'minimum_bitrate':128000},ok=False)
+        assert failure['error']['code']=='target_unmet' and not too_high.exists()
+    for extension in ['wav','flac']:
+        output=base/('fitted-lossless.'+extension)
+        value=request({'operation':'fit_audio','input':str(source),'output':str(output),'directory':str(pack),'max_bytes':200000})['result']
+        assert value['attempts']==1 and value['requested_bitrate'] is None and pcm(output)==expected_pcm
+        rejected=base/('lossless-unmet.'+extension)
+        failure=request({'operation':'fit_audio','input':str(source),'output':str(rejected),'directory':str(pack),'max_bytes':1000},ok=False)
+        assert failure['error']['code']=='target_unmet' and not rejected.exists()
     frames = base/'frames.rgb'
     frames.write_bytes(b''.join(bytes((x*4%256,y*5%256,i*10%256)) for i in range(20) for y in range(48) for x in range(64)))
     video = base/'clip.mp4'
@@ -123,4 +139,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True}))

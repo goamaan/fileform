@@ -40,6 +40,8 @@ pub struct AudioReceipt {
     pub sample_rate: String,
     pub lossy_codec: bool,
     pub trimmed_samples: Option<SampleRange>,
+    pub requested_bitrate: Option<u32>,
+    pub attempts: u32,
 }
 fn format(output: &Path) -> Result<(&'static str, &'static str)> {
     match output
@@ -91,9 +93,20 @@ pub fn convert(
     directory: &Path,
     expected: Option<&str>,
     trim: Option<SampleRange>,
+    bitrate: Option<u32>,
     cancellation: &Cancellation,
 ) -> Result<AudioReceipt> {
     let (muxer, encoder) = format(output)?;
+    let lossy = matches!(encoder, "aac" | "libmp3lame");
+    if bitrate.is_some_and(|rate| !(48000..=128000).contains(&rate))
+        || (bitrate.is_some() && !lossy)
+    {
+        return Err(fail(
+            "invalid_request",
+            "Bitrate controls require AAC/MP3 from 48 to 128 kb/s.",
+        ));
+    }
+    let audio_rate = bitrate.unwrap_or(128000);
     if let Some(range) = trim {
         range.count()?;
         if !matches!(muxer, "wav" | "flac") {
@@ -228,7 +241,7 @@ pub fn convert(
         "libmp3lame" => {
             encode.args([
                 "-b:a",
-                "128000",
+                &audio_rate.to_string(),
                 "-write_xing",
                 "1",
                 "-id3v2_version",
@@ -238,7 +251,7 @@ pub fn convert(
             ]);
         }
         "aac" => {
-            encode.args(["-b:a", "128000", "-movflags", "+faststart"]);
+            encode.args(["-b:a", &audio_rate.to_string(), "-movflags", "+faststart"]);
         }
         "flac" => {
             encode.args(["-compression_level", "8"]);
@@ -373,9 +386,110 @@ pub fn convert(
         channels,
         sample_rate: sample_rate.clone(),
         trimmed_samples: trim,
+        requested_bitrate: lossy.then_some(audio_rate),
+        attempts: 1,
         lossy_codec: matches!(encoder, "aac" | "libmp3lame"),
     })
 }
+pub fn fit(
+    input: &Path,
+    output: &Path,
+    directory: &Path,
+    maximum: u64,
+    minimum: Option<u32>,
+    expected: Option<&str>,
+    cancellation: &Cancellation,
+) -> Result<AudioReceipt> {
+    if maximum == 0 || maximum > MAX_OUTPUT {
+        return Err(fail(
+            "invalid_request",
+            "Choose a file-size limit from 1 byte to 512 MiB.",
+        ));
+    }
+    let (_, encoder) = format(output)?;
+    let lossy = matches!(encoder, "aac" | "libmp3lame");
+    let floor = minimum.unwrap_or(48000);
+    if !(48000..=128000).contains(&floor) || (!lossy && minimum.is_some()) {
+        return Err(fail(
+            "invalid_request",
+            "Minimum bitrate is only available for AAC/MP3 from 48 to 128 kb/s.",
+        ));
+    }
+    if output.try_exists()? {
+        return Err(fail(
+            "collision",
+            "The output already exists. Choose another name.",
+        ));
+    }
+    let mut source = Source::open_with_limit(input, cancellation.clone(), 2 * 1024 * 1024 * 1024)?;
+    if expected.is_some_and(|hash| hash != source.hash) {
+        return Err(fail("source_changed", "The inspected source changed."));
+    }
+    let parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let identity = same_file::Handle::from_path(parent)?;
+    let staging = tempfile::tempdir_in(parent)?;
+    let extension = output
+        .extension()
+        .and_then(|v| v.to_str())
+        .expect("validated format");
+    let mut rates: Vec<Option<u32>> = if lossy {
+        [128000, 112000, 96000, 80000, 64000, 56000, 48000]
+            .into_iter()
+            .filter(|rate| *rate >= floor)
+            .map(Some)
+            .collect()
+    } else {
+        vec![None]
+    };
+    if encoder == "aac" && !rates.contains(&Some(floor)) {
+        rates.push(Some(floor));
+    }
+    for (index, rate) in rates.into_iter().enumerate() {
+        cancellation.check()?;
+        let candidate = staging.path().join(format!("candidate.{extension}"));
+        let mut result = convert(
+            source.snapshot.path(),
+            &candidate,
+            directory,
+            Some(&source.hash),
+            None,
+            rate,
+            cancellation,
+        )?;
+        if result.bytes > maximum {
+            std::fs::remove_file(&candidate)?;
+            continue;
+        }
+        source.check(input)?;
+        if identity != same_file::Handle::from_path(parent)? {
+            return Err(fail("output_changed", "The output folder changed."));
+        }
+        cancellation.check()?;
+        tempfile::TempPath::try_from_path(candidate)?
+            .persist_noclobber(output)
+            .map_err(|e| {
+                fail(
+                    if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                        "collision"
+                    } else {
+                        "io"
+                    },
+                    e.error.to_string(),
+                )
+            })?;
+        result.output = output.to_path_buf();
+        result.attempts = index as u32 + 1;
+        return Ok(result);
+    }
+    Err(fail(
+        "target_unmet",
+        "No complete audio output met the byte limit within the selected constraints.",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
