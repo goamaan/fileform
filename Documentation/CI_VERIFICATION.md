@@ -33,3 +33,8 @@ Evidence: full reference run 34894538829 at
 2259e35317f7010a2dd5d5f9fe4625c55b13e7e6 passed on both macOS runners, including the
 expanded-table verification correction. Later image/frontend increments require
 their own portable evidence; a cancelled job is never recorded as a pass.
+
+Desktop layout commit `d9089e2fd224f4240b84dbefd779a0c95e6f8e60` passed portable
+workflow run `35773207660` on both macOS 26 and Windows 2025 (September 22, 2026).
+This proves the configured build/tests and installer packaging, not manual Windows
+GUI acceptance or signed public distribution.

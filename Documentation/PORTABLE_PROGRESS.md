@@ -496,3 +496,23 @@ restored 1180px window. Native picker → Orientation.png → square crop → 8p
 confirmed 8×8 sRGB with alpha. Only one preview app is running. Windows manual UI
 acceptance remains unavailable; these changes use the shared renderer. This is a
 preview increment, not a signed or feature-complete release.
+
+### September 22 — signed and notarized Electron preview
+
+Added a fail-closed signed macOS builder configuration and a Keychain-profile
+notarization helper. The helper rejects ad-hoc builds, verifies the app and worker
+publisher match, requires Apple's Accepted status, staples and checks the ticket,
+and assesses the result with Gatekeeper. Only JIT entitlement is granted; hardened
+runtime and existing Electron fuses remain enabled.
+
+The arm64 preview was accepted as submission
+`f6b7eba5-388f-44de-a636-f0ad84fe1d1b`. A post-stapling ZIP was extracted to a fresh
+folder; stapler validation and Gatekeeper returned Notarized Developer ID. Its
+SHA-256 is `56d53a98c0dc8528e38beeda658f981fce04fa3ba12015468a499eceab3acf71`.
+The extracted app launched and converted Orientation.png to a 12×16, 119-byte PNG.
+CLI decoding confirmed exact pixels against the oriented source. The older preview
+was closed first. Local artifacts and credentials remain outside tracked source.
+
+See ELECTRON_RELEASE.md for reproduction and remaining release gates. This does
+not establish Intel Mac acceptance, Windows signing, automatic updates, feature
+parity, or public release availability.
