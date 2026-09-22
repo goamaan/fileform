@@ -23,7 +23,7 @@ pub use media_audio::SampleRange;
 mod media_pack;
 mod media_probe;
 mod media_video;
-pub use media_video::VideoEncoding;
+pub use media_video::{VideoEncoding, VideoFit};
 mod native_process;
 pub use image_crop::PixelCrop;
 mod image_orientation;
@@ -84,6 +84,13 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    FitVideo {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        options: VideoFit,
+        expected_source_sha256: Option<String>,
+    },
     FitAudio {
         input: PathBuf,
         output: PathBuf,
@@ -763,6 +770,24 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::FitVideo {
+        input,
+        output,
+        directory,
+        options,
+        expected_source_sha256,
+    } = &request
+    {
+        return media_video::fit(
+            input,
+            output,
+            directory,
+            *options,
+            expected_source_sha256.as_deref(),
+            cancellation,
+        )
+        .map(Response::SavedVideo);
+    }
     if let Request::FitAudio {
         input,
         output,
@@ -797,6 +822,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             expected_source_sha256.as_deref(),
             Some(*options),
+            false,
             cancellation,
         )
         .map(Response::SavedVideo);
@@ -814,6 +840,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             expected_source_sha256.as_deref(),
             None,
+            false,
             cancellation,
         )
         .map(Response::SavedVideo);
@@ -892,7 +919,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::FitAudio { .. }
+        Request::FitVideo { .. }
+        | Request::FitAudio { .. }
         | Request::ConvertVideo { .. }
         | Request::RemuxVideo { .. }
         | Request::TrimAudio { .. }
@@ -909,7 +937,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::FitAudio { .. }
+        Request::FitVideo { .. }
+        | Request::FitAudio { .. }
         | Request::ConvertVideo { .. }
         | Request::RemuxVideo { .. }
         | Request::TrimAudio { .. }

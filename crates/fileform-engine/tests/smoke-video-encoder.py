@@ -73,3 +73,28 @@ with tempfile.TemporaryDirectory(prefix='fileform-video-native-') as folder:
     assert result.returncode!=0 and not invalid.exists()
     assert not any(p.is_dir() for p in base.iterdir())
     print(json.dumps({'nativeResize':[32,24],'decodedFrames':20,'rotationNormalized':[48,64],'pcmToAac':True,'invalidBitrateRejected':True}))
+
+# A detailed synthetic source requires a genuine bitrate reduction to fit.
+import random
+with tempfile.TemporaryDirectory(prefix='fileform-video-fit-') as folder:
+    base=Path(folder)
+    raw=base/'noise.rgb'
+    raw.write_bytes(random.Random(7).randbytes(128*96*3*60))
+    dense=base/'dense.mp4'
+    run(ffmpeg,'-v','error','-f','rawvideo','-pixel_format','rgb24','-video_size','128x96','-framerate','30','-i',raw,'-c:v','mpeg4','-q:v','2','-pix_fmt','yuv420p',dense)
+    fitted=base/'fitted.mp4'
+    receipt=json.loads(run(cli,'fit-video',dense,fitted,pack,200000))
+    assert receipt['bytes']==fitted.stat().st_size<=200000
+    assert receipt['attempts']>1 and receipt['requested_bitrate']>=150000
+    assert (receipt['width'],receipt['height'])==(128,96)
+    decoded=run(ffmpeg,'-v','error','-xerror','-i',fitted,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
+    assert len(decoded)==60*128*96*3//2
+    with_audio=base/'with-audio.mp4'
+    audio_receipt=json.loads(run(cli,'fit-video',source,with_audio,pack,1000000))
+    assert audio_receipt['audio_tracks']==1 and abs(audio_receipt['duration_seconds']-2)<.1
+    missing=base/'unmet.mov'
+    result=subprocess.run([str(worker)],input=json.dumps({'operation':'fit_video','input':str(dense),'output':str(missing),'directory':str(pack),'options':{'max_bytes':1,'minimum_bitrate':2000000}})+'\n',text=True,capture_output=True,timeout=120)
+    failure=json.loads(result.stdout)
+    assert result.returncode!=0 and failure['error']['code']=='target_unmet' and not missing.exists()
+    assert not any(p.is_dir() for p in base.iterdir())
+    print(json.dumps({'videoFitBytes':receipt['bytes'],'attempts':receipt['attempts'],'requestedBitrate':receipt['requested_bitrate'],'decodedFrames':60,'unmetTargetClean':True}))

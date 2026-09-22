@@ -3,8 +3,8 @@
 Status: media-pack verification and bounded media inspection are available in
 Rust/CLI/worker. WAV/FLAC/M4A/MP3 audio conversion and extraction are implemented;
 exact decoded-sample WAV/FLAC trimming, MP4/MOV stream copying and H.264 video
-re-encoding/resizing are implemented. Audio byte-limit fitting is implemented. Source-clock/fast/video trimming and
-video size fitting remain open. Media operations are not yet exposed by the portable
+re-encoding/resizing are implemented. Audio byte-limit fitting is implemented. Audio and video byte-limit fitting are implemented. Source-clock/fast/video
+trimming remains open. Media operations are not yet exposed by the portable
 app. Preserve the original Swift implementations as parity references.
 
 ## Pack verification
@@ -252,7 +252,7 @@ checked as a possible fallback, but has not been added as a dependency.
 `fileform-native convert-video INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY
 [--max-dimension PIXELS]` and worker `convert_video` with `options` use H.264
 VideoToolbox on Mac or software Media Foundation on Windows. Default video bitrate
-is 2 Mb/s; the worker accepts an explicit bitrate from 50 kb/s to 50 Mb/s. Existing
+is 2 Mb/s; the worker accepts an explicit bitrate from 50 kb/s to 100 Mb/s. Existing
 AAC audio is copied; other single audio tracks are encoded as 128 kb/s AAC. This
 is lossy video encoding, not size fitting or a guaranteed compression ratio.
 
@@ -312,3 +312,30 @@ real display-matrix preservation; the corrected fixture is in newer tests.
 H.264 re-encoding, resizing, corrected rotation and audio fitting were added later
 and remain pending Windows runtime verification. Manual Windows GUI testing,
 Windows signing and final downloadable app integration are still open.
+
+
+## Video byte-limit fitting
+
+`fileform-native fit-video INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY BYTES` and worker
+`fit_video` with `options.max_bytes` use a measured output limit up to 2 GiB.
+Optional `minimum_bitrate` defaults to the original app's 150 kb/s floor and accepts
+50 kb/s–100 Mb/s. The search tries descending video rates from 2 Mb/s through
+1.5 Mb/s, 1 Mb/s, 750, 500, 300 and 150 kb/s as applicable, then the exact chosen
+floor, with at most eight attempts. A floor above 2 Mb/s receives one attempt.
+
+Every candidate passes the complete video verification before its size is checked.
+The first verified fit is atomically published without overwrite; oversized
+candidates are deleted and an unmet target publishes nothing. Full recording
+length is retained. Dimensions change only with explicit `max_dimension`. Audio
+is encoded as 128 kb/s AAC during fitting, matching the original app's fit policy;
+ordinary conversion may still copy compatible AAC. Receipts report requested video
+bitrate and attempt count, not a promise of a mathematically optimal bitrate.
+Long-recording search throughput and whole-job scheduling budgets remain measured
+performance work; individual attempts retain timeout/cancellation limits.
+
+Mac real-tool testing fits a detailed 128×96, 60-frame synthetic clip below 200,000
+bytes after five attempts (141,803 bytes at a requested 500 kb/s), retains all 60
+frames and original dimensions, and verifies audio-bearing input and unmet-floor
+cleanup. Video regression smoke, 64 active Rust tests, Clippy, release build and
+Windows target check pass. The Windows encoder job is still active; it does not
+yet establish Windows execution of this fitting route.

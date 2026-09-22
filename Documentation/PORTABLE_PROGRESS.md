@@ -666,3 +666,13 @@ suite, establishing audio/extraction/sample-trim and stream-copy baseline runtim
 Newer video encoding/resize/rotation fixes and audio fitting are not covered by
 that result. See PORTABLE_MEDIA.md for exact evidence boundaries and remaining
 manual GUI/signing/integration requirements.
+
+### September 22 — verified video byte-limit fitting
+
+Added bounded native bitrate search with explicit quality floor/optional resize,
+128 kb/s AAC fit policy, complete candidate verification and measured no-clobber
+publication. Real Mac test fits a 60-frame detailed clip to 141,803 bytes under a
+200,000-byte limit after five attempts, retaining all frames and dimensions.
+Audio-bearing input and impossible-target cleanup pass. Video smoke, 64 active
+Rust tests, Clippy, release and Windows target checks pass. Windows real encoding
+and fitting remain pending the live Media Foundation pack/test job.

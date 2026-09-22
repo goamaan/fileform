@@ -1,10 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
-use fileform_engine::{Background, PixelCrop, Request, SampleRange, VideoEncoding};
+use fileform_engine::{Background, PixelCrop, Request, SampleRange, VideoEncoding, VideoFit};
 use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, directory, limit] if command == "fit-video" => {
+            let max_bytes = limit
+                .to_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or_else(|| {
+                    eprintln!("Byte limit must be a positive integer.");
+                    std::process::exit(2)
+                });
+            Request::FitVideo {
+                input: PathBuf::from(input),
+                output: PathBuf::from(output),
+                directory: PathBuf::from(directory),
+                options: VideoFit {
+                    max_bytes,
+                    minimum_bitrate: None,
+                    max_dimension: None,
+                },
+                expected_source_sha256: None,
+            }
+        }
         [command, input, output, directory, limit] if command == "fit-audio" => {
             let bytes = limit
                 .to_str()
@@ -112,7 +132,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

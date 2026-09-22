@@ -9,6 +9,27 @@ pub struct VideoEncoding {
     pub max_dimension: Option<u32>,
     pub bitrate: Option<u32>,
 }
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VideoFit {
+    pub max_bytes: u64,
+    pub minimum_bitrate: Option<u32>,
+    pub max_dimension: Option<u32>,
+}
+fn fit_rates(floor: u32) -> Result<Vec<u32>> {
+    if !(50000..=100000000).contains(&floor) {
+        return Err(fail(
+            "invalid_request",
+            "Video bitrate floor must be from 50 kb/s to 100 Mb/s.",
+        ));
+    }
+    let mut rates: Vec<u32> = [2000000, 1500000, 1000000, 750000, 500000, 300000, 150000]
+        .into_iter()
+        .filter(|rate| *rate > floor)
+        .collect();
+    rates.push(floor);
+    Ok(rates)
+}
 fn dimensions(width: u32, height: u32, rotation: i32, maximum: Option<u32>) -> Result<(u32, u32)> {
     if rotation % 90 != 0 || width < 2 || height < 2 {
         return Err(fail(
@@ -58,6 +79,8 @@ pub struct VideoReceipt {
     pub height: u32,
     pub audio_tracks: usize,
     pub stream_copy: bool,
+    pub requested_bitrate: Option<u32>,
+    pub attempts: u32,
 }
 fn command(executable: &Path) -> Command {
     let mut command = Command::new(executable);
@@ -156,6 +179,7 @@ pub fn transform(
     directory: &Path,
     expected: Option<&str>,
     encoding: Option<VideoEncoding>,
+    encode_audio: bool,
     cancellation: &Cancellation,
 ) -> Result<VideoReceipt> {
     let muxer = match output
@@ -194,11 +218,11 @@ pub fn transform(
         }
         if options
             .bitrate
-            .is_some_and(|v| !(50000..=50000000).contains(&v))
+            .is_some_and(|v| !(50000..=100000000).contains(&v))
         {
             return Err(fail(
                 "invalid_request",
-                "Video bitrate must be between 50 kb/s and 50 Mb/s.",
+                "Video bitrate must be between 50 kb/s and 100 Mb/s.",
             ));
         }
         dimensions(
@@ -210,11 +234,12 @@ pub fn transform(
     } else {
         (original.width.unwrap(), original.height.unwrap())
     };
-    let copy_audio = before
-        .streams
-        .iter()
-        .filter(|s| s.codec_type == "audio")
-        .all(|s| s.codec_name.as_deref() == Some("aac"));
+    let copy_audio = !encode_audio
+        && before
+            .streams
+            .iter()
+            .filter(|s| s.codec_type == "audio")
+            .all(|s| s.codec_name.as_deref() == Some("aac"));
     let parent = output
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -428,12 +453,108 @@ pub fn transform(
         height: copied.height.unwrap(),
         audio_tracks: after.audio_tracks,
         stream_copy: encoding.is_none(),
+        requested_bitrate: encoding.map(|options| options.bitrate.unwrap_or(2000000)),
+        attempts: 1,
     })
+}
+
+pub fn fit(
+    input: &Path,
+    output: &Path,
+    directory: &Path,
+    options: VideoFit,
+    expected: Option<&str>,
+    cancellation: &Cancellation,
+) -> Result<VideoReceipt> {
+    if options.max_bytes == 0 || options.max_bytes > MAX_OUTPUT {
+        return Err(fail(
+            "invalid_request",
+            "Choose a video limit from 1 byte to 2 GiB.",
+        ));
+    }
+    let extension = output
+        .extension()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| fail("invalid_request", "Choose MP4 or MOV output."))?;
+    if !matches!(extension.to_ascii_lowercase().as_str(), "mp4" | "mov") {
+        return Err(fail("invalid_request", "Choose MP4 or MOV output."));
+    }
+    let rates = fit_rates(options.minimum_bitrate.unwrap_or(150000))?;
+    if output.try_exists()? {
+        return Err(fail(
+            "collision",
+            "The output already exists. Choose another name.",
+        ));
+    }
+    let mut source = Source::open_with_limit(input, cancellation.clone(), MAX_OUTPUT)?;
+    if expected.is_some_and(|hash| hash != source.hash) {
+        return Err(fail("source_changed", "The inspected source changed."));
+    }
+    let parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let identity = same_file::Handle::from_path(parent)?;
+    let staging = tempfile::tempdir_in(parent)?;
+    for (index, rate) in rates.into_iter().enumerate() {
+        cancellation.check()?;
+        let candidate = staging.path().join(format!("candidate.{extension}"));
+        let mut result = transform(
+            source.snapshot.path(),
+            &candidate,
+            directory,
+            Some(&source.hash),
+            Some(VideoEncoding {
+                max_dimension: options.max_dimension,
+                bitrate: Some(rate),
+            }),
+            true,
+            cancellation,
+        )?;
+        if result.bytes > options.max_bytes {
+            std::fs::remove_file(&candidate)?;
+            continue;
+        }
+        source.check(input)?;
+        if identity != same_file::Handle::from_path(parent)? {
+            return Err(fail("output_changed", "The output folder changed."));
+        }
+        cancellation.check()?;
+        tempfile::TempPath::try_from_path(candidate)?
+            .persist_noclobber(output)
+            .map_err(|e| {
+                fail(
+                    if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                        "collision"
+                    } else {
+                        "io"
+                    },
+                    e.error.to_string(),
+                )
+            })?;
+        result.output = output.to_path_buf();
+        result.attempts = index as u32 + 1;
+        return Ok(result);
+    }
+    Err(fail(
+        "target_unmet",
+        "No complete video met the byte limit within the selected constraints.",
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bitrate_search_is_descending_and_includes_the_floor() {
+        for floor in [50000, 150000, 700000, 2500000, 100000000] {
+            let rates = fit_rates(floor).unwrap();
+            assert_eq!(rates.last(), Some(&floor));
+            assert!(rates.len() <= 8 && rates.windows(2).all(|pair| pair[0] > pair[1]));
+        }
+        assert!(fit_rates(49999).is_err());
+        assert!(fit_rates(100000001).is_err());
+    }
     #[test]
     fn resize_is_explicit_even_bounded_and_orientation_aware() {
         assert_eq!(dimensions(1920, 1080, 90, Some(720)).unwrap(), (404, 720));
