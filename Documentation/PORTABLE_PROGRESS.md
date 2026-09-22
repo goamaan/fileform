@@ -535,3 +535,19 @@ inspection reactivates a closed Mac window, so a truly windowless Open command i
 not established by this manual check. Windows GUI acceptance remains pending.
 Drag/drop, file associations and broader task navigation are still open UX01/UX02
 requirements; this does not mark the complete import requirement done.
+
+### September 22 — user correction: parity before final UX
+
+The user rejected category workspaces and requested a universal file-first entry
+plus an optional action-first route. The original HTML supports this direction.
+Recorded the requirements in USER_REQUIREMENTS.md and AGENTS.md. Uncommitted
+workspace-specific drag/drop work was preserved under ignored local
+Artifacts/parked-workspace-drop, then removed from the active source. Its package
+built but native drag/drop was not verified and it is not a delivered capability.
+
+Next implementation priority is remaining original-app backend/workflow parity:
+media conversion/extraction/trim, PDF composition/page operations/compression,
+text/OCR, then batch/persistence/result workflows, with full requirements retained
+in REQUIREMENTS.json. The final UX must organize those capabilities around files
+and tasks, not engine-specific workspaces. Signing/updates and release gates remain
+required. No claim of feature completeness is made.

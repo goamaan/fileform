@@ -30,3 +30,9 @@ on main. New feature breadth follows release stabilization, not the reverse.
 During desktop QA, quit superseded test builds before launching a replacement.
 Keep only one active Fileform Preview app; separate artifacts may remain on disk.
 Repeated launches must focus/restore the existing window, preserving active work.
+
+Final UX is file-first: one drop/choose surface, then contextual actions; also
+allow action-first tasks such as PDF merging. Tables/Images workspaces are only a
+temporary migration UI, explicitly rejected as the final structure. Restore
+original-app parity before the complete UX pass; revisit the generated HTML's
+richer composition. Do not keep polishing category-specific entry screens.

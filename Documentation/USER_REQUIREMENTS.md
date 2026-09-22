@@ -67,3 +67,30 @@ quiet navigation, simple workflows, and snappy, restrained transitions. Preserve
 teal identity, light/dark/system appearance, keyboard access and reduced motion.
 Only expose implemented tools. This applies to the shared Electron UI on both
 macOS and Windows and remains part of release acceptance.
+
+### File-first UX and parity-first priority — September 22, 2026
+
+The user rejected Tables/Images/category workspaces as the product interaction
+model. People arrive with a file and a desired result; they should not need to
+classify it before importing. This supersedes the recent category-navigation
+polish as the final UX direction.
+
+- Default entry: one attractive local file drop/choose surface for all supported
+  inputs. Inspect the files and offer relevant transformations/actions afterwards.
+- Also support action-first entry: choose a task (for example, merge PDFs), then
+  select the appropriate files. Both routes converge on the same task model.
+- Return to the original generated HTML's richer composition: file previews,
+  useful task shortcuts, contextual controls and results. Minimal must not mean
+  empty. Keep concise copy, teal identity and restrained motion.
+- Restore original-app capability parity first; then implement and verify the
+  complete coherent UI/UX. Do not spend further effort polishing temporary
+  category workspaces or treat them as the intended product architecture.
+- Existing core capabilities and safety remain prerequisites. No fake actions or
+  claims of parity; retain every required media/PDF/OCR/batch/persistence workflow.
+
+The original App v2 HTML was revisited: its default screen already combines one
+file drop area with task shortcuts for PDF combination, trimming and size fitting.
+Useful external references checked September 22:
+[FilePane's file-adaptive actions](https://mymixapps.com/how-filepane-works) and
+[Shutter Encoder's file list/function workflow](https://www.shutterencoder.com/documentation/).
+These inform interaction patterns, not copied branding or additional feature scope.
