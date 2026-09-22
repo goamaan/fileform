@@ -1,3 +1,4 @@
+import {useOpenFile} from './use-open-file';
 import {useState,useEffect,useRef} from 'react';
 import type {ImageSource,ImageSavedFile,ImagePreview,PixelCrop} from './contracts';
 
@@ -41,6 +42,7 @@ export function ImageWorkspace({onBusyChange,hidden}:{onBusyChange:(busy:boolean
     finally{setBusy(false);setCancelling(false);onBusyChange(false);}
   }
   const choose=()=>run(async()=>{const file=await window.fileform.chooseImage();if(file){setSource(file);setSaved(null);setCrop(null);setPast([]);setFuture([]);}});
+  useOpenFile(!hidden&&!busy,choose);
   return <section className={`workspace image-workspace ${source?'has-source':''}`} hidden={hidden} aria-label="Image workspace">
     <div className="heading"><h1>Images</h1><span className="format">PNG / JPEG / TIFF</span></div>
     {!source?<button className="dropzone" disabled={busy} onClick={choose}><span className="file-icon" aria-hidden="true">▧</span><strong>{busy?'Reading image…':'Choose an image'}</strong><span>PNG / JPEG / TIFF · up to 80 megapixels</span></button>:<article className="file"><span className="file-icon" aria-hidden="true">▧</span><div><h2>{source.name}</h2><p>{source.width.toLocaleString()} × {source.height.toLocaleString()} pixels · {source.hasAlpha?'With transparency':'Opaque'}</p></div><button disabled={busy} onClick={choose}>Change</button></article>}

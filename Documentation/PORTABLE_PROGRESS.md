@@ -516,3 +516,22 @@ was closed first. Local artifacts and credentials remain outside tracked source.
 See ELECTRON_RELEASE.md for reproduction and remaining release gates. This does
 not establish Intel Mac acceptance, Windows signing, automatic updates, feature
 parity, or public release availability.
+
+### September 22 — native Open menu and keyboard import
+
+Added File → Open with Command+O on macOS and Control+O on Windows. A narrow
+preload subscription routes the command to the currently visible workspace;
+listeners are removed on unmount and read committed state. Existing main-process
+sender validation and exclusive operation guards remain in effect. No file paths
+or IPC event objects are exposed through the subscription. Open is ignored while
+an operation or native dialog is active. Native editing/window/zoom menu roles
+remain available; reload/developer-tools actions are not included in the app menu.
+
+Packaged macOS validation: Command+O imported a two-row CSV, exported JSON and
+independent parsing matched both rows exactly. File → Open in Images imported the
+orientation fixture through the native worker. Cancelling a subsequent picker
+retained the image. Build and all four crop/export contract tests pass. The CUA
+inspection reactivates a closed Mac window, so a truly windowless Open command is
+not established by this manual check. Windows GUI acceptance remains pending.
+Drag/drop, file associations and broader task navigation are still open UX01/UX02
+requirements; this does not mark the complete import requirement done.

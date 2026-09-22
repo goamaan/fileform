@@ -1,3 +1,4 @@
+import {useOpenFile} from './use-open-file';
 import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import type {Appearance,SourceFile,SavedFile,TableOutput} from './contracts';
@@ -17,6 +18,7 @@ function App(){
   useEffect(()=>{void applyTheme().catch(()=>setError('Appearance could not be loaded.'));const query=matchMedia('(prefers-color-scheme: dark)');const changed=()=>void applyTheme().catch(()=>{});query.addEventListener('change',changed);return()=>query.removeEventListener('change',changed);},[]);
   async function run(action:()=>Promise<void>){setBusy(true);setError('');try{await action();}catch(error){setError(error instanceof Error?error.message.replace(/^Error invoking remote method '[^']+': Error: /,''):'The file could not be processed.');}finally{setBusy(false);setCancelling(false);}}
   const choose=()=>run(async()=>{const file=await window.fileform.chooseTable();if(file){setSource(file);setSaved(null);setFormat(file.outputs[0]);}});
+  useOpenFile(workspace==='tables'&&!busy&&!imageBusy,choose);
   return <main className="app-shell">
     <header><div className="brand"><span className="brand-mark" aria-hidden="true">F</span>Fileform</div><label>Appearance<select aria-label="Appearance" value={appearance} onChange={e=>void applyTheme(e.target.value as Appearance).catch(()=>setError('Appearance could not be saved.'))}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></header>
     <aside className="sidebar"><span className="nav-label">Workspace</span><nav className="workspace-switch" aria-label="File tools"><button aria-pressed={workspace==='tables'} disabled={busy||imageBusy} onClick={()=>setWorkspace('tables')}>Tables</button><button aria-pressed={workspace==='images'} disabled={busy||imageBusy} onClick={()=>setWorkspace('images')}>Images</button></nav><div className="local-status"><span aria-hidden="true">●</span> Files stay on your device</div></aside>

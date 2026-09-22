@@ -8,6 +8,7 @@ export interface ImagePreview { width:number; height:number; rgba:number[] }
 export interface ImageSource { id:string; name:string; bytes:number; width:number; height:number; hasAlpha:boolean; canConvert:boolean; preview:ImagePreview|null }
 export interface ImageSavedFile { id:string; name:string; bytes:number; width:number; height:number;quality:number|null }
 export interface FileformAPI {
+  onOpenFile(callback:()=>void):()=>void;
   chooseImage():Promise<ImageSource|null>;
   saveImage(sourceID:string,options:ImageExportOptions):Promise<ImageSavedFile|null>;
   cancel():Promise<void>;

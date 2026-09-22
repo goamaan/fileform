@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, protocol, net, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, shell, protocol, net, type IpcMainInvokeEvent } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -174,6 +174,22 @@ async function createWindow(){
   await window.loadURL(page);
 }
 if(ownsInstance)app.whenReady().then(async()=>{
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(process.platform==='darwin'?[{role:'appMenu' as const}]:[]),
+    {label:'File',submenu:[
+      {label:'Open…',accelerator:'CommandOrControl+O',click:()=>{
+        if(busy)return;
+        void showWindow().then(()=>{
+          if(!busy&&!window?.isDestroyed())window?.webContents.send('fileform:open-request');
+        });
+      }},
+      {type:'separator'},
+      {role:process.platform==='darwin'?'close':'quit'},
+    ]},
+    {role:'editMenu'},
+    {label:'View',submenu:[{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'},{type:'separator'},{role:'togglefullscreen'}]},
+    {role:'windowMenu'},
+  ]));
   protocol.handle('fileform',(request)=>{
     try{
       const url=new URL(request.url);

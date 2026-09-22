@@ -5,8 +5,9 @@ The Swift app/engine remain the working reference. This roadmap is not a promise
 that every listed feature is available or a commitment to release dates.
 
 The immediate priority is verified existing behavior, platform parity, public
-source/downloads, secure updates and a concise interface. The first portable slice
-converts CSV/TSV to JSON; it does not replace the complete reference app yet.
+source/downloads, secure updates and a concise interface. The portable app supports CSV/TSV/flat JSON conversion and bounded PNG/JPEG/TIFF
+image conversion, crop, resize and size fitting. It does not yet replace the
+complete reference app. See PORTABLE_IMAGES.md for preservation limits.
 
 Detailed scope is retained in [REQUIREMENTS.json](REQUIREMENTS.json). Historical
 reference statuses are not portable acceptance. Each completed row needs actual
