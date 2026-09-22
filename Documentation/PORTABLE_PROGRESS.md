@@ -793,3 +793,12 @@ smoke pass locally. Exact trim also now uses the reference picture-size guard.
 Windows run 35789300804 verified the prior fast AAC and trim-policy increment;
 new fast-video runtime acceptance remains pending. Track selection, other parity
 workflows, final UI and release integration remain open.
+
+### September 22 — native waveform envelopes
+
+Ported bounded per-channel waveform measurements to CLI/worker, with exact sample
+coverage and no mixing/padding. Real mono/stereo/short-tail and eight-channel
+4096-bucket tests pass, including the wire-size limit. Rust tests, Clippy, release,
+Windows target and full media smoke pass locally. Final preview UI and playback
+leases remain open. Windows run 35790570936 verified the prior fast-video route;
+waveform runtime acceptance awaits the next revision.

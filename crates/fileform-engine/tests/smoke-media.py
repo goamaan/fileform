@@ -43,6 +43,25 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     run(ffmpeg,'-v','error','-i',source,'-af',r'asetpts=PTS+gte(N\,44100)/TB','-c:a','aac',gap)
     gap_result=request({'operation':'inspect_audio_timeline','input':str(gap),'directory':str(pack)},ok=False)
     assert gap_result['error']['code']=='unsupported' and 'gaps, overlaps' in gap_result['error']['message']
+    envelope=json.loads(run(cli,'waveform',source,pack).stdout)
+    assert envelope['sample_count']==88200 and envelope['sample_rate']==44100 and len(envelope['channels'])==1
+    assert all(v<-.35 for v in envelope['channels'][0]['minimum']) and all(v>.35 for v in envelope['channels'][0]['maximum'])
+    stereo=base/'channel-preview.wav'
+    with wave.open(str(stereo),'wb') as audio:
+        audio.setparams((2,2,8000,0,'NONE','not compressed'));audio.writeframes(struct.pack('<hh',8192,-16384)*100)
+    envelope=request({'operation':'media_waveform','input':str(stereo),'directory':str(pack),'bins':16})['result']
+    assert envelope['sample_count']==100 and envelope['samples_per_bucket']==7
+    assert envelope['channels'][0]['minimum']==envelope['channels'][0]['maximum']==[.25]*15
+    assert envelope['channels'][1]['minimum']==envelope['channels'][1]['maximum']==[-.5]*15
+    dense_wave=base/'eight-channel-preview.wav'
+    with wave.open(str(dense_wave),'wb') as audio:
+        audio.setparams((8,2,8000,0,'NONE','not compressed'));audio.writeframes(struct.pack('<8h',*([12000]*8))*4096)
+    wire=subprocess.run([str(worker)],input=json.dumps({'operation':'media_waveform','input':str(dense_wave),'directory':str(pack),'bins':4096})+'\n',text=True,capture_output=True,check=True)
+    assert len(wire.stdout.encode())<1048576
+    dense_result=json.loads(wire.stdout)['result']
+    assert len(dense_result['channels'])==8 and len(dense_result['channels'][0]['minimum'])==4096
+    invalid=request({'operation':'media_waveform','input':str(stereo),'directory':str(pack),'bins':15},ok=False)
+    assert invalid['error']['code']=='invalid_request'
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
     def pcm(path):
         return run(ffmpeg, '-v', 'error', '-i', path, '-map', '0:a:0', '-f', 's16le', '-').stdout
@@ -236,4 +255,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True,'fast_video_copy_verified':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True,'fast_video_copy_verified':True,'waveform_channels_and_coverage_verified':True}))

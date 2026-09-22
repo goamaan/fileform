@@ -603,3 +603,27 @@ Windows execution of this new video-copy route remains pending.
 Windows run 35789300804 at f5e9444 passed the preceding fast AAC route and original
 trim-precision/channel policy regressions, along with its broader media suite.
 It does not establish acceptance of the later fast-video changes.
+
+## Native per-channel waveform preview
+
+`fileform-native waveform FILE PACK_DIRECTORY` and worker `media_waveform` return
+bounded per-channel minimum/maximum envelopes. The worker accepts 16–4096 buckets
+(default 512), uses the verified continuous audio clock, converts only the preview
+measurements to float, and does not downmix or pad samples. Compact channel arrays
+plus sample count/rate and samples-per-bucket define exact bucket intervals; the
+last bucket may be shorter. The source hash and origin accompany the preview.
+
+The parser verifies bucket order, complete sample coverage, every channel's finite
+extrema, duplicate/missing fields and bounds. Native filter buffering is limited
+to 128 MiB per bucket, tool output to 8 MiB and serialized preview data to 900,000
+bytes. Decimal measurements use f64 to avoid JSON-value promotion expanding f32
+values unnecessarily. The source is rechecked; full audio is never sent to the UI.
+
+Mac real-file tests verify sine extrema, distinct stereo DC levels, a short final
+bucket and all 4096 buckets across eight channels within the 1 MiB worker envelope.
+Invalid bucket counts fail. Rust tests, Clippy, release build, Windows target check
+and complete media smoke pass. This is backend preview support; playback proxies,
+explicit multi-track selection and final UI wiring remain open.
+
+Windows run 35790570936 at dc7834b passed the preceding fast-video packet-copy
+route and its broader suite. It predates this waveform increment.
