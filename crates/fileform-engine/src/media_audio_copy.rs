@@ -54,6 +54,7 @@ pub fn trim(
         .iter()
         .find(|s| s.codec_type == "audio")
         .expect("counted audio");
+    crate::media_audio::validate_trim_source(audio, false)?;
     if audio.codec_name.as_deref() != Some("aac") {
         return Err(fail("unsupported", "Fast audio trim requires AAC packets."));
     }

@@ -559,3 +559,18 @@ The example 0.35–1.21 second request copied 38 packets and reported its actual
 15360/44100–54272/44100 interval. Rust tests, Clippy, release build, Windows target
 check and media smoke pass locally. Windows runtime, fast video trim, explicit
 track selection and final UI integration remain open for this route.
+
+## Original trim precision policy
+
+Trim validation now checks the decoded sample format as well as codec/bit depth.
+Exact FLAC trim rejects floating-point decoded audio (including AAC decoded as
+fltp) and greater-than-24-bit input, matching the Swift reference. Ordinary
+conversion retains its separate explicit-conversion policy; AAC-to-FLAC conversion
+is not disabled. All retained-audio trim paths enforce one to eight channels.
+Explicit WAV trim continues to use its documented 16-bit output policy.
+
+Real-file regression checks reject AAC-to-FLAC exact trim and nine-channel PCM
+trim without publishing output, while ordinary AAC-to-FLAC conversion succeeds.
+All 74 active Rust tests, Clippy, release build, Windows target check and the full
+local media suite pass. This closes a discovered parity-policy mismatch rather
+than adding a new format or narrowing the overall release objective.

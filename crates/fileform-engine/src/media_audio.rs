@@ -87,6 +87,31 @@ fn command(executable: &Path) -> Command {
     ]);
     command
 }
+pub(crate) fn validate_trim_source(audio: &crate::media_probe::Stream, flac: bool) -> Result<()> {
+    if !audio.channels.is_some_and(|n| (1..=8).contains(&n)) {
+        return Err(fail(
+            "unsupported",
+            "Trimming supports one to eight audio channels.",
+        ));
+    }
+    let bits = audio.bits_per_sample.unwrap_or(0).max(
+        audio
+            .bits_per_raw_sample
+            .as_deref()
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0),
+    );
+    if flac
+        && (audio
+            .sample_fmt
+            .as_deref()
+            .is_some_and(|s| s.starts_with("flt") || s.starts_with("dbl"))
+            || bits > 24)
+    {
+        return Err(fail("unsupported","FLAC trimming requires integer decoded audio up to 24 bits. Use WAV for explicit 16-bit conversion."));
+    }
+    Ok(())
+}
 pub fn convert(
     input: &Path,
     output: &Path,
@@ -148,6 +173,9 @@ pub fn convert(
         .iter()
         .find(|s| s.codec_type == "audio")
         .expect("counted audio");
+    if trim.is_some() {
+        validate_trim_source(audio, encoder == "flac")?;
+    }
     let bit_depth = audio.bits_per_sample.unwrap_or(0).max(
         audio
             .bits_per_raw_sample
@@ -493,6 +521,17 @@ pub fn fit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn trim_policy_distinguishes_float_decoding_from_integer_storage() {
+        let mut audio:crate::media_probe::Stream=serde_json::from_value(serde_json::json!({"index":0,"codec_type":"audio","codec_name":"aac","channels":2,"sample_fmt":"fltp","bits_per_sample":0})).unwrap();
+        assert!(validate_trim_source(&audio, true).is_err());
+        assert!(validate_trim_source(&audio, false).is_ok());
+        audio.sample_fmt = Some("s32".into());
+        audio.bits_per_raw_sample = Some("24".into());
+        assert!(validate_trim_source(&audio, true).is_ok());
+        audio.channels = Some(9);
+        assert!(validate_trim_source(&audio, false).is_err());
+    }
     #[test]
     fn formats_are_explicit_and_case_insensitive() {
         assert!(SampleRange { start: 1, end: 1 }.count().is_err());

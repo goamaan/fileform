@@ -95,6 +95,12 @@ pub fn trim(
     let (start, end, realized) = frame_range(options.interval, &timeline)?;
     let info = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
     let audio_samples = if info.audio_tracks > 0 && !options.mute_audio {
+        let track = info
+            .streams
+            .iter()
+            .find(|s| s.codec_type == "audio")
+            .expect("counted audio");
+        crate::media_audio::validate_trim_source(track, false)?;
         let audio = media_timeline::inspect(source.snapshot.path(), directory, cancellation)?;
         let video_clock = timeline.origin_ticks as u128
             * u128::from(timeline.time_base.numerator)

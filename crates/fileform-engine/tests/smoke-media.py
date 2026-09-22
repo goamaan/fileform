@@ -61,6 +61,18 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
         collision = subprocess.run([str(cli), 'convert-audio', str(source), str(output), str(pack)], capture_output=True)
         assert collision.returncode != 0 and output.read_bytes() == before
         receipts.append(result)
+    # Exact FLAC trim must not silently quantize floating-point decoded AAC.
+    aac=base/'converted.m4a'
+    rejected_float_trim=base/'aac-trim.flac'
+    failure=request({'operation':'trim_audio','input':str(aac),'output':str(rejected_float_trim),'directory':str(pack),'samples':{'start':0,'end':44100}},ok=False)
+    assert failure['error']['code']=='unsupported' and not rejected_float_trim.exists()
+    run(cli,'convert-audio',aac,base/'explicit-aac-conversion.flac',pack)
+    many=base/'nine-channels.wav'
+    with wave.open(str(many),'wb') as audio:
+        audio.setparams((9,2,44100,0,'NONE','not compressed'));audio.writeframes(b'\0'*44100*9*2)
+    rejected_channels=base/'channel-trim.wav'
+    request({'operation':'trim_audio','input':str(many),'output':str(rejected_channels),'directory':str(pack),'samples':{'start':0,'end':44100}},ok=False)
+    assert not rejected_channels.exists()
     for extension in ['mp3','m4a']:
         output=base/('fitted.'+extension)
         result=json.loads(run(cli,'fit-audio',source,output,pack,20000).stdout)
@@ -202,4 +214,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True}))

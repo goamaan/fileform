@@ -773,3 +773,12 @@ coverage, layout and full decoding are verified before no-clobber publication.
 Real middle/full-recording packet comparisons and invalid-range cleanup pass.
 Rust tests, Clippy, release/Windows target checks and media smoke pass locally.
 Windows execution of this route and fast video output remain pending.
+
+### September 22 — restore original trim precision/channel guards
+
+Reference comparison found that exact FLAC trim must reject floating-point decoded
+AAC even though ordinary conversion permits it. Added decoded sample-format
+inspection and shared trim validation for audio, fast AAC and retained video audio.
+Real AAC/FLAC and nine-channel regressions pass; explicit conversion remains usable.
+All 74 active Rust tests, Clippy, release build, Windows target check and media
+smoke pass locally. Fast video packet-copy output remains the next media gap.
