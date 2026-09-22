@@ -21,6 +21,7 @@ mod jpeg_input;
 mod media_audio;
 pub use media_audio::SampleRange;
 mod media_pack;
+mod media_packets;
 mod media_probe;
 mod media_time_trim;
 mod media_timeline;
@@ -91,6 +92,11 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    InspectMediaPackets {
+        input: PathBuf,
+        directory: PathBuf,
+        stream_index: u32,
+    },
     TrimVideo {
         input: PathBuf,
         output: PathBuf,
@@ -228,6 +234,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PacketInspection(media_packets::PacketInspection),
     TrimmedVideo(media_video_trim::VideoTrimReceipt),
     VideoTimeline(media_video_timeline::VideoTimeline),
     TimedAudio(media_time_trim::TimedAudioReceipt),
@@ -803,6 +810,15 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::InspectMediaPackets {
+        input,
+        directory,
+        stream_index,
+    } = &request
+    {
+        return media_packets::inspect(input, directory, *stream_index, cancellation)
+            .map(Response::PacketInspection);
+    }
     if let Request::TrimVideo {
         input,
         output,
@@ -997,7 +1013,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::TrimVideo { .. }
+        Request::InspectMediaPackets { .. }
+        | Request::TrimVideo { .. }
         | Request::InspectVideoTimeline { .. }
         | Request::TrimAudioTime { .. }
         | Request::InspectAudioTimeline { .. }
@@ -1019,7 +1036,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::TrimVideo { .. }
+        Request::InspectMediaPackets { .. }
+        | Request::TrimVideo { .. }
         | Request::InspectVideoTimeline { .. }
         | Request::TrimAudioTime { .. }
         | Request::InspectAudioTimeline { .. }

@@ -752,3 +752,15 @@ picture/audio checks, muting and the broader audio/timeline/cleanup cases. This
 resolves the observed small-frame failure. The newer container-header assertions
 are being run separately at the latest revision; manual GUI and final release
 integration remain unverified.
+
+### September 22 — packet content/timing evidence and display regression acceptance
+
+Added bounded encoded-packet inspection for fast-trim verification, with payload
+hashes, exact timestamps and a compact sequence digest. Independent audio/video
+packet comparisons and invalid-stream rejection pass. All 73 active Rust tests,
+Clippy, release build, Windows target check and media smoke pass locally. Fast
+copied-output generation remains unfinished.
+
+Windows run 35787219817 at 1ba5522 passed the independent container-display checks
+and prior complete native media suites. This closes the display-dimension
+regression gap; it does not cover the newly added packet-reader entry point or GUI.

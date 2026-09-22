@@ -510,3 +510,26 @@ Media Foundation small-frame failure without raising visible dimension limits.
 The later independent container-header assertions at 8f909a8 require the subsequent
 current-revision run. This result does not cover GUI acceptance, packaging/signing,
 secure updates, missing parity routes or the overall release goal.
+
+## Encoded packet evidence
+
+`fileform-native inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX` and worker
+`inspect_media_packets` read a selected audio/video stream's bounded packet timing
+and SHA-256 payload hashes. The response contains source binding, packet count,
+time base, clock extent, maximum packet duration, reorder status and a digest of
+the ordered timing/hash evidence. Large packet arrays remain in the native worker;
+they are not returned to the renderer. The sequence digest must be interpreted
+with its reported time base and is not alone a proof of a selected trim range.
+
+The reader verifies the media pack, snapshots/rechecks the source, limits packets
+to 100,000 during JSON parsing, caps tool output at 32 MiB and validates required
+hashes/durations/timestamp bounds. CLI/worker smoke compares both audio and video
+records with independent FFprobe output and rejects nonexistent stream indices.
+All 73 active Rust tests, Clippy, release build, Windows target check and local
+media smoke pass. Fast copied-output selection/verification is not implemented yet.
+
+Windows run [35787219817](https://github.com/goamaan/fileform/actions/runs/35787219817)
+at `1ba55220f963a47fb13ac4e3c56a56f8c447ad84` additionally passed the new independent
+MP4/MOV display-dimension assertions along with the existing native media suites.
+It predates this new packet-reader entry point, whose Windows runtime check remains
+for the next revision. GUI/release acceptance remains separate.
