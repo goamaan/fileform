@@ -54,7 +54,7 @@ FILEFORM_FLAGS=(
     --prefix=/ --disable-autodetect --disable-network --disable-doc --disable-debug
     --disable-ffplay --disable-avdevice --disable-shared --enable-static
     --disable-protocols --enable-protocol=file,pipe
-    --enable-w32threads --enable-zlib --enable-mediafoundation
+    --enable-w32threads --enable-zlib --enable-mediafoundation --enable-d3d11va
     --enable-libmp3lame
     "--extra-cflags=-I$FILEFORM_LAME_PREFIX/include"
     "--extra-ldflags=-static -L$FILEFORM_LAME_PREFIX/lib"
@@ -83,7 +83,7 @@ python3 - "$FILEFORM_PACK" <<'CHECK'
 import sys
 from pathlib import Path
 p=Path(sys.argv[1])
-allowed={'kernel32.dll','advapi32.dll','user32.dll','gdi32.dll','ole32.dll','oleaut32.dll','shell32.dll','shlwapi.dll','ws2_32.dll','secur32.dll','bcrypt.dll','winmm.dll','avrt.dll','msvcrt.dll','ucrtbase.dll','combase.dll','ntdll.dll','mfplat.dll'}
+allowed={'kernel32.dll','advapi32.dll','user32.dll','gdi32.dll','ole32.dll','oleaut32.dll','shell32.dll','shlwapi.dll','ws2_32.dll','secur32.dll','bcrypt.dll','winmm.dll','avrt.dll','msvcrt.dll','ucrtbase.dll','combase.dll','ntdll.dll','mfplat.dll','d3d11.dll','dxgi.dll'}
 for name in ['ffmpeg','ffprobe']:
     dlls=[x.strip().lower() for x in (p/(name+'-dlls.txt')).read_text().splitlines()]
     assert dlls, 'No imported DLLs were inspected'

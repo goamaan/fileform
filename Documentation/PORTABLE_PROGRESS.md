@@ -676,3 +676,17 @@ publication. Real Mac test fits a 60-frame detailed clip to 141,803 bytes under 
 Audio-bearing input and impossible-target cleanup pass. Video smoke, 64 active
 Rust tests, Clippy, release and Windows target checks pass. Windows real encoding
 and fitting remain pending the live Media Foundation pack/test job.
+
+### September 22 — audio clock proofs and Windows encoder build correction
+
+Ported bounded rational audio-timeline inspection to CLI/worker. Normal/offset
+fixtures pass; a real AAC timestamp gap fails the continuity check. Parser/unit
+coverage rejects oversized arrays, gaps, overlaps and missing timing. Full media
+smoke, 66 active Rust tests, Clippy, release and Windows target checks pass.
+Source-time trim planning still needs to use these proofs.
+
+Windows encoder run 35779787420 failed with missing D3D11 types in FFmpeg's Media
+Foundation source. Enabled its D3D11VA dependency explicitly and updated system-DLL
+checks. Cancelled the remaining known-bad build 35781000000; corrected runtime
+verification is not yet complete. This does not invalidate the earlier passing
+Windows audio/stream-copy baseline, which did not enable this encoder.

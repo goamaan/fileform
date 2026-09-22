@@ -33,6 +33,16 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     with wave.open(str(source), 'wb') as audio:
         audio.setparams((1, 2, 44100, 0, 'NONE', 'not compressed'))
         audio.writeframes(b''.join(struct.pack('<h', int(12000*math.sin(2*math.pi*440*i/44100))) for i in range(88200)))
+    timeline=json.loads(run(cli,'inspect-audio-timeline',source,pack).stdout)
+    assert timeline['decoded_samples']==88200 and timeline['origin_ticks']==0 and timeline['continuous_sample_clock']
+    offset=base/'offset.mov'
+    run(ffmpeg,'-v','error','-itsoffset','1','-i',source,'-c:a','pcm_s16le',offset)
+    offset_timeline=request({'operation':'inspect_audio_timeline','input':str(offset),'directory':str(pack)})['result']
+    assert offset_timeline['decoded_samples']==88200 and offset_timeline['origin_ticks']==44100
+    gap=base/'gap.m4a'
+    run(ffmpeg,'-v','error','-i',source,'-af',r'asetpts=PTS+gte(N\,44100)/TB','-c:a','aac',gap)
+    gap_result=request({'operation':'inspect_audio_timeline','input':str(gap),'directory':str(pack)},ok=False)
+    assert gap_result['error']['code']=='unsupported' and 'gaps, overlaps' in gap_result['error']['message']
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
     def pcm(path):
         return run(ffmpeg, '-v', 'error', '-i', path, '-map', '0:a:0', '-f', 's16le', '-').stdout
@@ -139,4 +149,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True}))

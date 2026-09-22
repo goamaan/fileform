@@ -339,3 +339,37 @@ frames and original dimensions, and verifies audio-bearing input and unmet-floor
 cleanup. Video regression smoke, 64 active Rust tests, Clippy, release build and
 Windows target check pass. The Windows encoder job is still active; it does not
 yet establish Windows execution of this fitting route.
+
+## Audio source-clock inspection
+
+`fileform-native inspect-audio-timeline FILE PACK_DIRECTORY` and worker
+`inspect_audio_timeline` establish a single audio track's source origin, rational
+time base, declared duration, decoded frame count and sample count. Every decoded
+frame timestamp must exactly equal the accumulated sample position in the stream's
+clock. Gaps, overlaps, missing/imprecise timestamps, incompatible container origins
+and unmeasurable durations fail; no floating-point approximation is used for the
+sample-continuity comparison. Origin/container comparison retains the reference
+app's 1 ms tolerance. The result is bound to a source hash and source recheck.
+
+Inspection is limited to 100,000 decoded frames, six hours, a 16 MiB tool response,
+120 seconds and 8–384 kHz audio. The JSON frame array is bounded during parsing.
+The time-base numerator is a positive u32 and denominator a positive signed-32-bit
+range, allowing exact u128 arithmetic under the timestamp/sample bounds. This is
+preparation for source-time trim planning, not a complete time-based trim command.
+
+Mac CLI/worker tests measure 88,200 samples in the 2-second WAV, preserve a one-second
+source origin in MOV, and reject an AAC file with an actual timestamp gap by the
+continuity check. Unit tests cover gaps, overlaps, missing timestamps, invalid
+rational clocks and excessive frame arrays. The complete media smoke, 66 active
+Rust tests, Clippy, release build and Windows target check pass. Windows execution
+of this new reader remains pending.
+
+## Windows Media Foundation build correction
+
+Run 35779787420 failed compiling FFmpeg's mfenc.c because its D3D11 types were not
+available under the explicit no-autodetection configuration. The verified FFmpeg
+9.0.1 source includes those types under CONFIG_D3D11VA; the recipe now explicitly
+enables D3D11VA alongside Media Foundation. D3D11/DXGI system DLLs are listed in the
+import audit. This does not enable hardware encoding in the runtime test, which
+still requests software encoding. Known-bad run 35781000000 was cancelled for this
+confirmed configuration failure; the corrected build is pending verification.

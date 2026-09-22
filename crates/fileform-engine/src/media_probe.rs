@@ -13,6 +13,7 @@ pub struct Stream {
     pub nb_frames: Option<String>,
     pub time_base: Option<String>,
     pub start_time: Option<String>,
+    pub start_pts: Option<i64>,
     pub color_primaries: Option<String>,
     pub color_space: Option<String>,
     pub color_range: Option<String>,
@@ -38,6 +39,7 @@ pub struct Disposition {
 }
 #[derive(Deserialize)]
 struct Format {
+    start_time: Option<String>,
     duration: Option<String>,
     format_name: String,
 }
@@ -48,6 +50,7 @@ struct Probe {
 }
 #[derive(Debug, Serialize)]
 pub struct MediaInspection {
+    pub container_start_time: Option<String>,
     pub sha256: String,
     pub bytes: u64,
     pub duration_seconds: f64,
@@ -116,12 +119,13 @@ pub fn inspect(
             command.env("SystemRoot", system);
         }
     }
-    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration:stream=index,codec_type,codec_name,duration,duration_ts,nb_frames,time_base,start_time,width,height,channels,sample_rate,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_side_data=rotation","-of","json"]);
+    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration,start_time:stream=index,codec_type,codec_name,duration,duration_ts,nb_frames,time_base,start_time,start_pts,width,height,channels,sample_rate,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_side_data=rotation","-of","json"]);
     command.arg(source.snapshot.path());
     let bytes = native_process::run(command, cancellation, Duration::from_secs(30), 512 * 1024)?;
     let (probe, duration_seconds, audio_tracks, video_tracks) = parse(&bytes)?;
     source.check(input)?;
     Ok(MediaInspection {
+        container_start_time: probe.format.start_time,
         sha256: source.hash,
         bytes: source.input.metadata()?.len(),
         duration_seconds,

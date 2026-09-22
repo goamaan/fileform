@@ -22,6 +22,7 @@ mod media_audio;
 pub use media_audio::SampleRange;
 mod media_pack;
 mod media_probe;
+mod media_timeline;
 mod media_video;
 pub use media_video::{VideoEncoding, VideoFit};
 mod native_process;
@@ -84,6 +85,10 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    InspectAudioTimeline {
+        input: PathBuf,
+        directory: PathBuf,
+    },
     FitVideo {
         input: PathBuf,
         output: PathBuf,
@@ -199,6 +204,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    AudioTimeline(media_timeline::AudioTimeline),
     SavedVideo(media_video::VideoReceipt),
     SavedAudio(media_audio::AudioReceipt),
     MediaInspection(media_probe::MediaInspection),
@@ -770,6 +776,10 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::InspectAudioTimeline { input, directory } = &request {
+        return media_timeline::inspect(input, directory, cancellation)
+            .map(Response::AudioTimeline);
+    }
     if let Request::FitVideo {
         input,
         output,
@@ -919,7 +929,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::FitVideo { .. }
+        Request::InspectAudioTimeline { .. }
+        | Request::FitVideo { .. }
         | Request::FitAudio { .. }
         | Request::ConvertVideo { .. }
         | Request::RemuxVideo { .. }
@@ -937,7 +948,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::FitVideo { .. }
+        Request::InspectAudioTimeline { .. }
+        | Request::FitVideo { .. }
         | Request::FitAudio { .. }
         | Request::ConvertVideo { .. }
         | Request::RemuxVideo { .. }
