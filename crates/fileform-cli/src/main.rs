@@ -5,6 +5,9 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, directory] if command == "verify-media-pack" => Request::VerifyMediaPack {
+            directory: PathBuf::from(directory),
+        },
         [command, rest @ ..] if command == "convert-image" => {
             image_request(rest).unwrap_or_else(|message| {
                 eprintln!("{message}");
@@ -25,7 +28,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

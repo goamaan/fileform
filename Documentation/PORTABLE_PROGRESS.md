@@ -551,3 +551,14 @@ text/OCR, then batch/persistence/result workflows, with full requirements retain
 in REQUIREMENTS.json. The final UX must organize those capabilities around files
 and tasks, not engine-specific workspaces. Signing/updates and release gates remain
 required. No claim of feature completeness is made.
+
+### September 22 — portable media-pack validation
+
+Ported the original media-pack integrity boundary to safe Rust, exposed through
+CLI and worker. Manifest/file reads are bounded, tool hashes checked, declared
+architecture/network policy validated, and cancellation supported. Windows uses
+.exe tool names. Added four tests for verification/tampering, invalid manifests,
+cancellation and Unix out-of-pack symlinks. All 57 Rust tests, Clippy, release build
+and Windows target check passed. Both CLI and worker verified the existing real
+Mac FFmpeg/LAME pack. Details and remaining media parity work are in
+PORTABLE_MEDIA.md; no new category UI or transformation-completion claim was added.
