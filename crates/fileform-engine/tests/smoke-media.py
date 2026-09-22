@@ -197,6 +197,27 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
     invalid_copy=base/'invalid-copy.m4a'
     request({'operation':'copy_audio_trim','input':str(h264),'output':str(invalid_copy),'directory':str(pack),'interval':{'start':{'ticks':0,'timescale':1},'end':{'ticks':3,'timescale':1}}},ok=False)
     assert not invalid_copy.exists()
+    fast_video=base/'fast-trim.mp4'
+    receipt=json.loads(run(cli,'copy-video-trim',h264,fast_video,pack,'1.3','1.7').stdout)
+    assert (receipt['start_frame'],receipt['end_frame'])==(12,20)
+    actual=run(ffmpeg,'-v','error','-noautorotate','-i',fast_video,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-').stdout
+    expected=run(ffmpeg,'-v','error','-noautorotate','-i',h264,'-map','0:v:0','-vf','trim=start_frame=12:end_frame=20,setpts=PTS-STARTPTS','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-').stdout
+    assert actual==expected and len(actual)==8*64*48*3//2
+    offset_video=base/'offset-video.mp4'
+    run(ffmpeg,'-v','error','-itsoffset','1','-i',h264,'-map','0:v:0','-c','copy',offset_video)
+    offset_fast=base/'offset-fast.mov'
+    offset_result=json.loads(run(cli,'copy-video-trim',offset_video,offset_fast,pack,'1.3','1.7').stdout)
+    assert (offset_result['start_frame'],offset_result['end_frame'])==(12,20)
+    assert run(ffmpeg,'-v','error','-i',offset_fast,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-').stdout==expected
+    pcm_video=base/'pcm-video.mov'
+    run(ffmpeg,'-v','error','-i',h264,'-c:v','copy','-c:a','pcm_s16le',pcm_video)
+    muted=base/'fast-muted.mov'
+    assert json.loads(run(cli,'copy-video-trim',pcm_video,muted,pack,'1.3','1.7','--mute-audio').stdout)['audio_tracks']==0
+    reordered_h264=base/'reordered-h264.mp4'
+    run(ffmpeg,'-v','error','-i',h264,'-map','0:v:0','-c','copy','-bsf:v','setts=dts=DTS-1024','-avoid_negative_ts','disabled',reordered_h264)
+    rejected_fast=base/'reordered-rejected.mp4'
+    failure=request({'operation':'copy_video_trim','input':str(reordered_h264),'output':str(rejected_fast),'directory':str(pack),'options':{'interval':{'start':{'ticks':1,'timescale':10},'end':{'ticks':1,'timescale':1}}}},ok=False)
+    assert failure['error']['code']=='unsupported' and not rejected_fast.exists()
     mov=base/'copied.mov'
     request({'operation':'remux_video','input':str(h264),'output':str(mov),'directory':str(pack)})
     roundtrip=base/'roundtrip.mp4'
@@ -209,9 +230,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-audio-smoke-') as folder:
             info=json.loads(run(ffprobe,'-v','error','-show_streams','-of','json',selected).stdout)
             assert any(d.get('rotation')==90 for d in info['streams'][0].get('side_data_list',[]))
         request({'operation':'remux_video','input':str(selected),'output':str(base/(variant+'.mov')),'directory':str(pack)})
+        run(cli,'copy-video-trim',selected,base/(variant+'-fast.mov'),pack,'1.3','1.7')
     rejected=base/'unsupported-video.mov'
     request({'operation':'remux_video','input':str(video),'output':str(rejected),'directory':str(pack)},ok=False)
     assert not rejected.exists()
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
     assert not any(p.is_dir() for p in base.iterdir()), 'Staging directory leaked'
-    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True}))
+    print(json.dumps({'formats':['wav','flac','m4a','mp3'],'lossless_pcm_exact':True,'video_audio_extraction_exact':True,'collisions_preserved':True,'stale_source_rejected':True,'cancellation_clean':True,'high_depth_flac_rejected':True,'source_unchanged':True,'flac_24bit_exact':True,'float_flac_rejected':True,'mp3_resampling_rejected':True,'multiple_tracks_rejected':True,'exact_sample_trims':True,'single_sample_trim':True,'trim_24bit_exact':True,'invalid_ranges_clean':True,'video_packets_and_timing_exact':True,'silent_and_rotated_video':True,'unsupported_video_rejected':True,'audio_byte_limits_verified':True,'minimum_bitrate_enforced':True,'lossless_fit_checked':True,'audio_clock_and_offset_verified':True,'gapped_clock_rejected':True,'source_time_trim_exact':True,'offset_time_trim_exact':True,'invalid_time_trims_clean':True,'decoded_video_clock_verified':True,'reordered_video_identified':True,'variable_timing_rejected':True,'packet_hash_and_clock_evidence_verified':True,'fast_aac_trim_packets_verified':True,'trim_precision_policy_verified':True,'fast_video_copy_verified':True}))

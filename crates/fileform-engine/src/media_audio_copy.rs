@@ -229,45 +229,18 @@ pub fn trim(
     }
     let copied = media_packets::read(temporary.path(), directory, result.index, cancel)?;
     let output_base = TimeBase::parse(result.time_base.as_deref())?;
-    let matches = |a: &media_packets::Packet, b: &media_packets::Packet| {
-        a.data_hash == b.data_hash
-            && b.dts == Some(b.pts)
-            && (seconds(a.duration, base) - seconds(b.duration, output_base)).abs() <= 0.001
-            && (seconds(a.pts - origin - start, base) - seconds(b.pts, output_base)).abs() <= 0.001
-    };
-    let first = original
-        .iter()
-        .position(|p| matches(p, &copied[0]))
-        .ok_or_else(|| {
-            fail(
-                "verification",
-                "Copied packets start outside the approved interval.",
-            )
-        })?;
-    if first + copied.len() > original.len()
-        || original[first..first + copied.len()]
-            .iter()
-            .zip(&copied)
-            .any(|(a, b)| !matches(a, b))
-    {
-        return Err(fail(
-            "verification",
-            "Encoded audio packets or timestamps changed.",
-        ));
-    }
-    let actual_start = seconds(original[first].pts - origin, base);
-    let last = &original[first + copied.len() - 1];
-    let actual_end = seconds(last.pts + last.duration - origin, base);
-    if (actual_start - seconds(start, base)).abs() > tolerance
-        || (actual_end - seconds(end, base)).abs() > tolerance
-        || actual_start > seconds(start, base) + 0.001
-        || actual_end < seconds(end, base) - 0.001
-    {
-        return Err(fail(
-            "verification",
-            "Copied packet coverage differs from the approved interval.",
-        ));
-    }
+    media_packets::verify_copy(
+        &original,
+        &copied,
+        media_packets::CopyWindow {
+            base,
+            origin,
+            start: seconds(start, base),
+            end: seconds(end, base),
+            tolerance,
+        },
+        output_base,
+    )?;
     let mut decode = crate::media_video::command(&executable);
     decode
         .args(["-err_detect", "explode", "-i"])

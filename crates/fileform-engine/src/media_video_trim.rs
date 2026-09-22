@@ -91,9 +91,10 @@ pub fn trim(
     if expected.is_some_and(|hash| hash != source.hash) {
         return Err(fail("source_changed", "The inspected source changed."));
     }
+    let info = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
+    media_video::trim_picture(&info)?;
     let timeline = media_video_timeline::inspect(source.snapshot.path(), directory, cancellation)?;
     let (start, end, realized) = frame_range(options.interval, &timeline)?;
-    let info = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
     let audio_samples = if info.audio_tracks > 0 && !options.mute_audio {
         let track = info
             .streams

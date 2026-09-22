@@ -574,3 +574,32 @@ trim without publishing output, while ordinary AAC-to-FLAC conversion succeeds.
 All 74 active Rust tests, Clippy, release build, Windows target check and the full
 local media suite pass. This closes a discovered parity-policy mismatch rather
 than adding a new format or narrowing the overall release objective.
+
+## Fast H.264/AAC video trimming
+
+`fileform-native copy-video-trim INPUT OUTPUT.{mp4,mov} PACK_DIRECTORY
+START_SECONDS END_SECONDS [--mute-audio]` and worker `copy_video_trim` copy a
+constant-rate, non-reordered H.264 video track from MP4/MOV-family input. Retained
+audio must be one aligned AAC track; explicitly muted non-AAC audio is allowed.
+The requested interval snaps outward to jointly verified keyframe boundaries and
+is reported separately from the realized interval. Existing trim picture/channel
+constraints apply; exact trim remains available when packet-copy timing is unsafe.
+
+Both retained streams are checked against contiguous source packet sequences by
+payload hash, presentation timestamp, duration and coverage. Copied pictures are
+also decoded and hashed against the independently selected source frame range,
+then the complete output is decoded. Display/color/rotation, frame count, audio
+layout and measured duration must pass before no-clobber publication. AAC edge
+tolerance is derived from bounded actual packet durations. Source changes and
+output-folder changes are rechecked. This adds no renderer-side processing.
+
+Mac tests prove a 1.3–1.7 second request snaps to frames [12,20), producing the
+unchanged eight pictures for 1.2–2.0 seconds. Source offsets, silent/rotated clips,
+explicit muting of PCM audio and reordered-timing rejection pass. Shared packet
+verification has content/timing/coverage regressions. All 75 active Rust tests,
+Clippy, release build, Windows target check and full media smoke pass locally.
+Windows execution of this new video-copy route remains pending.
+
+Windows run 35789300804 at f5e9444 passed the preceding fast AAC route and original
+trim-precision/channel policy regressions, along with its broader media suite.
+It does not establish acceptance of the later fast-video changes.

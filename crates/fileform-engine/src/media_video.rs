@@ -123,7 +123,10 @@ pub(crate) fn command(executable: &Path) -> Command {
     ]);
     command
 }
-fn video(info: &media_probe::MediaInspection, stream_copy: bool) -> Result<&media_probe::Stream> {
+pub(crate) fn video(
+    info: &media_probe::MediaInspection,
+    stream_copy: bool,
+) -> Result<&media_probe::Stream> {
     if info.video_tracks != 1
         || info.audio_tracks > 1
         || info.streams.len() != 1 + info.audio_tracks
@@ -176,6 +179,24 @@ fn video(info: &media_probe::MediaInspection, stream_copy: bool) -> Result<&medi
         ));
     }
     Ok(video)
+}
+pub(crate) fn trim_picture(info: &media_probe::MediaInspection) -> Result<&media_probe::Stream> {
+    let picture = video(info, false)?;
+    if !picture
+        .width
+        .is_some_and(|n| (2..=8192).contains(&n) && n % 2 == 0)
+        || !picture
+            .height
+            .is_some_and(|n| (2..=8192).contains(&n) && n % 2 == 0)
+        || picture
+            .sample_aspect_ratio
+            .as_deref()
+            .is_some_and(|v| !matches!(v, "1:1" | "0:1" | "N/A"))
+        || rotation(picture) % 90 != 0
+    {
+        return Err(fail("unsupported","Trim requires even-sized, square-pixel video up to 8192 pixels per edge and right-angle rotation."));
+    }
+    Ok(picture)
 }
 fn start(stream: &media_probe::Stream) -> Result<f64> {
     stream

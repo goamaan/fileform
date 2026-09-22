@@ -181,9 +181,119 @@ pub fn inspect(
         packet_sequence_sha256: digest,
     })
 }
+pub(crate) struct CopyWindow {
+    pub base: TimeBase,
+    pub origin: i64,
+    pub start: f64,
+    pub end: f64,
+    pub tolerance: f64,
+}
+pub(crate) fn verify_copy(
+    original: &[Packet],
+    copied: &[Packet],
+    window: CopyWindow,
+    destination: TimeBase,
+) -> Result<()> {
+    if !(0..=i64::MAX / 4).contains(&window.origin)
+        || !window.start.is_finite()
+        || !window.end.is_finite()
+        || !window.tolerance.is_finite()
+        || window.start < 0.0
+        || window.start >= window.end
+        || window.tolerance < 0.0
+        || window.base.denominator == 0
+        || destination.denominator == 0
+    {
+        return Err(fail(
+            "verification",
+            "Invalid packet-copy verification clock.",
+        ));
+    }
+    let seconds = |ticks: i64, base: TimeBase| {
+        ticks as f64 * f64::from(base.numerator) / f64::from(base.denominator)
+    };
+    let first_packet = copied
+        .first()
+        .ok_or_else(|| fail("verification", "No copied packets were found."))?;
+    let matches = |a: &Packet, b: &Packet| {
+        a.data_hash == b.data_hash
+            && b.dts == Some(b.pts)
+            && (seconds(a.pts - window.origin, window.base)
+                - window.start
+                - seconds(b.pts, destination))
+            .abs()
+                <= 0.001
+            && (seconds(a.duration, window.base) - seconds(b.duration, destination)).abs() <= 0.001
+    };
+    let first = original
+        .iter()
+        .position(|p| matches(p, first_packet))
+        .ok_or_else(|| {
+            fail(
+                "verification",
+                "Copied packets start outside the approved source interval.",
+            )
+        })?;
+    if first + copied.len() > original.len()
+        || original[first..first + copied.len()]
+            .iter()
+            .zip(copied)
+            .any(|(a, b)| !matches(a, b))
+    {
+        return Err(fail(
+            "verification",
+            "Copied packet content or timing changed.",
+        ));
+    }
+    let begin = seconds(original[first].pts - window.origin, window.base);
+    let last = &original[first + copied.len() - 1];
+    let end = seconds(last.pts + last.duration - window.origin, window.base);
+    if (begin - window.start).abs() > window.tolerance
+        || (end - window.end).abs() > window.tolerance
+        || begin > window.start + 0.001
+        || end < window.end - 0.001
+    {
+        return Err(fail(
+            "verification",
+            "Copied packet coverage differs from the approved interval.",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn copied_content_timing_and_coverage_are_verified() {
+        let packet = |pts, duration| Packet {
+            pts,
+            dts: Some(pts),
+            duration,
+            data_hash: format!("SHA256:{}", "a".repeat(64)),
+        };
+        let original = vec![packet(0, 10), packet(10, 10), packet(20, 10)];
+        let mut copied = vec![packet(0, 100), packet(100, 100)];
+        let window = || CopyWindow {
+            base: TimeBase {
+                numerator: 1,
+                denominator: 100,
+            },
+            origin: 0,
+            start: 0.1,
+            end: 0.3,
+            tolerance: 0.001,
+        };
+        let destination = TimeBase {
+            numerator: 1,
+            denominator: 1000,
+        };
+        assert!(verify_copy(&original, &copied, window(), destination).is_ok());
+        copied[1].data_hash = format!("SHA256:{}", "b".repeat(64));
+        assert!(verify_copy(&original, &copied, window(), destination).is_err());
+        copied.pop();
+        assert!(verify_copy(&original, &copied, window(), destination).is_err());
+    }
     #[test]
     fn packet_evidence_requires_timestamps_durations_and_hashes() {
         let mut packets = vec![Packet {

@@ -782,3 +782,14 @@ inspection and shared trim validation for audio, fast AAC and retained video aud
 Real AAC/FLAC and nine-channel regressions pass; explicit conversion remains usable.
 All 74 active Rust tests, Clippy, release build, Windows target check and media
 smoke pass locally. Fast video packet-copy output remains the next media gap.
+
+### September 22 — packet-verified fast video output
+
+Added keyframe-snapped H.264/AAC copying with shared packet content/timing/coverage
+verification and independent decoded-picture identity checks. Real source-offset,
+silent/rotated, retained-audio, explicit PCM muting and reordered-timing rejection
+cases pass. All 75 active Rust tests, Clippy, release/Windows target checks and media
+smoke pass locally. Exact trim also now uses the reference picture-size guard.
+Windows run 35789300804 verified the prior fast AAC and trim-policy increment;
+new fast-video runtime acceptance remains pending. Track selection, other parity
+workflows, final UI and release integration remain open.

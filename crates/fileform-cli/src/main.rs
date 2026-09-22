@@ -40,6 +40,37 @@ fn main() {
                 stream_index,
             }
         }
+        [command, input, output, directory, start, end, flags @ ..]
+            if command == "copy-video-trim" =>
+        {
+            let mute_audio = match flags {
+                [] => false,
+                [flag] if flag == "--mute-audio" => true,
+                _ => {
+                    eprintln!("Use --mute-audio or no extra flags.");
+                    std::process::exit(2)
+                }
+            };
+            let time = |v: &std::ffi::OsString| {
+                MediaTime::decimal(v.to_str().unwrap_or("")).unwrap_or_else(|e| {
+                    eprintln!("{}", e.message);
+                    std::process::exit(2)
+                })
+            };
+            Request::CopyVideoTrim {
+                input: PathBuf::from(input),
+                output: PathBuf::from(output),
+                directory: PathBuf::from(directory),
+                options: VideoTrimOptions {
+                    interval: MediaInterval {
+                        start: time(start),
+                        end: time(end),
+                    },
+                    mute_audio,
+                },
+                expected_source_sha256: None,
+            }
+        }
         [command, input, output, directory, start, end, flags @ ..] if command == "trim-video" => {
             let mute_audio = match flags {
                 [] => false,
@@ -226,7 +257,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
