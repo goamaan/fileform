@@ -562,3 +562,14 @@ cancellation and Unix out-of-pack symlinks. All 57 Rust tests, Clippy, release b
 and Windows target check passed. Both CLI and worker verified the existing real
 Mac FFmpeg/LAME pack. Details and remaining media parity work are in
 PORTABLE_MEDIA.md; no new category UI or transformation-completion claim was added.
+
+### September 22 — native media inspection
+
+Added a bounded direct-process adapter and ffprobe inspection through the Rust CLI
+and worker. Uses verified pack, source snapshot/recheck, restricted demuxers and
+protocols, bounded output pipes, timeout and cancellation/reaping. No category UI
+was added. Real WAV/MP4 fixtures passed both entry points with exact expected
+stream counts/duration; invalid input failed and source hashes stayed unchanged.
+All 60 active tests, Clippy, release build and Windows target check passed. See
+PORTABLE_MEDIA.md for process containment, executable-launch race, Windows pack,
+format/metadata and transformation gaps still required for release.

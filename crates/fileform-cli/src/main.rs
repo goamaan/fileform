@@ -5,6 +5,10 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, directory] if command == "inspect-media" => Request::InspectMedia {
+            input: PathBuf::from(input),
+            directory: PathBuf::from(directory),
+        },
         [command, directory] if command == "verify-media-pack" => Request::VerifyMediaPack {
             directory: PathBuf::from(directory),
         },
@@ -28,7 +32,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

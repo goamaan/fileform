@@ -1,8 +1,8 @@
 # Portable media migration
 
-Status: media-pack integrity verification is available in Rust/CLI/worker. Media
-inspection, conversion, extraction and trimming are not yet exposed by the
-portable app. Preserve the original Swift implementations as parity references.
+Status: media-pack verification and bounded media inspection are available in
+Rust/CLI/worker. Conversion, extraction and trimming are not yet ported. Media
+operations are not yet exposed by the portable app. Preserve the original Swift implementations as parity references.
 
 ## Pack verification
 
@@ -43,3 +43,35 @@ passed. The real Mac `9.0.1-fileform.2` pack passed through both CLI and worker,
 including matching hashes for FFmpeg and ffprobe. This is not a Windows tool-pack
 build or media transformation acceptance. Native Windows CI runs the platform
 filename/tampering tests using disposable fixture bytes, not FFmpeg executables.
+
+
+## Native media inspection
+
+`fileform-native inspect-media FILE PACK_DIRECTORY` and the worker's `inspect_media`
+request use the verified pack, snapshot the input, and run ffprobe outside the UI.
+Inputs are bounded to 2 GiB, duration to six hours, streams to 64 and video frames
+to 80 megapixels. The source identity/hash is rechecked after inspection. Reported
+streams retain codec, dimensions, sample rate, channels, pixel format, transfer and
+aspect-ratio metadata; attached artwork is not counted as a video track.
+
+The process adapter captures each output pipe up to 512 KiB, limits execution to
+30 seconds, closes stdin, clears inherited environment (retaining SystemRoot on
+Windows), and kills/reaps the direct process on cancellation or timeout. Windows
+uses CREATE_NO_WINDOW. FFprobe allows only file/pipe protocols and an explicit
+MOV/Matroska/WebM/AVI/WAV/FLAC/MP3/Ogg/AAC demuxer list. No network input route is
+added. Its 256 MiB max_alloc flag bounds individual allocations, not total process
+memory. This is inspection metadata, not a conversion eligibility/preservation
+proof. Additional original formats and richer timing/rotation metadata remain.
+
+The adapter is private to bundled tools which do not create descendants. Windows
+Job Objects/Unix process-group containment and hard worker-exit cleanup are still
+release requirements; do not extend this to arbitrary commands or advertise full
+OS sandboxing. Pack verification is not yet race-proof executable launch binding.
+
+Verification: 60 Rust tests pass, including real subprocess success, failure,
+output overflow, timeout and cancellation. One ignored test function is explicitly
+launched by the process tests as a child fixture, not an omitted acceptance test.
+Clippy, release build and Windows MSVC target check pass. Local real-pack CLI and
+worker tests inspect a 2-second WAV and a 64×48, 2-second MP4 (audio + video), reject
+invalid bytes and preserve source hashes. Real Windows media-pack execution is
+still pending; these local fixtures do not establish Windows media parity.
