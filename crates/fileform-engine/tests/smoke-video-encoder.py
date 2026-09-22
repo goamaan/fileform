@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prove an OS video encoder can encode, resize and fully decode a generated clip."""
 import json
+import struct
 from pathlib import Path
 import subprocess
 import sys
@@ -20,6 +21,30 @@ def run(*args):
     if result.returncode:
         raise RuntimeError(result.stderr.decode(errors='replace'))
     return result.stdout
+
+def display_sizes(path):
+    data=Path(path).read_bytes()
+    sizes=[]
+    def boxes(start,end):
+        while start<end:
+            assert start+8<=end
+            size,kind=struct.unpack_from('>I4s',data,start)
+            header=8
+            if size==1:
+                assert start+16<=end
+                size=struct.unpack_from('>Q',data,start+8)[0];header=16
+            elif size==0:
+                size=end-start
+            assert size>=header and start+size<=end
+            if kind in [b'moov',b'trak']:
+                boxes(start+header,start+size)
+            elif kind==b'tkhd':
+                assert size>=header+8
+                width,height=struct.unpack_from('>II',data,start+size-8)
+                if width and height:sizes.append((width/65536,height/65536))
+            start+=size
+    boxes(0,len(data))
+    return sizes
 
 with tempfile.TemporaryDirectory(prefix='fileform-video-encoder-') as folder:
     output=Path(folder)/'encoded.mp4'
@@ -47,6 +72,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-video-native-') as folder:
     resized=base/'resized.mp4'
     receipt=json.loads(run(cli,'convert-video',source,resized,pack,'--max-dimension','32'))
     assert receipt['stream_copy'] is False and (receipt['width'],receipt['height'])==(32,24)
+    assert display_sizes(resized)==[(32,24)]
     pixels=run(ffmpeg,'-v','error','-i',resized,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
     reference=run(ffmpeg,'-v','error','-i',source,'-map','0:v:0','-vf','scale=32:24,setsar=1','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
     assert len(pixels)==len(reference)==20*32*24*3//2
@@ -60,6 +86,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-video-native-') as folder:
     result=json.loads(response.stdout)
     assert response.returncode==0 and result['ok'],result
     assert (result['result']['width'],result['result']['height'])==(48,64)
+    assert display_sizes(output)==[(48,64)]
     def picture(path):
         return run(ffmpeg,'-v','error','-i',path,'-map','0:v:0','-pix_fmt','yuv420p','-fps_mode','passthrough','-f','rawvideo','-')
     actual,reference=picture(output),picture(rotated)

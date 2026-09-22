@@ -733,3 +733,12 @@ remain the requested values; no test or public constraint was weakened. Prototyp
 verification includes FFprobe, MP4 track headers and AVFoundation at 32×24. Unit,
 Clippy, release/Windows target checks and Mac regressions pass; Windows runtime
 validation of the adapter is pending the targeted rerun.
+
+### September 22 — regression guard for video display dimensions
+
+Added independent MP4/MOV track-header dimension checks to the real video smoke
+suite. Resized and rotation-normalized output must report the intended display
+rectangle as well as correct decoded pixels, preventing stale padded container
+dimensions from passing decoder-only checks. The full Mac video suite passes.
+Windows run 35786756236 remains active on the padding-adapter revision; the new
+container assertions will run on the next current-revision validation.
