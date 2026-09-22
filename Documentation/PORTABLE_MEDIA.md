@@ -106,3 +106,24 @@ video-to-WAV extraction, existing-output preservation, stale-source rejection,
 cancellation cleanup and unsupported 32-bit FLAC rejection. The 61 active Rust
 tests, Clippy, release build and Windows target check passed. The real-tool script
 is not yet run in Windows CI because the Windows media pack is still pending.
+
+## Windows pack build
+
+`crates/fileform-engine/tools/build-media-windows.sh` builds the pinned FFmpeg
+9.0.1 and LAME 3.100 sources in MSYS2 UCRT64, verifies the FFmpeg source signature
+and both source hashes, disables networking and optional auto-detected libraries,
+and requests static linking. It retains source archives, licenses, flags, compiler
+and package versions. An imported-DLL check rejects non-system dependencies.
+The build tool packages are recorded but not yet frozen in a reproducible MSYS2
+snapshot; bit-for-bit reproducibility is not claimed.
+
+`.github/workflows/media-windows.yml` builds the pack on Windows 2025, builds the
+Rust CLI/worker with static CRT, and runs the real-tool audio smoke suite. It keeps
+pack and diagnostic artifacts for 14 days; this is not signed public distribution.
+Initial workflow execution is pending as of this implementation commit. Do not
+mark Windows media parity achieved until the job and real audio smoke pass.
+
+The build follows [FFmpeg Windows guidance](https://www.ffmpeg.org/platform.html)
+and the pinned [MSYS2 setup action](https://github.com/msys2/setup-msys2/tree/66cd2cce69caa17b53920067426061ca1de3a884).
+Windows video-encoder selection and media packaging into Electron remain separate
+parity work; this job exercises existing WAV/FLAC/M4A/MP3 conversion and extraction.
