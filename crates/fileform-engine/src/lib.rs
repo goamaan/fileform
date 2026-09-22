@@ -36,7 +36,9 @@ mod media_video_trim;
 mod media_waveform;
 pub use media_video::{VideoEncoding, VideoFit};
 pub use media_video_trim::VideoTrimOptions;
+mod native_pack;
 mod native_process;
+mod pdf_inspect;
 pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
@@ -96,6 +98,13 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    VerifyPdfPack {
+        directory: PathBuf,
+    },
+    InspectPdf {
+        input: PathBuf,
+        directory: PathBuf,
+    },
     MediaPoster {
         input: PathBuf,
         output: PathBuf,
@@ -264,6 +273,8 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfPackVerification(pdf_inspect::PdfPackVerification),
+    PdfInspection(pdf_inspect::PdfInspection),
     MediaPoster(media_poster::Poster),
     MediaWaveform(media_waveform::Waveform),
     CopiedVideoTrim(media_video_copy::CopyReceipt),
@@ -844,6 +855,13 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::VerifyPdfPack { directory } = &request {
+        return pdf_inspect::verify_pack(directory, cancellation)
+            .map(Response::PdfPackVerification);
+    }
+    if let Request::InspectPdf { input, directory } = &request {
+        return pdf_inspect::inspect(input, directory, cancellation).map(Response::PdfInspection);
+    }
     if let Request::MediaPoster {
         input,
         output,
@@ -1110,7 +1128,9 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::MediaPoster { .. }
+        Request::VerifyPdfPack { .. }
+        | Request::InspectPdf { .. }
+        | Request::MediaPoster { .. }
         | Request::MediaWaveform { .. }
         | Request::CopyVideoTrim { .. }
         | Request::CopyAudioTrim { .. }
@@ -1137,7 +1157,9 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::MediaPoster { .. }
+        Request::VerifyPdfPack { .. }
+        | Request::InspectPdf { .. }
+        | Request::MediaPoster { .. }
         | Request::MediaWaveform { .. }
         | Request::CopyVideoTrim { .. }
         | Request::CopyAudioTrim { .. }

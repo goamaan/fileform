@@ -72,12 +72,11 @@ pub(crate) fn run_with_output_limit(
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
-    let mut child = Reap(command.spawn().map_err(|_| {
-        fail(
-            "engine_unavailable",
-            "The native media tool could not start.",
-        )
-    })?);
+    let mut child = Reap(
+        command
+            .spawn()
+            .map_err(|_| fail("engine_unavailable", "The native tool could not start."))?,
+    );
     let overflow = Arc::new(AtomicBool::new(false));
     let stdout = capture(
         child.0.stdout.take().expect("piped stdout"),
@@ -95,13 +94,13 @@ pub(crate) fn run_with_output_limit(
             break Err(error);
         }
         if cancellation.is_cancelled() {
-            break Err(fail("cancelled", "Media processing cancelled."));
+            break Err(fail("cancelled", "Native processing cancelled."));
         }
         if overflow.load(Ordering::Acquire) {
-            break Err(fail("limit", "The media tool returned too much data."));
+            break Err(fail("limit", "The native tool returned too much data."));
         }
         if started.elapsed() >= timeout {
-            break Err(fail("timeout", "Media processing took too long."));
+            break Err(fail("timeout", "Native processing took too long."));
         }
         match child.0.try_wait() {
             Ok(Some(status)) => break Ok(status),
@@ -115,13 +114,13 @@ pub(crate) fn run_with_output_limit(
     }
     let out = stdout
         .join()
-        .map_err(|_| fail("engine_failed", "Media output could not be read."))??;
+        .map_err(|_| fail("engine_failed", "Native output could not be read."))??;
     let err = stderr
         .join()
-        .map_err(|_| fail("engine_failed", "Media output could not be read."))??;
+        .map_err(|_| fail("engine_failed", "Native output could not be read."))??;
     cancellation.check()?;
     if overflow.load(Ordering::Acquire) {
-        return Err(fail("limit", "The media tool returned too much data."));
+        return Err(fail("limit", "The native tool returned too much data."));
     }
     check_output(output)?;
     if !status?.success() {
@@ -133,11 +132,11 @@ pub(crate) fn run_with_output_limit(
                 .chars()
                 .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
                 .collect();
-            eprintln!("Native media diagnostic: {safe}");
+            eprintln!("Native tool diagnostic: {safe}");
         }
         return Err(fail(
             "unsupported",
-            "The media operation failed. The input may be damaged or unsupported.",
+            "The native operation failed. The input may be damaged or unsupported.",
         ));
     }
     Ok(out)

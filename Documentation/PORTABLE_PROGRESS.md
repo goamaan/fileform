@@ -811,3 +811,15 @@ and no-clobber publication. Real frame-pixel, rotation, bounds, default-size and
 end-boundary tests pass. Rust tests, Clippy, release/Windows target checks and media
 smoke pass locally. HDR/extended-color handling, preview caching/playback leases,
 track selection and final UI integration remain open.
+
+### September 22 — shared tool-pack checks and native PDF inspection
+
+Extracted shared bounded pack verification while retaining media's offline policy.
+Added qpdf pack verification and snapshot-bound structural PDF inspection through
+CLI/worker. Real two-page, malformed and password-protected fixtures pass expected
+checks, with unchanged source bytes. All 79 active Rust tests, Clippy, release/
+Windows target checks and media regression smoke pass. Rendering and PDF output
+workflows are not yet ported; details are in PORTABLE_PDF.md.
+
+Windows run 35792695320 at 566ae9d passed the preceding waveform/poster preview
+suite with the existing media regressions. This is not Windows PDF acceptance.
