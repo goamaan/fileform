@@ -453,3 +453,31 @@ metadata, selected/batch publication and final app integration still remain.
 Windows [PDF run 35829743560](https://github.com/goamaan/fileform/actions/runs/35829743560)
 passed at 61f2caa, including static forms, adaptive OCR and normalized line endings.
 It predates this exact-resolution work, which has a new Windows fixture step.
+
+### Streamed single-page PNG export
+
+`export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI` and worker
+`export_pdf_png` now save an explicit page at 36–600 DPI. Crop, rotation and UserUnit
+determine dimensions; the established 16384-side/64-million-pixel limits reject
+oversized requests without scaling down. Output is opaque RGB with sRGB and
+physical-resolution metadata. Rasterization losses are reported in the receipt.
+
+Large helper replies are captured into owned staging files with a hard byte
+ceiling, 64 KiB transfer buffers and bounded diagnostics. They are not returned
+through JSON or accumulated as an extra full-image Vec. PNG encoding streams from
+that raster; verification independently decodes rows, checks all pixels against
+the raw raster hash, checks DPI/color metadata and strict PNG checksums/end record,
+then rechecks the source and atomically saves without replacing a file. The native
+renderer still needs its bounded bitmap allocation; OS resource containment remains
+a separate release requirement.
+
+Mac fixtures independently decode PNG chunks/pixels and verify high-DPI output,
+physical-resolution rounding, inherited geometry, UserUnit, form appearances,
+CLI/worker equality, file hashes and collision handling. Shared process tests cover
+binary preservation, strict file-output caps, child failure, timeout and cancellation.
+The Windows workflow includes the real export fixture. JPEG, selected/batch output,
+mixed image sources and final desktop wiring still remain for full page-image parity.
+
+Windows run [35832062083](https://github.com/goamaan/fileform/actions/runs/35832062083)
+passed at ea9e1f9, proving the earlier exact-target helper and DPI planner. The
+streamed PNG exporter is newer and needs its own Windows acceptance.

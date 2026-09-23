@@ -8,6 +8,30 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, directory, renderer, page, dpi] if command == "export-pdf-png" => {
+            let page_index = page
+                .to_str()
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or_else(|| {
+                    eprintln!("Choose a zero-based page index.");
+                    std::process::exit(2)
+                });
+            let dpi = dpi
+                .to_str()
+                .and_then(|v| v.parse::<u16>().ok())
+                .unwrap_or_else(|| {
+                    eprintln!("Choose 36–600 DPI.");
+                    std::process::exit(2)
+                });
+            Request::ExportPdfPng(fileform_engine::PdfPngExport {
+                input: input.into(),
+                output: output.into(),
+                directory: directory.into(),
+                renderer_directory: renderer.into(),
+                page_index,
+                dpi,
+            })
+        }
         [command, input, directory, dpi] if command == "plan-pdf-raster" => {
             let dpi = dpi
                 .to_str()
@@ -433,7 +457,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT.pdf... | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI | plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT.pdf... | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

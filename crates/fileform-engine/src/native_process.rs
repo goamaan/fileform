@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{fail, Cancellation, Result};
 use std::{
-    io::Read,
+    io::{Read, Seek, SeekFrom, Write},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -32,6 +32,43 @@ fn capture(
         Ok(bytes)
     })
 }
+fn capture_file(
+    mut reader: impl Read + Send + 'static,
+    file: std::fs::File,
+    maximum: u64,
+    overflow: Arc<AtomicBool>,
+) -> thread::JoinHandle<std::io::Result<Vec<u8>>> {
+    thread::spawn(move || {
+        let result = (|| {
+            let mut writer = std::io::BufWriter::with_capacity(64 * 1024, file);
+            let mut buffer = [0u8; 64 * 1024];
+            let mut total = 0u64;
+            loop {
+                let count = match reader.read(&mut buffer) {
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    other => other?,
+                };
+                if count == 0 {
+                    break;
+                }
+                let next = total.checked_add(count as u64);
+                if next.is_none_or(|v| v > maximum) {
+                    overflow.store(true, Ordering::Release);
+                    writer.flush()?;
+                    return Ok(Vec::new());
+                }
+                writer.write_all(&buffer[..count])?;
+                total = next.expect("checked byte count");
+            }
+            writer.flush()?;
+            Ok(Vec::new())
+        })();
+        if result.is_err() {
+            overflow.store(true, Ordering::Release);
+        }
+        result
+    })
+}
 /// Private adapter for bundled tools which do not spawn child processes.
 /// Process-tree containment is required before extending this to arbitrary tools.
 pub(crate) fn run(
@@ -48,18 +85,55 @@ fn check_output(output: Option<(&std::path::Path, u64)>) -> Result<()> {
         if !metadata.is_file() || metadata.len() > maximum {
             return Err(fail(
                 "limit",
-                "The media output exceeded its size limit. No new output was saved.",
+                "The native output exceeded its size limit. No new output was saved.",
             ));
         }
     }
     Ok(())
 }
 pub(crate) fn run_with_output_limit(
+    command: Command,
+    cancellation: &Cancellation,
+    timeout: Duration,
+    limit: usize,
+    output: Option<(&std::path::Path, u64)>,
+) -> Result<Vec<u8>> {
+    run_internal(command, cancellation, timeout, limit, output, None)
+}
+/// Keep large binary replies in an owned staging file, not an in-memory Vec.
+pub(crate) fn run_to_file(
+    command: Command,
+    cancellation: &Cancellation,
+    timeout: Duration,
+    temporary: &mut tempfile::NamedTempFile,
+    maximum: u64,
+) -> Result<u64> {
+    cancellation.check()?;
+    let file = temporary.as_file_mut();
+    file.set_len(0)?;
+    file.seek(SeekFrom::Start(0))?;
+    run_internal(
+        command,
+        cancellation,
+        timeout,
+        64 * 1024,
+        None,
+        Some((file.try_clone()?, maximum)),
+    )?;
+    let bytes = file.metadata()?.len();
+    if bytes > maximum {
+        return Err(fail("limit", "Native output exceeded its size limit."));
+    }
+    file.seek(SeekFrom::Start(0))?;
+    Ok(bytes)
+}
+fn run_internal(
     mut command: Command,
     cancellation: &Cancellation,
     timeout: Duration,
     limit: usize,
     output: Option<(&std::path::Path, u64)>,
+    stdout_file: Option<(std::fs::File, u64)>,
 ) -> Result<Vec<u8>> {
     cancellation.check()?;
     check_output(output)?;
@@ -78,11 +152,11 @@ pub(crate) fn run_with_output_limit(
             .map_err(|_| fail("engine_unavailable", "The native tool could not start."))?,
     );
     let overflow = Arc::new(AtomicBool::new(false));
-    let stdout = capture(
-        child.0.stdout.take().expect("piped stdout"),
-        limit,
-        overflow.clone(),
-    );
+    let reader = child.0.stdout.take().expect("piped stdout");
+    let stdout = match stdout_file {
+        Some((file, maximum)) => capture_file(reader, file, maximum, overflow.clone()),
+        None => capture(reader, limit, overflow.clone()),
+    };
     let stderr = capture(
         child.0.stderr.take().expect("piped stderr"),
         limit,
@@ -150,6 +224,11 @@ mod tests {
     fn child_fixture() {
         use std::io::Write;
         match std::env::var("FILEFORM_TEST_CHILD").as_deref() {
+            Ok("binary") => {
+                std::io::stdout()
+                    .write_all(b"binary-start\0\xff\r\nbinary-end")
+                    .unwrap();
+            }
             Ok("flood") => {
                 for _ in 0..1000 {
                     let _ = std::io::stdout().write_all(&[b'x'; 4096]);
@@ -214,6 +293,72 @@ mod tests {
             .code,
             "limit"
         );
+    }
+    #[test]
+    fn binary_capture_is_file_backed_and_strictly_bounded() {
+        let mut temporary = tempfile::NamedTempFile::new().unwrap();
+        let count = run_to_file(
+            command("binary"),
+            &Cancellation::default(),
+            Duration::from_secs(5),
+            &mut temporary,
+            4096,
+        )
+        .unwrap();
+        let bytes = std::fs::read(temporary.path()).unwrap();
+        assert_eq!(count, bytes.len() as u64);
+        assert!(bytes
+            .windows(b"binary-start\0\xff\r\nbinary-end".len())
+            .any(|v| v == b"binary-start\0\xff\r\nbinary-end"));
+        let error = run_to_file(
+            command("flood"),
+            &Cancellation::default(),
+            Duration::from_secs(5),
+            &mut temporary,
+            512,
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "limit");
+        assert!(temporary.as_file().metadata().unwrap().len() <= 512);
+        assert!(run_to_file(
+            command("fail"),
+            &Cancellation::default(),
+            Duration::from_secs(5),
+            &mut temporary,
+            4096
+        )
+        .is_err());
+        assert_eq!(
+            run_to_file(
+                command("wait"),
+                &Cancellation::default(),
+                Duration::from_millis(100),
+                &mut temporary,
+                4096
+            )
+            .unwrap_err()
+            .code,
+            "timeout"
+        );
+        let signal = Cancellation::default();
+        let copy = signal.clone();
+        let trigger = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            copy.cancel();
+        });
+        assert_eq!(
+            run_to_file(
+                command("wait"),
+                &signal,
+                Duration::from_secs(5),
+                &mut temporary,
+                4096
+            )
+            .unwrap_err()
+            .code,
+            "cancelled"
+        );
+        trigger.join().unwrap();
     }
     #[test]
     fn oversized_file_is_rejected_even_when_child_succeeds() {

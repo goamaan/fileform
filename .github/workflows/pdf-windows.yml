@@ -92,6 +92,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python native/pdf-render/stage-evaluation.py Artifacts/pdfium-evaluation/build/Release Artifacts/pdfium-evaluation Artifacts/PDFRenderPack-Windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-pdf-png.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-png-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-render-engine.py Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-render-engine-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-optimize.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-optimize-windows.txt
@@ -118,6 +120,7 @@ jobs:
             Artifacts/pdf-render-smoke-windows.txt
             Artifacts/pdf-annotations-windows.txt
             Artifacts/pdf-raster-plan-windows.txt
+            Artifacts/pdf-png-windows.txt
             Artifacts/pdf-render-engine-windows.txt
             Artifacts/pdf-optimize-windows.txt
             Artifacts/pdf-compose-windows.txt

@@ -18,7 +18,11 @@ pub struct RasterPlan {
     pub dpi: u16,
     pub pages: Vec<RasterPagePlan>,
 }
-fn dimensions(page: &pdf_pages::PageGeometry, dpi: u16, rotation: i32) -> Result<RasterPagePlan> {
+pub(crate) fn dimensions(
+    page: &pdf_pages::PageGeometry,
+    dpi: u16,
+    rotation: i32,
+) -> Result<RasterPagePlan> {
     if !(36..=600).contains(&dpi) || rotation % 90 != 0 {
         return Err(fail(
             "invalid_request",
