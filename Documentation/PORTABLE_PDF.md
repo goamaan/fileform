@@ -399,3 +399,9 @@ Windows run 35822052666 passed the native renderer, compression, composition,
 images and split tests but failed the new document-text test because Python used
 Windows CP1252 to read a UTF-8 file. The assertion now checks the exact UTF-8 bytes
 instead of the host default text encoding; a new Windows result is required.
+
+Windows run [35822398439](https://github.com/goamaan/fileform/actions/runs/35822398439)
+passed at dc303eb after the exact-byte test fix, including whole-document embedded
+text export. Portable OCR dependency evaluation is now recorded in
+[OCR_RESEARCH.md](OCR_RESEARCH.md); its English raster baseline is not OCR parity
+or an integrated app capability.

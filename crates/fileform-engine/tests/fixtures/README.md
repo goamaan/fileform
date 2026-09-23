@@ -27,3 +27,14 @@ This checked-in H.264 fixture allows Windows remux/decoding tests without assumi
 hardware encoder availability. Encoder byte-for-byte reproducibility is not claimed.
 
 SHA-256: `6c347933b4681bf3c95ab62ebb240fe5eddd8827c53103decada29f16cd9772d`.
+
+## OCR baseline
+
+`ocr-page.ppm.gz` is a deterministic gzip of a source-owned 400×600 P6 raster.
+It was generated from `pdf_fixtures.fixture(text=True)`, page 0, with the pinned
+PDFium 8066 helper at a 2048-pixel maximum (its two-pixels-per-unit cap produces
+400×600). Text is “Fileform page 1” with a colored vector square; no user document
+or font program is embedded. Uncompressed SHA-256:
+`5c2a05c38d6e400212f9355bd8d6ec502f5f8769f51a53353393e1bbcfbc5030`.
+The OCR process receives only raster pixels. This simple English fixture is not a
+multilingual, small-print or scan-quality acceptance corpus.
