@@ -74,3 +74,10 @@ after the four resolved MediaBox coordinates. The helper sets that absolute
 in-memory rotation before rendering; it never saves the altered page. Text
 extraction remains in the source content order. This permits verification of
 selected pages rotated during composition.
+
+`ocr` is a distinct internal render mode: it uses the full MediaBox and scales
+the longest edge to 4096 pixels, including enlargement, matching the reference
+OCR preparation policy. It accepts the same resolved box/rotation arguments.
+Allocation stays at most 4096² BGRA pixels and output at most 4096² RGB bytes plus
+framing. Numeric preview/preservation modes retain their 2048-edge and two-pixels-
+per-unit caps. The engine validates the complete raster before handing it to OCR.

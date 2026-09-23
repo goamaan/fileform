@@ -56,7 +56,7 @@ mod pdf_preservation;
 mod pdf_render;
 mod pdf_text;
 pub use image_crop::PixelCrop;
-pub use pdf_document_text::TextExport as PdfTextExport;
+pub use pdf_document_text::{PdfOcrOptions, TextExport as PdfTextExport};
 pub use pdf_render::PdfRenderBox;
 mod image_orientation;
 mod image_preview;

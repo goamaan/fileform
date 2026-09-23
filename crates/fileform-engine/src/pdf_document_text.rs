@@ -11,6 +11,12 @@ use std::{
 };
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct PdfOcrOptions {
+    pub directory: PathBuf,
+    pub language: crate::OcrLanguage,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TextExport {
     pub input: PathBuf,
     pub output: PathBuf,
@@ -18,6 +24,7 @@ pub struct TextExport {
     pub renderer_directory: PathBuf,
     #[serde(default)]
     pub allow_missing_text: bool,
+    pub ocr: Option<PdfOcrOptions>,
 }
 #[derive(Debug, Serialize)]
 pub struct DocumentTextReceipt {
@@ -28,6 +35,9 @@ pub struct DocumentTextReceipt {
     pub pages: u32,
     pub pages_without_embedded_text: Vec<u32>,
     pub ocr_performed: bool,
+    pub ocr_pages: Vec<u32>,
+    pub pages_without_recognized_text: Vec<u32>,
+    pub ocr_language: Option<&'static str>,
     pub warnings: Vec<&'static str>,
 }
 pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTextReceipt> {
@@ -53,6 +63,17 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
     let working = tempfile::tempdir()?;
     let mut missing = Vec::new();
+    let mut ocr_pages = Vec::new();
+    let mut empty_pages = Vec::new();
+    let mut fallback = options.ocr.as_ref().map(|config| DocumentOcr {
+        input: source.snapshot.path().to_path_buf(),
+        pdf_directory: &options.directory,
+        renderer_directory: &options.renderer_directory,
+        config,
+        session: None,
+        geometry: None,
+        page_count: info.pages,
+    });
     let deadline = Instant::now() + Duration::from_secs(600);
     let mut expected = sha2::Sha256::new();
     use sha2::Digest;
@@ -89,10 +110,28 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
                 })?
                 .min(Duration::from_secs(60));
             let bytes = native_process::run(command, cancel, timeout, 4_000_032)?;
-            let text = pdf_text::decode(&bytes)?.trim();
+            let mut text = std::borrow::Cow::Borrowed(pdf_text::decode(&bytes)?.trim());
+            let mut did_ocr = false;
             if text.is_empty() {
                 missing.push(page);
-                if !options.allow_missing_text {
+                if let Some(fallback) = &mut fallback {
+                    did_ocr = true;
+                    ocr_pages.push(page);
+                    if let Some(recognized) = fallback.recognize(
+                        page,
+                        deadline,
+                        version.as_deref().expect("recorded renderer"),
+                        cancel,
+                    )? {
+                        text = std::borrow::Cow::Owned(recognized);
+                    }
+                    if text.is_empty() && info.pages == 1 {
+                        return Err(fail(
+                            "no_text",
+                            "No text was recognized. No output was saved.",
+                        ));
+                    }
+                } else if !options.allow_missing_text {
                     return Err(fail(
                         "ocr_required",
                         format!(
@@ -101,6 +140,9 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
                         ),
                     ));
                 }
+            }
+            if text.is_empty() {
+                empty_pages.push(page);
             }
             let mut write = |value: &[u8]| -> Result<()> {
                 for chunk in value.chunks(64 * 1024) {
@@ -116,7 +158,11 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
                 write(format!("Page {}\n\n", page + 1).as_bytes())?;
             }
             write(if text.is_empty() {
-                b"[No embedded text on this page; OCR required.]"
+                if did_ocr {
+                    b"[No text recognized on this page.]"
+                } else {
+                    b"[No embedded text on this page; OCR required.]"
+                }
             } else {
                 text.as_bytes()
             })?;
@@ -153,6 +199,108 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
             e.error.to_string(),
         )
     })?;
-    Ok(DocumentTextReceipt { output:options.output.clone(),bytes,sha256,source_sha256:source.hash,pages:info.pages,pages_without_embedded_text:missing,ocr_performed:false,
-        warnings:vec!["Embedded text only; OCR was not performed. Images, formatting and interactive features are omitted. Review reading order."] })
+    let ocr_performed = !ocr_pages.is_empty();
+    Ok(DocumentTextReceipt {
+        output: options.output.clone(),
+        bytes,
+        sha256,
+        source_sha256: source.hash,
+        pages: info.pages,
+        pages_without_embedded_text: missing,
+        ocr_performed,
+        ocr_language: if ocr_performed { Some("eng") } else { None },
+        ocr_pages,
+        pages_without_recognized_text: empty_pages,
+        warnings: vec![if ocr_performed {
+            "English OCR was used on pages without embedded text. Review spelling, numbers and reading order; formatting and interactive features are omitted."
+        } else {
+            "Embedded text only; OCR was not performed. Images, formatting and interactive features are omitted. Review reading order."
+        }],
+    })
+}
+
+struct DocumentOcr<'a> {
+    input: PathBuf,
+    pdf_directory: &'a Path,
+    renderer_directory: &'a Path,
+    config: &'a PdfOcrOptions,
+    session: Option<crate::ocr_image::OcrSession>,
+    geometry: Option<Vec<crate::pdf_pages::PageGeometry>>,
+    page_count: u32,
+}
+impl DocumentOcr<'_> {
+    fn recognize(
+        &mut self,
+        page: u32,
+        deadline: Instant,
+        expected_version: &str,
+        cancel: &Cancellation,
+    ) -> Result<Option<String>> {
+        if self.geometry.is_none() {
+            let inspection = crate::pdf_pages::inspect(&self.input, self.pdf_directory, cancel)?;
+            if inspection
+                .special_preservation_keys
+                .iter()
+                .any(|v| matches!(v.as_str(), "/Annots" | "/AcroForm" | "/XFA" | "/Encrypt"))
+            {
+                return Err(fail("unsupported", "PDF OCR does not yet support encrypted documents, annotations or form appearances. No output was saved."));
+            }
+            let pages = inspection.pages;
+            if pages.len() != self.page_count as usize {
+                return Err(fail("verification", "PDF page inspections disagree."));
+            }
+            self.geometry = Some(pages);
+        }
+        if self.session.is_none() {
+            self.session = Some(crate::ocr_image::OcrSession::new(
+                &self.config.directory,
+                &self.config.language,
+                cancel,
+            )?);
+        }
+        let geometry = self
+            .geometry
+            .as_ref()
+            .and_then(|v| v.get(page as usize))
+            .ok_or_else(|| fail("verification", "Missing PDF page geometry."))?;
+        let (mut command, version) = pdf_render::command(self.renderer_directory, cancel)?;
+        if version != expected_version {
+            return Err(fail(
+                "engine_unavailable",
+                "The PDF renderer changed during OCR.",
+            ));
+        }
+        command
+            .arg(&self.input)
+            .arg(page.to_string())
+            .args(["ocr", "media"])
+            .args(geometry.media_box.iter().map(|v| v.to_string()))
+            .arg((geometry.rotation / 90).to_string());
+        let raster =
+            native_process::run(command, cancel, remaining(deadline)?, 4096 * 4096 * 3 + 64)?;
+        pdf_render::raster(&raster, 4096)?;
+        let session = self.session.as_ref().expect("initialized OCR session");
+        {
+            let mut file = session.create_raster()?;
+            for chunk in raster.chunks(65536) {
+                cancel.check()?;
+                file.write_all(chunk)?;
+            }
+            file.flush()?;
+        }
+        drop(raster);
+        session.recognize(cancel, remaining(deadline)?)
+    }
+}
+fn remaining(deadline: Instant) -> Result<Duration> {
+    deadline
+        .checked_duration_since(Instant::now())
+        .filter(|v| !v.is_zero())
+        .map(|v| v.min(Duration::from_secs(60)))
+        .ok_or_else(|| {
+            fail(
+                "limit",
+                "PDF text extraction exceeded ten minutes. No output was saved.",
+            )
+        })
 }

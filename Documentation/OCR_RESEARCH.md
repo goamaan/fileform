@@ -211,3 +211,29 @@ raster OCR and native model verification all passed. The downloaded executable's
 hash matched its manifest and PE import inspection showed only KERNEL32.dll.
 This run predates the image adapter and its Unicode-path tests; a new run must
 verify those separately.
+
+## Explicit English PDF fallback
+
+Whole-document text export now accepts `--ocr OCR_PACK eng` (worker `ocr` with
+`directory` and `language: "eng"`). Embedded text remains preferred; pages without
+it are rendered at a 4096-pixel longest edge and recognized through a reusable
+private OCR session. The receipt identifies every OCR-attempted page, pages with
+no recognized text, and the explicit language. Blank pages in a multi-page document
+receive the original-style no-text marker; a wholly blank single page fails
+without saving. One model snapshot is reused across the document.
+
+The fallback preserves the shared ten-minute budget, bounded raster/text output,
+source rechecks and no-clobber final save. Eligibility checks reuse the bounded
+metadata-only qpdf page inspection rather than expanding image streams. Full
+graph proofs still require stream data; a regression test ensures the lighter
+metadata query cannot substitute for a preservation proof.
+
+Annotations/forms/XFA and encrypted documents are currently rejected when OCR is
+needed, because full appearance parity is not yet implemented. Automatic language
+selection and wider scan/orientation/accuracy coverage also remain open. This
+explicit-English route does not close the original Vision OCR requirement.
+
+Windows run [35824522369](https://github.com/goamaan/fileform/actions/runs/35824522369)
+passed at abb6d00, including image OCR through the engine, Unicode image/pack/output
+paths, EXIF handling, transparency and model-tamper checks. PDF fallback is newer
+and awaits its own Windows result.

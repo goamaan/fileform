@@ -174,7 +174,11 @@ pub struct GraphDigest {
     pub visited_nodes: usize,
     pub special_preservation_keys: Vec<String>,
 }
-pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<GraphDigest> {
+fn walk_document<'a>(
+    document: &'a Value,
+    cancel: &'a Cancellation,
+    require_stream_data: bool,
+) -> Result<Walk<'a>> {
     let qpdf = document
         .get("qpdf")
         .and_then(Value::as_array)
@@ -198,7 +202,7 @@ pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<Gra
         }
         if let Some(stream) = object.get("stream") {
             if !stream.get("dict").is_some_and(Value::is_object)
-                || !stream.get("data").is_some_and(Value::is_string)
+                || (require_stream_data && !stream.get("data").is_some_and(Value::is_string))
             {
                 return Err(fail(
                     "verification",
@@ -216,6 +220,16 @@ pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<Gra
         cancel,
     };
     walk.visit(trailer, 0, false, true)?;
+    Ok(walk)
+}
+pub(crate) fn metadata_features(document: &Value, cancel: &Cancellation) -> Result<Vec<String>> {
+    Ok(walk_document(document, cancel, false)?
+        .special
+        .into_iter()
+        .collect())
+}
+pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<GraphDigest> {
+    let walk = walk_document(document, cancel, true)?;
     let graph_sha256 = walk
         .hash
         .finalize()
@@ -224,7 +238,7 @@ pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<Gra
         .collect();
     Ok(GraphDigest {
         graph_sha256,
-        objects: objects.len(),
+        objects: walk.objects.len(),
         reached_objects: walk.seen.len(),
         visited_nodes: walk.nodes,
         special_preservation_keys: walk.special.into_iter().collect(),
@@ -260,6 +274,21 @@ pub fn inspect(input: &Path, directory: &Path, cancel: &Cancellation) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn metadata_features_do_not_weaken_stream_proofs() {
+        let mut value = document(1, "samples");
+        let stream = value["qpdf"][1]["obj:1 0 R"]["stream"]
+            .as_object_mut()
+            .unwrap();
+        stream.remove("data");
+        stream["dict"]
+            .as_object_mut()
+            .unwrap()
+            .insert("/Annots".into(), serde_json::json!([]));
+        let cancel = Cancellation::default();
+        assert_eq!(metadata_features(&value, &cancel).unwrap(), vec!["/Annots"]);
+        assert!(fingerprint(&value, &cancel).is_err());
+    }
     fn document(id: u32, data: &str) -> Value {
         serde_json::json!({"qpdf":[{"jsonversion":2},{format!("obj:{id} 0 R"):{"stream":{"dict":{"/Length":99,"/Self":format!("{id} 0 R")},"data":data}},"trailer":{"value":{"/Root":format!("{id} 0 R"),"/ID":["ignored"],"/Size":100}}}]})
     }

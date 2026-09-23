@@ -89,9 +89,6 @@ pub fn recognize(
     language: &OcrLanguage,
     cancel: &Cancellation,
 ) -> Result<OcrReceipt> {
-    let language = match language {
-        OcrLanguage::Eng => "eng",
-    };
     if !output
         .extension()
         .and_then(|v| v.to_str())
@@ -102,7 +99,7 @@ pub fn recognize(
     if output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
-    let pack = ocr_pack::verify(directory, cancel)?;
+    let session = OcrSession::new(directory, language, cancel)?;
     let (mut source, inspection, pixels) = prepare_image(input, cancel)?;
     if !inspection.conversion_available {
         return Err(fail(
@@ -112,15 +109,8 @@ pub fn recognize(
     }
     let pixels = image_resize::limit(pixels, 4096, cancel)?;
     let (width, height) = pixels.dimensions();
-    let working = tempfile::tempdir()?;
-    copy_model(
-        directory,
-        working.path(),
-        &pack.assets["tessdata/eng.traineddata"],
-        cancel,
-    )?;
     {
-        let mut file = std::io::BufWriter::new(File::create(working.path().join("input.ppm"))?);
+        let mut file = std::io::BufWriter::new(session.create_raster()?);
         writeln!(file, "P6\n{width} {height}\n255")?;
         let mut block = Vec::with_capacity(4096 * 3);
         for chunk in pixels.as_raw().chunks(4096 * 4) {
@@ -139,43 +129,14 @@ pub fn recognize(
         file.flush()?;
     }
     drop(pixels);
-    let mut command = Command::new(directory.canonicalize()?.join(if cfg!(windows) {
-        "bin/tesseract.exe"
-    } else {
-        "bin/tesseract"
-    }));
-    command.env_clear();
-    #[cfg(windows)]
-    if let Some(system) = std::env::var_os("SystemRoot") {
-        command.env("SystemRoot", system);
-    }
-    // Only owned ASCII relative filenames reach the native parser. Model copies
-    // are rehashed; arbitrary image formats, config files and user paths do not.
-    command.current_dir(working.path()).args([
-        "input.ppm",
-        "stdout",
-        "--tessdata-dir",
-        "tessdata",
-        "-l",
-        language,
-        "--oem",
-        "1",
-        "--psm",
-        "3",
-    ]);
-    let result = native_process::run(command, cancel, Duration::from_secs(60), 4_000_000)?;
-    let text = std::str::from_utf8(&result)
-        .map_err(|_| fail("verification", "OCR returned invalid UTF-8."))?
-        .trim();
-    if text.contains('\0') {
-        return Err(fail("verification", "OCR returned invalid text."));
-    }
-    if text.is_empty() {
-        return Err(fail(
-            "no_text",
-            "No text was recognized. Try a sharper or higher-contrast image.",
-        ));
-    }
+    let text = session
+        .recognize(cancel, Duration::from_secs(60))?
+        .ok_or_else(|| {
+            fail(
+                "no_text",
+                "No text was recognized. Try a sharper or higher-contrast image.",
+            )
+        })?;
     let parent = output
         .parent()
         .filter(|v| !v.as_os_str().is_empty())
@@ -221,11 +182,92 @@ pub fn recognize(
         bytes,
         sha256,
         source_sha256: source.hash,
-        language,
+        language: session.language,
         ocr_performed: true,
         automatic_language_detection: false,
         raster_width: width,
         raster_height: height,
         warnings: vec!["English OCR only. Review spelling, numbers and reading order."],
     })
+}
+
+pub(crate) struct OcrSession {
+    working: tempfile::TempDir,
+    executable: PathBuf,
+    pub(crate) language: &'static str,
+}
+impl OcrSession {
+    pub(crate) fn new(
+        directory: &Path,
+        language: &OcrLanguage,
+        cancel: &Cancellation,
+    ) -> Result<Self> {
+        let language = match language {
+            OcrLanguage::Eng => "eng",
+        };
+        let pack = ocr_pack::verify(directory, cancel)?;
+        let working = tempfile::tempdir()?;
+        copy_model(
+            directory,
+            working.path(),
+            &pack.assets["tessdata/eng.traineddata"],
+            cancel,
+        )?;
+        let executable = directory.canonicalize()?.join(if cfg!(windows) {
+            "bin/tesseract.exe"
+        } else {
+            "bin/tesseract"
+        });
+        Ok(Self {
+            working,
+            executable,
+            language,
+        })
+    }
+    pub(crate) fn create_raster(&self) -> Result<File> {
+        Ok(File::create(self.working.path().join("input.ppm"))?)
+    }
+    pub(crate) fn recognize(
+        &self,
+        cancel: &Cancellation,
+        timeout: Duration,
+    ) -> Result<Option<String>> {
+        let mut command = Command::new(&self.executable);
+        command.env_clear();
+        #[cfg(windows)]
+        if let Some(system) = std::env::var_os("SystemRoot") {
+            command.env("SystemRoot", system);
+        }
+        // Only owned ASCII relative filenames reach the native parser. Model copies
+        // are rehashed; arbitrary image formats, config files and user paths do not.
+        command.current_dir(self.working.path()).args([
+            "input.ppm",
+            "stdout",
+            "--tessdata-dir",
+            "tessdata",
+            "-l",
+            self.language,
+            "--oem",
+            "1",
+            "--psm",
+            "3",
+        ]);
+        let result = native_process::run(
+            command,
+            cancel,
+            timeout.min(Duration::from_secs(60)),
+            4_000_000,
+        )?;
+        let text = std::str::from_utf8(&result)
+            .map_err(|_| fail("verification", "OCR returned invalid UTF-8."))?
+            .trim();
+        if text.contains('\0') {
+            return Err(fail("verification", "OCR returned invalid text."));
+        }
+        Ok(if text.is_empty() {
+            None
+        } else {
+            Some(text.to_owned())
+        })
+    }
 }

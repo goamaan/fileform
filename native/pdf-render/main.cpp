@@ -106,7 +106,7 @@ int extract_text(FPDF_PAGE page) {
   return 0;
 }
 int render(const std::filesystem::path& input, int index, int edge, bool media,
-           const std::vector<float>& resolved_box, int rotation) {
+           const std::vector<float>& resolved_box, int rotation, bool ocr) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
   std::ifstream source(input, std::ios::binary | std::ios::ate);
@@ -148,10 +148,10 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
   if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
       width > 1000000 || height > 1000000)
     throw std::runtime_error("Unsupported page dimensions");
-  const double scale = std::min(2.0, edge / std::max(width, height));
+  const double scale = ocr ? edge / std::max(width, height) : std::min(2.0, edge / std::max(width, height));
   const int w = std::clamp(static_cast<int>(std::ceil(width * scale)), 1, edge);
   const int h = std::clamp(static_cast<int>(std::ceil(height * scale)), 1, edge);
-  const int stride = w * 4; // edge <= 2048; all products fit int and size_t.
+  const int stride = w * 4; // edge <= 4096; all products fit int and size_t.
   std::vector<unsigned char> pixels(static_cast<std::size_t>(stride) * h, 255);
   Bitmap bitmap{FPDFBitmap_CreateEx(w, h, FPDFBitmap_BGRA, pixels.data(), stride)};
   if (!bitmap.value || !FPDFBitmap_FillRect(bitmap.value, 0, 0, w, h, 0xffffffff))
@@ -183,10 +183,11 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4 && argc != 5 && argc != 9 && argc != 10) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP [QUARTER_TURNS]]]}");
+    if (argc != 4 && argc != 5 && argc != 9 && argc != 10) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|ocr|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP [QUARTER_TURNS]]]}");
     const auto operation = std::filesystem::path(argv[3]).string();
     if (operation == "text" && argc != 4) throw std::runtime_error("Text extraction does not accept a box option");
-    const auto box = argc >= 5 ? std::filesystem::path(argv[4]).string() : "crop";
+    const auto box = argc >= 5 ? std::filesystem::path(argv[4]).string() : (operation == "ocr" ? "media" : "crop");
+    if (operation == "ocr" && box != "media") throw std::runtime_error("OCR requires the full media box");
     if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
     std::vector<float> resolved_box;
     if (argc >= 9) {
@@ -202,8 +203,8 @@ int main(int argc, char** argv) {
     }
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media", resolved_box,
-                  argc == 10 ? number(std::filesystem::path(argv[9]).string(), 0, 3) : -1);
+                  operation == "text" ? 0 : (operation == "ocr" ? 4096 : number(operation, 1, 2048)), box == "media", resolved_box,
+                  argc == 10 ? number(std::filesystem::path(argv[9]).string(), 0, 3) : -1, operation == "ocr");
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

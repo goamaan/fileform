@@ -405,3 +405,20 @@ passed at dc303eb after the exact-byte test fix, including whole-document embedd
 text export. Portable OCR dependency evaluation is now recorded in
 [OCR_RESEARCH.md](OCR_RESEARCH.md); its English raster baseline is not OCR parity
 or an integrated app capability.
+
+### Scanned-page fallback with explicit English OCR
+
+`export-pdf-text ... --ocr OCR_PACK eng` now adds local recognition for pages with
+no embedded text. The worker accepts `ocr: {directory, language: "eng"}`. It uses
+the full resolved MediaBox at a 4096-pixel longest edge, verifies raster framing,
+and reuses a private, rehashed model snapshot. Page labels/separators remain intact.
+Receipts report zero-based `ocr_pages`, `pages_without_recognized_text`, and the
+explicit `ocr_language`; text-only pages do not invoke OCR. Blank multi-page entries
+are marked, while a blank single page saves nothing.
+
+Mac fixtures pass mixed embedded/scanned/blank documents, exact final text and
+hashes, CLI/worker parity, source preservation and collision/annotation rejection.
+Standalone image OCR and embedded-only extraction remain regression requirements.
+The Windows PDF workflow now builds the pinned OCR dependency and runs the same
+integrated fixture. Automatic language detection, annotations/forms and broader
+scan-quality coverage remain parity gates; see [OCR_RESEARCH.md](OCR_RESEARCH.md).

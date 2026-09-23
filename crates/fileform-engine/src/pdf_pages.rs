@@ -90,6 +90,7 @@ pub struct PageGeometry {
 pub struct PageInspection {
     pub sha256: String,
     pub pages: Vec<PageGeometry>,
+    pub special_preservation_keys: Vec<String>,
 }
 fn geometry(document: &Value, cancel: &Cancellation) -> Result<Vec<PageGeometry>> {
     let pages = document
@@ -227,11 +228,14 @@ pub fn inspect(input: &Path, directory: &Path, cancel: &Cancellation) -> Result<
         ])
         .arg(source.snapshot.path());
     let bytes = native_process::run(command, cancel, Duration::from_secs(120), 64 * 1024 * 1024)?;
-    let pages = geometry(&serde_json::from_slice(&bytes)?, cancel)?;
+    let document: Value = serde_json::from_slice(&bytes)?;
+    let pages = geometry(&document, cancel)?;
+    let special_preservation_keys = pdf_graph::metadata_features(&document, cancel)?;
     source.check(input)?;
     let result = PageInspection {
         sha256: source.hash,
         pages,
+        special_preservation_keys,
     };
     if serde_json::to_vec(&result)?.len() > 900000 {
         return Err(fail(

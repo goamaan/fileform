@@ -44,6 +44,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-') as folder:
     assert b'\x00\x00\x00' in first[2]  # Standard-font text actually rendered.
     assert raster(source, edge=1)[:2] == (1, 1)
     assert raster(source, edge=2048)[:2] == (400, 600)  # Two pixels/point cap.
+    ocr = run(helper, source, 0, 'ocr')
+    assert ocr.returncode == 0 and ocr.stdout.startswith(b'P6\n2731 4096\n255\n')
+    assert len(ocr.stdout.split(b'\n', 3)[3]) == 2731 * 4096 * 3
+    assert run(helper, source, 0, 'ocr', 'crop').returncode != 0
     rewritten = base / 'rewritten.pdf'
     rewrite = run(qpdf, '--object-streams=generate', '--stream-data=compress', source, rewritten)
     assert rewrite.returncode == 0, rewrite.stderr
