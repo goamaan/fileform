@@ -823,3 +823,12 @@ workflows are not yet ported; details are in PORTABLE_PDF.md.
 
 Windows run 35792695320 at 566ae9d passed the preceding waveform/poster preview
 suite with the existing media regressions. This is not Windows PDF acceptance.
+
+### September 22 — Windows qpdf source-build pipeline
+
+Added a pinned-source UCRT64 qpdf/JPEG build recipe with explicit static zlib,
+system-DLL checks, retained sources/notices and exact recipe/toolchain caching.
+The new Windows PDF workflow builds the Rust tools and runs the real inspection
+smoke suite. Shell syntax, workflow YAML and existing CI routing checks pass.
+Actual compilation/runtime proof awaits the launched workflow; no Windows PDF
+acceptance or signed-download claim is made yet.

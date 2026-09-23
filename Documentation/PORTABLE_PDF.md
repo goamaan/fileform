@@ -43,3 +43,20 @@ Next: build/review the Windows qpdf pack with retained sources/notices; port PDF
 object-graph inspection and preservation checks, then existing transformations and
 render/text/OCR support. Revisit limits against the complete reference contracts
 before declaring parity or publishing capability claims.
+
+## Windows source-build workflow
+
+`crates/fileform-engine/tools/build-pdf-windows.sh` builds the same pinned qpdf
+12.4.1 and libjpeg-turbo 3.2.0 sources in MSYS2 UCRT64, selects static zlib/JPEG/qpdf
+linkage and audits imported DLLs against Windows system libraries. It retains
+source archives, license notices, CMake caches and installed-toolchain metadata.
+The recipe follows qpdf's documented MinGW/MSYS2 build route:
+https://qpdf.readthedocs.io/en/latest/installation.html
+
+`.github/workflows/pdf-windows.yml` builds or restores an exact recipe/toolchain
+cache, builds the current Rust CLI/worker, and runs the real PDF smoke suite. A
+cache hit never skips current pack or PDF inspection checks. Source build and
+runtime verification are pending the first execution; local shell/YAML checks
+alone do not prove Windows PDF support. Toolchain packages are recorded, not yet
+frozen into a bit-for-bit reproducible snapshot. Retained CI artifacts are unsigned
+and expire after 14 days; final public distribution/signing remain separate gates.
