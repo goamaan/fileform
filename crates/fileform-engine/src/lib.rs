@@ -38,9 +38,11 @@ pub use media_video::{VideoEncoding, VideoFit};
 pub use media_video_trim::VideoTrimOptions;
 mod native_pack;
 mod native_process;
+mod pdf_compose;
 mod pdf_graph;
 mod pdf_inspect;
 mod pdf_optimize;
+pub use pdf_compose::{Composition as PdfComposition, PdfPageSelection};
 mod pdf_pages;
 mod pdf_preservation;
 mod pdf_render;
@@ -105,6 +107,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ComposePdf(PdfComposition),
     OptimizePdf {
         input: PathBuf,
         output: PathBuf,
@@ -309,6 +312,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    ComposedPdf(pdf_compose::CompositionReceipt),
     OptimizedPdf(pdf_optimize::OptimizationReceipt),
     PdfText(pdf_text::TextReceipt),
     PdfPageRender(pdf_render::RenderReceipt),
@@ -896,6 +900,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::ComposePdf(options) = &request {
+        return pdf_compose::compose(options, cancellation).map(Response::ComposedPdf);
+    }
     if let Request::OptimizePdf {
         input,
         output,
@@ -1224,7 +1231,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::OptimizePdf { .. }
+        Request::ComposePdf(..)
+        | Request::OptimizePdf { .. }
         | Request::ExtractPdfText { .. }
         | Request::RenderPdfPage { .. }
         | Request::InspectPdfPages { .. }
@@ -1258,7 +1266,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::OptimizePdf { .. }
+        Request::ComposePdf(..)
+        | Request::OptimizePdf { .. }
         | Request::ExtractPdfText { .. }
         | Request::RenderPdfPage { .. }
         | Request::InspectPdfPages { .. }

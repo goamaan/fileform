@@ -4,6 +4,7 @@
 #include <fpdfview.h>
 #include <fpdf_transformpage.h>
 #include <fpdf_text.h>
+#include <fpdf_edit.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -105,7 +106,7 @@ int extract_text(FPDF_PAGE page) {
   return 0;
 }
 int render(const std::filesystem::path& input, int index, int edge, bool media,
-           const std::vector<float>& resolved_box) {
+           const std::vector<float>& resolved_box, int rotation) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
   std::ifstream source(input, std::ios::binary | std::ios::ate);
@@ -125,6 +126,7 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
   Page page{FPDF_LoadPage(document.value, index)};
   if (!page.value) throw std::runtime_error("Cannot load PDF page");
   if (edge == 0) return extract_text(page.value);
+  if (rotation >= 0) FPDFPage_SetRotation(page.value, rotation);
   if (media) {
     float left = 0, bottom = 0, right = 0, top = 0;
     if (!resolved_box.empty()) {
@@ -181,13 +183,13 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4 && argc != 5 && argc != 9) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP]]}");
+    if (argc != 4 && argc != 5 && argc != 9 && argc != 10) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP [QUARTER_TURNS]]]}");
     const auto operation = std::filesystem::path(argv[3]).string();
     if (operation == "text" && argc != 4) throw std::runtime_error("Text extraction does not accept a box option");
     const auto box = argc >= 5 ? std::filesystem::path(argv[4]).string() : "crop";
     if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
     std::vector<float> resolved_box;
-    if (argc == 9) {
+    if (argc >= 9) {
       if (box != "media") throw std::runtime_error("Resolved coordinates require media mode");
       for (int i = 5; i < 9; ++i) {
         const auto value = std::filesystem::path(argv[i]).string();
@@ -200,7 +202,8 @@ int main(int argc, char** argv) {
     }
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media", resolved_box);
+                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media", resolved_box,
+                  argc == 10 ? number(std::filesystem::path(argv[9]).string(), 0, 3) : -1);
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

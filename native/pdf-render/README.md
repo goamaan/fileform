@@ -68,3 +68,9 @@ qpdf-resolved MediaBox, including inherited values the PDFium direct getter can
 miss. Coordinates must be finite with positive dimensions; bitmap bounds still
 apply. This is a temporary in-memory viewport, never a saved document edit.
 Standalone `media` without coordinates still rejects an unresolved inherited box.
+
+Internal page-composition verification may append a quarter-turn value (0–3)
+after the four resolved MediaBox coordinates. The helper sets that absolute
+in-memory rotation before rendering; it never saves the altered page. Text
+extraction remains in the source content order. This permits verification of
+selected pages rotated during composition.

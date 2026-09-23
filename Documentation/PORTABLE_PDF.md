@@ -267,3 +267,35 @@ Windows run [35819512430](https://github.com/goamaan/fileform/actions/runs/35819
 passed at 9952b5c, including the Unicode helper and CLI/worker text fixtures.
 Lossless compression and resolved inherited-box rendering are newer and await
 their own Windows run.
+
+### PDF composition: merge, select, reorder, duplicate and rotate
+
+`merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT.pdf...` merges all source pages
+in input order. Worker `compose_pdf` accepts `inputs`, `output`, `directory`,
+`renderer_directory`, `allow_document_changes: true`, and optional `pages`. Each
+selection has zero-based `source_index` and `page_index`, plus an optional
+`clockwise_rotation` in multiples of 90 degrees. Omitting `pages` merges all pages.
+The API requires acceptance of document-level changes; the explicit CLI merge
+action selects that policy and returns the corresponding warning.
+
+Reference limits are retained: 128 sources, combined 512 MiB input, 1000 output
+pages, and 512 MiB output. Sources are immutable snapshots; output is size-bounded,
+strictly checked, synced and committed without replacing an existing file. A
+private qpdf job JSON avoids Windows command-line length limits and supports
+interleaved selections. Expected geometry includes the requested rotation; the
+helper renders the matching in-memory orientation before comparing every output
+page's text and pixels. This does not claim document-level graph identity: the
+result is a new document, and metadata/bookmarks/form behavior and signature
+certification are explicitly not guaranteed.
+
+Mac end-to-end fixtures pass mixed text/image/Unicode PDF merges, page ordering,
+independent rotations of duplicate selections, negative-origin/inherited boxes,
+source hashes, output hashes, collision and invalid-selection handling. Compression
+and render/text regressions also pass with the orientation-aware verifier. The
+Windows workflow now exercises the same composition suite. Still-image inputs,
+atomic split-directory output, and complex forms/annotations need additional
+implementation/acceptance before full original composition parity is claimed.
+
+Windows run [35820043378](https://github.com/goamaan/fileform/actions/runs/35820043378)
+passed at 668a4d4, establishing the earlier lossless compression and inherited-box
+verification baseline. It predates this composition implementation.

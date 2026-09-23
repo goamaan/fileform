@@ -29,14 +29,20 @@ pub(crate) fn pages(
     let deadline = Instant::now() + Duration::from_secs(600);
     let working = tempfile::tempdir()?;
     let mut proofs = Vec::with_capacity(geometry.len());
-    for (page, geometry) in geometry.iter().enumerate() {
+    for geometry in geometry {
+        let page = geometry
+            .position
+            .checked_sub(1)
+            .filter(|v| *v < 1000)
+            .ok_or_else(|| fail("invalid_request", "Invalid PDF page position."))?;
         let (mut render, version) = pdf_render::command(directory, cancel)?;
         render
             .current_dir(working.path())
             .arg(input)
             .arg(page.to_string())
             .args(["2048", "media"])
-            .args(geometry.media_box.iter().map(|v| v.to_string()));
+            .args(geometry.media_box.iter().map(|v| v.to_string()))
+            .arg((geometry.rotation / 90).to_string());
         let bytes =
             native_process::run(render, cancel, remaining(deadline)?, 2048 * 2048 * 3 + 64)?;
         pdf_render::raster(&bytes, 2048)?;
