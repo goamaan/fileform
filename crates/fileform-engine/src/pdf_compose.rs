@@ -5,7 +5,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -50,7 +50,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     {
         return Err(fail(
             "invalid_request",
-            "Choose 1–128 PDF inputs and a PDF output.",
+            "Choose 1–128 PDF, PNG, JPEG or TIFF inputs and a PDF output.",
         ));
     }
     if options
@@ -65,13 +65,37 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     }
     let mut sources = Vec::new();
     let mut geometries = Vec::new();
+    let mut prepared = Vec::new();
+    let mut documents = Vec::new();
+    let mut prepared_bytes = 0;
     let mut total = 0;
     for input in &options.inputs {
-        let source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024 - total)?;
+        let mut source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024 - total)?;
         total += source.snapshot.as_file().metadata()?.len();
-        let info = pdf_inspect::inspect(source.snapshot.path(), &options.directory, cancel)?;
-        let geometry =
-            pdf_pages::inspect(source.snapshot.path(), &options.directory, cancel)?.pages;
+        let mut signature = [0u8; 8];
+        let read = source.snapshot_reader()?.read(&mut signature)?;
+        let is_image = read >= 2
+            && (signature[..2] == [0xff, 0xd8]
+                || signature[..2] == *b"II"
+                || signature[..2] == *b"MM"
+                || signature.starts_with(b"\x89PNG"));
+        let document = if is_image {
+            let page = crate::pdf_images::prepare(
+                source.snapshot.path(),
+                &options.directory,
+                512 * 1024 * 1024 - prepared_bytes,
+                cancel,
+            )?;
+            prepared_bytes += page.as_file().metadata()?.len();
+            let path = page.path().to_path_buf();
+            prepared.push(page);
+            path
+        } else {
+            source.snapshot.path().to_path_buf()
+        };
+        let info = pdf_inspect::inspect(&document, &options.directory, cancel)?;
+        let geometry = pdf_pages::inspect(&document, &options.directory, cancel)?.pages;
+        documents.push(document);
         if geometry.len() != info.pages as usize {
             return Err(fail("verification", "PDF page inspections disagree."));
         }
@@ -123,7 +147,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     }
     // Group source verification without changing the requested output order.
     let mut proof = (0..selected.len()).map(|_| None).collect::<Vec<_>>();
-    for (source_index, source) in sources.iter().enumerate() {
+    for (source_index, document) in documents.iter().enumerate() {
         let positions = selected
             .iter()
             .enumerate()
@@ -136,12 +160,8 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
             .iter()
             .map(|&i| expected[i].clone())
             .collect::<Vec<_>>();
-        let verified = pdf_preservation::pages(
-            source.snapshot.path(),
-            &options.renderer_directory,
-            &geometry,
-            cancel,
-        )?;
+        let verified =
+            pdf_preservation::pages(document, &options.renderer_directory, &geometry, cancel)?;
         for (position, verified) in positions.into_iter().zip(verified) {
             proof[position] = Some(verified);
         }
@@ -155,7 +175,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
     let working = tempfile::tempdir()?;
     let mut job = tempfile::NamedTempFile::new_in(working.path())?;
-    let pages = selected.iter().map(|v| serde_json::json!({"file": sources[v.source_index].snapshot.path(), "range":(v.page_index + 1).to_string()})).collect::<Vec<_>>();
+    let pages = selected.iter().map(|v| serde_json::json!({"file": documents[v.source_index], "range":(v.page_index + 1).to_string()})).collect::<Vec<_>>();
     let rotation = expected
         .iter()
         .enumerate()
@@ -223,6 +243,16 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
             e.error.to_string(),
         )
     })?;
-    Ok(CompositionReceipt { output: options.output.clone(), bytes, sha256, source_sha256: sources.into_iter().map(|v| v.hash).collect(), pages: selected.len(),
-        warnings: vec!["A new PDF is created. Document-level metadata, bookmarks and form behavior may change; existing signatures do not certify it. Originals remain unchanged."] })
+    let mut warnings = vec!["A new PDF is created. Document-level metadata, bookmarks and form behavior may change; existing signatures do not certify it. Originals remain unchanged."];
+    if !prepared.is_empty() {
+        warnings.push("Each image becomes one sRGB page at one PDF point per oriented pixel. Descriptive metadata is omitted; transparency is retained as a soft mask.");
+    }
+    Ok(CompositionReceipt {
+        output: options.output.clone(),
+        bytes,
+        sha256,
+        source_sha256: sources.into_iter().map(|v| v.hash).collect(),
+        pages: selected.len(),
+        warnings,
+    })
 }

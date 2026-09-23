@@ -1,10 +1,12 @@
 # Portable PDF migration
 
-Status: qpdf pack verification and bounded structural inspection are available in
-Rust/CLI/worker. PDF composition, page operations, compression, image extraction,
-rendering/text/OCR, previews and final UI integration remain parity work. Preserve
-the Swift/PDFKit/qpdf implementations as references; do not mark their historical
-completion as portable acceptance.
+Status: the portable engine has bounded PDF inspection, graph/geometry evidence,
+page rendering/text extraction, lossless compression, and selected-page composition
+with PDF/PNG/JPEG/TIFF inputs. These are native CLI/worker capabilities; the desktop
+has not yet integrated them. Split-directory output, lossy optimization, embedded
+image extraction, OCR, whole-document text export and broader format/resource
+acceptance remain parity work. Preserve the Swift implementations as references;
+historical completion is not portable acceptance.
 
 ## Current entry points
 
@@ -299,3 +301,30 @@ implementation/acceptance before full original composition parity is claimed.
 Windows run [35820043378](https://github.com/goamaan/fileform/actions/runs/35820043378)
 passed at 668a4d4, establishing the earlier lossless compression and inherited-box
 verification baseline. It predates this composition implementation.
+
+### Still images in PDF assembly
+
+Composition now accepts the existing verified PNG/JPEG/TIFF SDR pipeline as well
+as PDFs, detecting source content rather than relying on its extension. Every
+image becomes one page at one PDF point per oriented pixel. ICC/gamma conversion
+and all EXIF orientations use the existing image preparation code. Extended/HDR
+and unsupported image cases remain rejected rather than silently flattened.
+
+A safe Rust writer emits only generated PDF objects, embedding straight RGB, a
+grayscale alpha soft mask and an sRGB ICC profile. It streams samples in 4096-pixel
+blocks, bounds combined prepared image PDFs to 512 MiB, and releases decoded pixels
+before qpdf independently reads and hashes the RGB, alpha and profile streams.
+The normal assembly path then verifies every final page's geometry, text and
+rendered appearance. Descriptive image metadata is intentionally omitted and
+disclosed; source files remain unchanged. Uncompressed intermediate PDFs are
+private staging files, not final exports.
+
+Mac fixtures pass all eight EXIF orientations, native-scale rendered pixel colors,
+transparent and half-transparent samples, mixed PDF/PNG/JPEG/TIFF merging, page
+sizes, output hashes and high-depth rejection. Enlarged PDFium previews may
+interpolate samples, so source-color assertions use a one-to-one render scale;
+embedded-stream checks remain exact. Windows CI runs the same image suite.
+
+Windows run [35820493422](https://github.com/goamaan/fileform/actions/runs/35820493422)
+passed at f140c0e, covering PDF-only merge, selection, duplication and independent
+rotation. The new still-image assembly paths require their own Windows result.

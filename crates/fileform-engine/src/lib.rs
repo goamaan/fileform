@@ -40,6 +40,7 @@ mod native_pack;
 mod native_process;
 mod pdf_compose;
 mod pdf_graph;
+mod pdf_images;
 mod pdf_inspect;
 mod pdf_optimize;
 pub use pdf_compose::{Composition as PdfComposition, PdfPageSelection};
