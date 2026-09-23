@@ -39,7 +39,9 @@ pub use media_video_trim::VideoTrimOptions;
 mod directory_transaction;
 mod native_pack;
 mod native_process;
+mod ocr_image;
 mod ocr_pack;
+pub use ocr_image::OcrLanguage;
 mod pdf_compose;
 mod pdf_split;
 pub use pdf_split::Split as PdfSplit;
@@ -114,6 +116,12 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    OcrImage {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        language: OcrLanguage,
+    },
     VerifyOcrPack {
         directory: PathBuf,
     },
@@ -324,6 +332,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    RecognizedImage(ocr_image::OcrReceipt),
     OcrPackVerification(ocr_pack::OcrPackVerification),
     PdfDocumentText(pdf_document_text::DocumentTextReceipt),
     SplitPdf(pdf_split::SplitReceipt),
@@ -915,6 +924,16 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::OcrImage {
+        input,
+        output,
+        directory,
+        language,
+    } = &request
+    {
+        return ocr_image::recognize(input, output, directory, language, cancellation)
+            .map(Response::RecognizedImage);
+    }
     if let Request::VerifyOcrPack { directory } = &request {
         return ocr_pack::verify(directory, cancellation).map(Response::OcrPackVerification);
     }
@@ -1255,7 +1274,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::VerifyOcrPack { .. }
+        Request::OcrImage { .. }
+        | Request::VerifyOcrPack { .. }
         | Request::ExportPdfText(..)
         | Request::SplitPdf(..)
         | Request::ComposePdf(..)
@@ -1293,7 +1313,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::VerifyOcrPack { .. }
+        Request::OcrImage { .. }
+        | Request::VerifyOcrPack { .. }
         | Request::ExportPdfText(..)
         | Request::SplitPdf(..)
         | Request::ComposePdf(..)

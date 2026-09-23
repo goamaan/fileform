@@ -141,7 +141,7 @@ models. [Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/5.5.
 above with their recorded archive hashes, disables optional Leptonica codecs and
 Tesseract network/archive/graphics/training features, and stages an explicitly
 `evaluationOnly` pack. It retains source archives, all three license notices, model
-hashes and local build logs/commands. No OCR execution adapter consumes this pack yet.
+hashes and local build logs/commands. The image adapter described below now consumes the pack; PDF fallback remains open.
 The recipe supports a Windows x64 build route, whose new CI job must still prove it.
 
 A fresh Mac arm64 source build completed and the binary linked only system
@@ -184,3 +184,30 @@ so the modern static-runtime property was ignored. The Windows recipe now suppli
 Windows build is required to verify that correction; no Windows OCR success is
 claimed from the failed run. The workflow also exercises native CLI/worker model
 verification after its controlled recognition baseline.
+
+## Native image OCR adapter
+
+`ocr-image INPUT OUTPUT.txt OCR_PACK eng` and worker `ocr_image` now recognize
+explicit English text from supported PNG/JPEG/TIFF inputs. Rust applies the
+existing orientation/color pipeline, limits the longest edge to 4096 pixels,
+composites alpha over white in small blocks and writes an owned P6 raster. The
+English model is copied into the private working directory and rehashed before
+launch; Tesseract receives only ASCII relative input/model paths, avoiding native
+path-encoding ambiguity. The command clears inherited environment settings and
+runs under the existing 60-second timeout, cancellation/reaping and four-million-
+byte text-output cap. Final UTF-8 text is rehashed, source-checked, synced and saved
+without replacement. Blank recognition saves nothing.
+
+Mac real CLI/worker tests pass exact text/hash receipts, PNG/JPEG/TIFF inputs,
+Unicode image/pack/output paths, EXIF rotation, transparent hidden-text exclusion,
+collisions, modified-model rejection and unchanged sources. This is still an
+English adapter with explicit language selection; automatic-language detection,
+PDF OCR fallback, broader accuracy/orientation testing and OS memory/process-tree
+containment remain open. Do not claim Vision parity from this baseline.
+
+Windows run [35823552707](https://github.com/goamaan/fileform/actions/runs/35823552707)
+passed at 3ce63bd: the static-runtime policy correction, source build, controlled
+raster OCR and native model verification all passed. The downloaded executable's
+hash matched its manifest and PE import inspection showed only KERNEL32.dll.
+This run predates the image adapter and its Unicode-path tests; a new run must
+verify those separately.

@@ -37,6 +37,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-ocr-pack.py Artifacts/ocr-windows/OCRPack | Tee-Object -FilePath Artifacts/ocr-windows/pack-smoke.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-ocr-image.py Artifacts/ocr-windows/OCRPack | Tee-Object -FilePath Artifacts/ocr-windows/image-smoke.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain evaluation pack and build evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -48,4 +50,5 @@ jobs:
             Artifacts/ocr-windows/commands.json
             Artifacts/ocr-windows/smoke.txt
             Artifacts/ocr-windows/pack-smoke.txt
+            Artifacts/ocr-windows/image-smoke.txt
           retention-days: 14
