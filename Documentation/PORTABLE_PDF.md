@@ -4,7 +4,7 @@ Status: the portable engine has bounded PDF inspection, graph/geometry evidence,
 page rendering/text extraction, lossless compression, and selected-page composition
 with PDF/PNG/JPEG/TIFF inputs and split-folder publication. These are native CLI/worker capabilities; the desktop
 has not yet integrated them. Lossy optimization, embedded
-image extraction, OCR, whole-document text export and broader format/resource
+image extraction, OCR fallback for text export and broader format/resource
 acceptance remain parity work. Preserve the Swift implementations as references;
 historical completion is not portable acceptance.
 
@@ -364,3 +364,33 @@ Windows CI includes these tests; its result is still required.
 Windows run [35821016403](https://github.com/goamaan/fileform/actions/runs/35821016403)
 passed at 266496a, including mixed PNG/JPEG/TIFF/PDF assembly and orientation/alpha
 fixtures. This predates the split implementation.
+
+### Whole-document embedded-text export
+
+`export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK` / worker `export_pdf_text`
+exports every page, trimming page-edge whitespace and retaining the reference
+app's multi-page labels and form-feed separators, with a final newline. The source
+is snapshotted once. Text is validated one page at a time and streamed to bounded
+staging; the final file is independently hashed against the expected written
+bytes, synced, source-checked and saved without replacement. Limits remain
+512 MiB input/output and 1000 pages, with the helper's per-page character limit,
+60-second calls and a ten-minute extraction budget.
+
+This is not full original text-export parity: the Swift app automatically runs
+Vision OCR on pages without embedded text. No portable OCR engine is installed
+or integrated yet. The default portable operation returns `ocr_required` and
+saves nothing if a page has no embedded text. An explicit `--allow-missing-text`
+(worker `allow_missing_text: true`) writes a visible marker on each such page and
+reports its zero-based index. The receipt always says `ocr_performed: false`.
+Do not advertise this as scanned-PDF text recognition or silently substitute it
+for the original OCR-backed conversion.
+
+Mac end-to-end fixtures pass exact multi-page labels/separators, Unicode, single-
+page formatting, CLI/worker equality, source/output hashes, collisions, cleanup
+after a later page requires OCR, explicit missing-page disclosure and invalid
+Unicode rejection. The Windows workflow includes this suite.
+
+Windows run [35821665428](https://github.com/goamaan/fileform/actions/runs/35821665428)
+passed at a140e5f, including split-folder publication, existing-folder rejection,
+later-group rollback and cancellation after the first staged part. Whole-document
+embedded-text export is newer and awaits its own Windows result.

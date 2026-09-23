@@ -93,6 +93,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-split.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-split-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-pdf-document-text.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-document-text-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain pack and diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -108,6 +110,7 @@ jobs:
             Artifacts/pdf-compose-windows.txt
             Artifacts/pdf-images-windows.txt
             Artifacts/pdf-split-windows.txt
+            Artifacts/pdf-document-text-windows.txt
             Artifacts/PDFRenderPack-Windows/
             Artifacts/pdfium-evaluation/attestation-verification.json
             Artifacts/pdfium-evaluation/args.gn
