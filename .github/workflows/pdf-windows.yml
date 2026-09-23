@@ -2,9 +2,9 @@ name: Windows PDF parity
 on:
   push:
     branches: [main]
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
+    paths: ['crates/**', 'native/pdf-render/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
   pull_request:
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
+    paths: ['crates/**', 'native/pdf-render/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -58,6 +58,29 @@ jobs:
         run: |
           python crates/fileform-engine/tests/smoke-pdf.py Artifacts/PDFPack-Windows | Tee-Object -FilePath Artifacts/pdf-smoke-windows.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify PDFium evaluation dependency
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force Artifacts/pdfium-evaluation | Out-Null
+          $archive = 'Artifacts/pdfium-evaluation/pdfium-win-x64.tgz'
+          Invoke-WebRequest 'https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8066/pdfium-win-x64.tgz' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '739a57d597d864297909cc40a2411eba728490c76a0fa25e3ea299c7f6b07020') { throw 'PDFium archive hash mismatch' }
+          gh attestation verify $archive --repo bblanchon/pdfium-binaries --format json > Artifacts/pdfium-evaluation/attestation-verification.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          tar -xzf $archive -C Artifacts/pdfium-evaluation
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and exercise Windows PDF rendering helper
+        shell: pwsh
+        run: |
+          $pdfium = (Resolve-Path Artifacts/pdfium-evaluation).Path
+          cmake -S native/pdf-render -B Artifacts/pdfium-evaluation/build -A x64 "-DPDFIUM_ROOT=$pdfium"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build Artifacts/pdfium-evaluation/build --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-pdf-render.py Artifacts/pdfium-evaluation/build/Release/fileform-pdf-render.exe Artifacts/PDFPack-Windows/bin/qpdf.exe | Tee-Object -FilePath Artifacts/pdf-render-smoke-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain pack and diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -67,4 +90,11 @@ jobs:
             Artifacts/PDFPack-Windows/
             Artifacts/pdf-build-windows/*.log
             Artifacts/pdf-smoke-windows.json
+            Artifacts/pdf-render-smoke-windows.txt
+            Artifacts/pdfium-evaluation/attestation-verification.json
+            Artifacts/pdfium-evaluation/args.gn
+            Artifacts/pdfium-evaluation/VERSION
+            Artifacts/pdfium-evaluation/LICENSE
+            Artifacts/pdfium-evaluation/licenses/
+            Artifacts/pdfium-evaluation/build/Release/
           retention-days: 14

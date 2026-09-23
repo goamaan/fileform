@@ -1,8 +1,8 @@
 # PDFium integration research
 
 Checked September 22, 2026. Dependency evaluation only: the Mac arm64 archive
-was downloaded and inspected after research. No PDFium code was executed and no
-implementation/runtime acceptance is established.
+was downloaded and inspected after research. The later helper evaluation recorded below executes this library; production
+integration and full parity acceptance remain open.
 
 ## Candidate and provenance — verified metadata
 
@@ -158,3 +158,11 @@ path before signing. The archive includes headers and dependency notices; their
 presence is not a completed license-completeness audit. Windows/x64 archive
 inspection, helper execution, source provenance and production packaging remain
 pending. Local verification JSON is retained with the ignored evaluation files.
+
+## Native helper evaluation
+
+The initial adapter at `native/pdf-render` builds and runs on Mac arm64. Its
+generated-fixture smoke passed basic bounded rendering and rewrite/change checks;
+see `PORTABLE_PDF.md` and the helper README for exact scope. This supersedes the
+initial research-only execution status. It does not close the remaining source,
+containment, platform, font/color or preservation gates listed above.

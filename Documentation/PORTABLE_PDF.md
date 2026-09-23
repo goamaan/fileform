@@ -142,3 +142,20 @@ verified Mac arm64 archive/attestation evidence, and
 [rendering acceptance](PDF_RENDER_ACCEPTANCE.md) for reference-derived checks.
 The generated qpdf smoke fixture now also includes standard-font text alongside
 vector shapes. This is preparation for rendering tests, not rendering parity.
+
+### Initial native renderer helper
+
+`native/pdf-render` now builds a separate C++ adapter against the evaluated
+non-V8 PDFium archive. On Mac arm64, real fixtures pass bounded RGB raster output,
+standard-font text/vector rendering, identical pixels after a qpdf object-stream
+rewrite, changed pixels after content/text removal, inherited crop/rotation,
+Unicode paths, invalid arguments, malformed/protected input and unchanged source
+bytes. The original structural/graph smoke also still passes after sharing the
+fixture generator.
+
+This is an evaluation executable, not yet a Rust/worker API or app preview. Its
+effective crop rendering differs from the Swift MediaBox fingerprint; UserUnit,
+fonts/color/forms and full preservation coverage remain open. See its README for
+limits and the required supervisor/containment integration. Windows CI now builds
+and exercises the same helper against a hash-pinned, attestation-verified archive;
+the result must be checked before claiming Windows acceptance.
