@@ -844,3 +844,12 @@ release build and Windows target checking pass.
 Windows qpdf run 35815982405 compiled but the DLL audit rejected zlib1.dll. Corrected
 the recipe to use qpdf's own static-zlib CMake variable names; the guard was not
 weakened. PDF output operations and independent rendering remain pending.
+
+### September 22 — PDF special-preservation guards
+
+Added reachable dictionary-key reporting for the reference optimizer's sensitive
+PDF features. Real annotation and unit reachability checks pass alongside 83 active
+Rust tests, Clippy, release/Windows target checks and PDF smoke. This prevents a
+future graph-only success result from bypassing signed/interactive-document rules.
+Rendering and transformation-specific proof remain open. Corrected Windows qpdf
+run 35816815487 is still actively building its pack.

@@ -13,8 +13,9 @@ cli=root/'target/release'/('fileform-native'+suffix)
 worker=root/'target/release'/('fileform-worker'+suffix)
 qpdf=pack/'bin'/('qpdf'+suffix)
 def run(*args):return subprocess.run([str(x) for x in args],capture_output=True,check=True,timeout=120)
-def fixture(path):
+def fixture(path, annotated=False):
     objects=[b'<< /Type /Catalog /Pages 2 0 R >>',b'<< /Type /Pages /Count 2 /Kids [3 0 R 4 0 R] >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Resources << >> /Contents 5 0 R >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 6 0 R >>']
+    if annotated: objects[2]=objects[2].replace(b'/Resources',b'/Annots [] /Resources')
     for content in [b'q 1 0 0 rg 10 10 50 50 re f Q\n',b'q 0 0 1 rg 20 20 40 40 re f Q\n']:
         objects.append(f'<< /Length {len(content)} >>\nstream\n'.encode()+content+b'endstream')
     data=bytearray(b'%PDF-1.7\n');offsets=[0]
@@ -40,6 +41,9 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
     assert graph['graph_sha256']==after['graph_sha256']
     changed=base/'changed.pdf';changed.write_bytes(source.read_bytes().replace(b'1 0 0 rg',b'0 1 0 rg'))
     assert json.loads(run(cli,'inspect-pdf-graph',changed,pack).stdout)['graph_sha256']!=graph['graph_sha256']
+    assert graph['special_preservation_keys']==[]
+    annotated=base/'annotated.pdf';fixture(annotated,True)
+    assert '/Annots' in json.loads(run(cli,'inspect-pdf-graph',annotated,pack).stdout)['special_preservation_keys']
     damaged=base/'damaged.pdf';damaged.write_bytes(b'%PDF-1.7\ninvalid')
     protected=base/'protected.pdf'
     run(qpdf,'--encrypt','fixture-user','fixture-owner','256','--',source,protected)
@@ -47,4 +51,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
         response=subprocess.run([str(cli),'inspect-pdf',str(path),str(pack)],capture_output=True,timeout=120)
         assert response.returncode!=0
     assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
-    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True,'rewriteGraphPreserved':True,'changedContentDetected':True}))
+    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True,'rewriteGraphPreserved':True,'changedContentDetected':True,'specialPreservationKeysDetected':True}))

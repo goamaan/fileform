@@ -89,3 +89,19 @@ because it imported zlib1.dll. The pinned qpdf CMake source uses ZLIB_LIB_PATH a
 ZLIB_H_PATH, not the standard FindZLIB variable names used in the initial recipe.
 The recipe now supplies qpdf's actual variables for libz.a. The DLL guard remains
 unchanged; corrected Windows build/runtime acceptance is still pending.
+
+## Preservation-sensitive feature detection
+
+Graph inspection now reports `special_preservation_keys` from reachable
+dictionaries, matching the reference optimizer's conservative guard set: forms,
+annotations, signature byte ranges/permissions, actions/JavaScript, embedded or
+associated files, tagged/layered structures, portfolios, XFA, encryption and
+outlines. Unreachable objects do not trigger the reachable-graph report. Key
+presence is a conservative signal, not complete PDF semantic classification.
+
+A matching graph digest alone must not authorize an optimization when these
+features require special handling. Independent rendering, page geometry/content
+checks and transformation-specific eligibility remain required. Real annotated
+PDF and unit reachability cases pass; all 83 active Rust tests, Clippy, release
+build, Windows target check and PDF smoke pass locally. The corrected Windows
+pack build is still active; no PDF output operation is declared complete.

@@ -3,7 +3,11 @@ use crate::{fail, native_process, pdf_inspect, Cancellation, Result, Source};
 use serde::Serialize;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    time::Duration,
+};
 fn reference(value: &str) -> bool {
     let mut parts = value.split(' ');
     let (Some(number), Some(generation), Some("R"), None) =
@@ -54,6 +58,7 @@ struct Walk<'a> {
     seen: BTreeMap<String, usize>,
     hash: Sha256,
     nodes: usize,
+    special: BTreeSet<String>,
     cancel: &'a Cancellation,
 }
 impl Walk<'_> {
@@ -96,6 +101,28 @@ impl Walk<'_> {
                 let mut keys: Vec<_> = values.keys().collect();
                 keys.sort();
                 for key in keys {
+                    if matches!(
+                        key.as_str(),
+                        "/AcroForm"
+                            | "/Annots"
+                            | "/ByteRange"
+                            | "/Perms"
+                            | "/JavaScript"
+                            | "/JS"
+                            | "/OpenAction"
+                            | "/AA"
+                            | "/EmbeddedFiles"
+                            | "/AF"
+                            | "/StructTreeRoot"
+                            | "/OCProperties"
+                            | "/Collection"
+                            | "/XFA"
+                            | "/Encrypt"
+                            | "/Outlines"
+                    ) {
+                        self.special.insert(key.clone());
+                    }
+
                     if stream_dict && key == "/Length" {
                         continue;
                     }
@@ -145,6 +172,7 @@ pub struct GraphDigest {
     pub objects: usize,
     pub reached_objects: usize,
     pub visited_nodes: usize,
+    pub special_preservation_keys: Vec<String>,
 }
 pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<GraphDigest> {
     let qpdf = document
@@ -184,6 +212,7 @@ pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<Gra
         seen: BTreeMap::new(),
         hash: Sha256::new(),
         nodes: 0,
+        special: BTreeSet::new(),
         cancel,
     };
     walk.visit(trailer, 0, false, true)?;
@@ -198,6 +227,7 @@ pub(crate) fn fingerprint(document: &Value, cancel: &Cancellation) -> Result<Gra
         objects: objects.len(),
         reached_objects: walk.seen.len(),
         visited_nodes: walk.nodes,
+        special_preservation_keys: walk.special.into_iter().collect(),
     })
 }
 #[derive(Debug, Serialize)]
@@ -270,6 +300,15 @@ mod tests {
             .unwrap()
             .remove("data");
         assert!(fingerprint(&missing, &cancel).is_err());
+    }
+    #[test]
+    fn special_features_are_reported_from_reachable_dictionaries() {
+        let mut value = document(1, "YWJj");
+        value["qpdf"][1]["obj:1 0 R"]["stream"]["dict"]["/Annots"] = serde_json::json!([]);
+        value["qpdf"][1]["obj:1 0 R"]["stream"]["dict"]["/JS"] = "u:script".into();
+        value["qpdf"][1]["obj:2 0 R"] = serde_json::json!({"value":{"/XFA":"u:unreachable"}});
+        let result = fingerprint(&value, &Cancellation::default()).unwrap();
+        assert_eq!(result.special_preservation_keys, vec!["/Annots", "/JS"]);
     }
     #[test]
     fn numbers_are_exact_without_float_rounding() {
