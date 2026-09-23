@@ -56,3 +56,27 @@ def unicode_fixture(path, invalid=False, supplementary=b"D83DDE00"):
         f'<< /Length {len(cmap)} >>\nstream\n'.encode()+cmap+b'endstream',
     ]
     write_pdf(path, objects)
+
+
+def annotation_fixture(path, rotation=0, reveal_hidden=False, generated_widget=False, xfa=False):
+    def appearance(text, color):
+        data=f'q {color} rg 0 0 140 30 re f Q BT /Helv 14 Tf 0 g 5 8 Td ({text}) Tj ET\n'.encode()
+        return f'<< /Type /XObject /Subtype /Form /BBox [0 0 140 30] /Resources << /Font << /Helv 5 0 R >> >> /Length {len(data)} >>\nstream\n'.encode()+data+b'endstream'
+    widget_ap=b'' if generated_widget else b'/AP << /N 8 0 R >> '
+    objects=[
+        b'<< /Type /Catalog /Pages 2 0 R /AcroForm 7 0 R /OpenAction << /S /JavaScript /JS (this.getField("visible").value = "CHANGED";) >> >>',
+        b'<< /Type /Pages /Count 1 /Kids [3 0 R] >>',
+        f'<< /Type /Page /Parent 2 0 R /MediaBox [10 20 210 320] /CropBox [20 30 200 300] /Rotate {rotation} /Resources << >> /Contents 4 0 R /Annots [6 0 R 9 0 R 11 0 R 13 0 R] >>'.encode(),
+        b'<< /Length 0 >>\nstream\nendstream',
+        b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        b'<< /Type /Annot /Subtype /Widget /FT /Tx /T (visible) /V (Visible form) /Rect [40 190 180 220] /F 4 /DA (/Helv 14 Tf 0 g) /MK << /BG [1 1 0] >> '+widget_ap+b'/P 3 0 R >>',
+        b'<< /Fields [6 0 R 9 0 R] /DA (/Helv 14 Tf 0 g) /DR << /Font << /Helv 5 0 R >> >> '+(b'/XFA [] ' if xfa else b'')+b'>>',
+        appearance('Visible form','1 1 0'),
+        f'<< /Type /Annot /Subtype /Widget /FT /Tx /T (hidden) /V (Hidden form) /Rect [40 50 180 80] /F {4 if reveal_hidden else 36} /AP << /N 10 0 R >> /P 3 0 R >>'.encode(),
+        appearance('Hidden form','1 0 1'),
+        b'<< /Type /Annot /Subtype /FreeText /Contents (Visible note) /Rect [40 120 180 150] /F 4 /DA (/Helv 14 Tf 0 g) /AP << /N 12 0 R >> /P 3 0 R >>',
+        appearance('Visible note','0 1 1'),
+        f'<< /Type /Annot /Subtype /FreeText /Contents (Hidden note) /Rect [40 85 180 115] /F {4 if reveal_hidden else 6} /AP << /N 14 0 R >> /P 3 0 R >>'.encode(),
+        appearance('Hidden note','1 0.5 0'),
+    ]
+    write_pdf(path,objects)

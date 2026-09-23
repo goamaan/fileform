@@ -241,9 +241,9 @@ impl DocumentOcr<'_> {
             if inspection
                 .special_preservation_keys
                 .iter()
-                .any(|v| matches!(v.as_str(), "/Annots" | "/AcroForm" | "/XFA" | "/Encrypt"))
+                .any(|v| matches!(v.as_str(), "/XFA" | "/Encrypt"))
             {
-                return Err(fail("unsupported", "PDF OCR does not yet support encrypted documents, annotations or form appearances. No output was saved."));
+                return Err(fail("unsupported", "PDF OCR does not yet support encrypted documents or XFA forms. No output was saved."));
             }
             let pages = inspection.pages;
             if pages.len() != self.page_count as usize {

@@ -5,6 +5,7 @@
 #include <fpdf_transformpage.h>
 #include <fpdf_text.h>
 #include <fpdf_edit.h>
+#include <fpdf_formfill.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -50,6 +51,50 @@ struct Page {
 struct Bitmap {
   FPDF_BITMAP value;
   ~Bitmap() { if (value) FPDFBitmap_Destroy(value); }
+};
+// Static rendering only: no timers, navigation, user interaction or JavaScript
+// platform. The non-V8/non-XFA dependency is enforced by the build recipe.
+struct FormInfo : FPDF_FORMFILLINFO {
+  FPDF_DOCUMENT document;
+  FPDF_PAGE page;
+  int index;
+  FormInfo(FPDF_DOCUMENT d, FPDF_PAGE p, int i)
+      : FPDF_FORMFILLINFO{}, document(d), page(p), index(i) {
+    version = 1;
+    FFI_Invalidate = [](FPDF_FORMFILLINFO*, FPDF_PAGE, double, double, double, double) {};
+    FFI_SetCursor = [](FPDF_FORMFILLINFO*, int) {};
+    FFI_SetTimer = [](FPDF_FORMFILLINFO*, int, TimerCallback) { return 0; };
+    FFI_KillTimer = [](FPDF_FORMFILLINFO*, int) {};
+    FFI_GetLocalTime = [](FPDF_FORMFILLINFO*) { return FPDF_SYSTEMTIME{}; };
+    FFI_GetPage = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT requested_document, int requested_index) {
+      const auto* self = static_cast<FormInfo*>(info);
+      return requested_document == self->document && requested_index == self->index ? self->page : nullptr;
+    };
+    FFI_GetCurrentPage = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT requested_document) {
+      const auto* self = static_cast<FormInfo*>(info);
+      return requested_document == self->document ? self->page : nullptr;
+    };
+    FFI_GetRotation = [](FPDF_FORMFILLINFO*, FPDF_PAGE requested_page) { return FPDFPage_GetRotation(requested_page); };
+    FFI_ExecuteNamedAction = [](FPDF_FORMFILLINFO*, FPDF_BYTESTRING) {};
+  }
+};
+struct FormEnvironment {
+  FormInfo info;
+  FPDF_FORMHANDLE handle = nullptr;
+  FormEnvironment(const FormEnvironment&) = delete;
+  FormEnvironment& operator=(const FormEnvironment&) = delete;
+  explicit FormEnvironment(FPDF_DOCUMENT document, FPDF_PAGE page, int index)
+      : info(document, page, index) {
+    handle = FPDFDOC_InitFormFillEnvironment(document, &info);
+    if (!handle) throw std::runtime_error("Cannot initialize static form appearances");
+    FORM_OnAfterLoadPage(page, handle);
+  }
+  ~FormEnvironment() {
+    if (handle) {
+      FORM_OnBeforeClosePage(info.page, handle);
+      FPDFDOC_ExitFormFillEnvironment(handle);
+    }
+  }
 };
 struct TextPage {
   FPDF_TEXTPAGE value;
@@ -148,6 +193,7 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
   if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
       width > 1000000 || height > 1000000)
     throw std::runtime_error("Unsupported page dimensions");
+  FormEnvironment forms(document.value, page.value, index);
   const double scale = ocr ? edge / std::max(width, height) : std::min(2.0, edge / std::max(width, height));
   const int w = std::clamp(static_cast<int>(std::ceil(width * scale)), 1, edge);
   const int h = std::clamp(static_cast<int>(std::ceil(height * scale)), 1, edge);
@@ -158,6 +204,7 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
     throw std::runtime_error("Cannot allocate PDF bitmap");
   // Intrinsic crop/rotation follows PDFium; no extra rotation and no form callbacks.
   FPDF_RenderPageBitmap(bitmap.value, page.value, 0, 0, w, h, 0, FPDF_ANNOT);
+  FPDF_FFLDraw(forms.handle, bitmap.value, page.value, 0, 0, w, h, 0, FPDF_ANNOT);
   std::vector<unsigned char> row(static_cast<std::size_t>(w) * 3);
   std::cout << "P6\n" << w << ' ' << h << "\n255\n";
   for (int y = 0; y < h; ++y) {

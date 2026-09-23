@@ -237,3 +237,29 @@ Windows run [35824522369](https://github.com/goamaan/fileform/actions/runs/35824
 passed at abb6d00, including image OCR through the engine, Unicode image/pack/output
 paths, EXIF handling, transparency and model-tamper checks. PDF fallback is newer
 and awaits its own Windows result.
+
+## Static form/annotation rendering and empty-result retry
+
+The PDF helper now draws static AcroForm widget appearances after normal page
+annotations, using PDFium's form-rendering API. Required host callbacks cannot
+execute actions, navigate, schedule timers or provide JavaScript. Tests include
+explicit appearance streams and a text widget whose appearance is generated from
+its stored value, with a document OpenAction that must remain inert. Hidden and
+NoView appearances remain excluded even when marked printable. Crop-origin and
+all right-angle rotation fixtures pass locally.
+
+A colored-field fixture rendered correctly but default OCR thresholding found no
+text. Tesseract's adaptive local Sauvola method recovered both visible labels. The
+OCR session now retries that method only after an empty normal result, sharing
+the same total timeout across both attempts. Ordinary successful recognition is
+unchanged. Blank/transparent image regressions still save nothing.
+
+The blanket annotation/AcroForm OCR rejection is removed after these native tests;
+XFA and encrypted cases remain rejected. Mac whole-document tests recover visible
+field/free-text labels while excluding hidden values and script-modified values.
+This establishes the tested static appearances, not every form type or interactive
+behavior. Automatic language handling and broader accuracy coverage remain open.
+
+Windows run [35826134162](https://github.com/goamaan/fileform/actions/runs/35826134162)
+passed at 61c4e9e, validating the preceding mixed scanned/embedded PDF OCR fallback.
+The new form rendering and adaptive retry require a new Windows result.

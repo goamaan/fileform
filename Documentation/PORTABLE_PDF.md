@@ -422,3 +422,14 @@ Standalone image OCR and embedded-only extraction remain regression requirements
 The Windows PDF workflow now builds the pinned OCR dependency and runs the same
 integrated fixture. Automatic language detection, annotations/forms and broader
 scan-quality coverage remain parity gates; see [OCR_RESEARCH.md](OCR_RESEARCH.md).
+
+### Static annotation/widget appearances
+
+Static AcroForm text widgets and normal annotations now render together, including
+missing widget appearances generated from stored values. The helper has no action,
+timer, navigation or JavaScript services. Native fixtures verify Hidden/NoView
+exclusion, printable-but-hidden cases, nonzero crop origins, all right-angle
+rotations, rewrite stability and unchanged sources. Explicit-English OCR can now
+read these rendered appearances; an empty initial OCR result gets one adaptive
+threshold retry within the same deadline. XFA/encryption remain unsupported for
+OCR, and wider form/recognition coverage is still required.

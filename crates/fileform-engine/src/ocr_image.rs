@@ -9,7 +9,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::Command,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug, Deserialize)]
@@ -232,42 +232,46 @@ impl OcrSession {
         cancel: &Cancellation,
         timeout: Duration,
     ) -> Result<Option<String>> {
-        let mut command = Command::new(&self.executable);
-        command.env_clear();
-        #[cfg(windows)]
-        if let Some(system) = std::env::var_os("SystemRoot") {
-            command.env("SystemRoot", system);
+        let deadline = Instant::now() + timeout.min(Duration::from_secs(60));
+        for adaptive in [false, true] {
+            let mut command = Command::new(&self.executable);
+            command.env_clear();
+            #[cfg(windows)]
+            if let Some(system) = std::env::var_os("SystemRoot") {
+                command.env("SystemRoot", system);
+            }
+            // Only owned ASCII relative filenames reach the native parser. Model copies
+            // are rehashed; arbitrary image formats, config files and user paths do not.
+            command.current_dir(self.working.path()).args([
+                "input.ppm",
+                "stdout",
+                "--tessdata-dir",
+                "tessdata",
+                "-l",
+                self.language,
+                "--oem",
+                "1",
+                "--psm",
+                "3",
+            ]);
+            if adaptive {
+                command.args(["-c", "thresholding_method=2"]);
+            }
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .filter(|v| !v.is_zero())
+                .ok_or_else(|| fail("limit", "OCR exceeded its time budget."))?;
+            let result = native_process::run(command, cancel, remaining, 4_000_000)?;
+            let text = std::str::from_utf8(&result)
+                .map_err(|_| fail("verification", "OCR returned invalid UTF-8."))?
+                .trim();
+            if text.contains('\0') {
+                return Err(fail("verification", "OCR returned invalid text."));
+            }
+            if !text.is_empty() {
+                return Ok(Some(text.to_owned()));
+            }
         }
-        // Only owned ASCII relative filenames reach the native parser. Model copies
-        // are rehashed; arbitrary image formats, config files and user paths do not.
-        command.current_dir(self.working.path()).args([
-            "input.ppm",
-            "stdout",
-            "--tessdata-dir",
-            "tessdata",
-            "-l",
-            self.language,
-            "--oem",
-            "1",
-            "--psm",
-            "3",
-        ]);
-        let result = native_process::run(
-            command,
-            cancel,
-            timeout.min(Duration::from_secs(60)),
-            4_000_000,
-        )?;
-        let text = std::str::from_utf8(&result)
-            .map_err(|_| fail("verification", "OCR returned invalid UTF-8."))?
-            .trim();
-        if text.contains('\0') {
-            return Err(fail("verification", "OCR returned invalid text."));
-        }
-        Ok(if text.is_empty() {
-            None
-        } else {
-            Some(text.to_owned())
-        })
+        Ok(None)
     }
 }

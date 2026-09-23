@@ -29,7 +29,7 @@ def digest(name):
     return hashlib.sha256((destination / 'bin' / name).read_bytes()).hexdigest()
 (destination / 'manifest.json').write_text(json.dumps({
     'schemaVersion': 1, 'id': 'app.fileform.pdf-render',
-    'version': 'pdfium-8066-helper-6-evaluation',
+    'version': 'pdfium-8066-helper-7-evaluation',
     'architecture': platform.machine().lower(),
     'executables': {'fileform-pdf-render': digest(helper)},
     'libraries': {library: digest(library)},

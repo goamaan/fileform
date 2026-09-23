@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import zlib
-from pdf_fixtures import fixture
+from pdf_fixtures import fixture, annotation_fixture
 root=Path(__file__).resolve().parents[3]
 pdf,renderer,ocr=[Path(v).resolve() for v in sys.argv[1:]]
 suffix='.exe' if sys.platform=='win32' else ''
@@ -55,8 +55,18 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-ocr-') as folder:
     rejected=base/'rejected.txt'
     result=run(cli,'export-pdf-text',single,rejected,pdf,renderer,'--ocr',ocr,'eng')
     assert result.returncode!=0 and b'no_text' in result.stderr and not rejected.exists()
-    annotated=base/'annotated.pdf';fixture(annotated,annotated=True)
+    for generated in [False,True]:
+        form=base/f'form-{generated}.pdf';annotation_fixture(form,generated_widget=generated)
+        saved=form.read_bytes()
+        form_text=base/f'form-{generated}.txt'
+        result=run(cli,'export-pdf-text',form,form_text,pdf,renderer,'--ocr',ocr,'eng')
+        assert result.returncode==0,result.stderr
+        text=form_text.read_bytes()
+        assert text==b'Visible form\n\nVisible note\n',text
+        assert b'Hidden' not in text and b'CHANGED' not in text
+        assert form.read_bytes()==saved
+    annotated=base/'xfa.pdf';annotation_fixture(annotated,xfa=True)
     result=run(cli,'export-pdf-text',annotated,rejected,pdf,renderer,'--ocr',ocr,'eng')
     assert result.returncode!=0 and b'unsupported' in result.stderr and not rejected.exists()
     assert mixed.read_bytes()==original
-print('PDF OCR: mixed embedded/scanned/blank pages, 4096-edge rendering, per-page provenance, CLI/worker parity, blank/annotation/collision rejection and unchanged source passed')
+print('PDF OCR: mixed embedded/scanned/blank pages, 4096-edge rendering, per-page provenance, CLI/worker parity, static form/annotation OCR, hidden-value exclusion, blank/XFA/collision rejection and unchanged source passed')

@@ -19,7 +19,8 @@ Output is white-backed RGB, at most 2048²×3 bytes plus a short PPM header.
 The default uses PDFium's effective crop and intrinsic rotation. `media` expands
 the in-memory crop to MediaBox before rendering, without saving the document.
 Graph and geometry evidence must remain independent of bitmap comparisons. Noninteractive annotations are included;
-widgets/popups, forms and XFA do not have appearance parity. No document actions
+static AcroForm widgets are drawn through the form-rendering API. Interactive
+behavior, transient popups and XFA are not implemented. No document actions
 or form callbacks are invoked. Per-page text extraction is described below.
 
 The helper reads a private snapshot into memory. The engine now supervises a
@@ -81,3 +82,12 @@ OCR preparation policy. It accepts the same resolved box/rotation arguments.
 Allocation stays at most 4096² BGRA pixels and output at most 4096² RGB bytes plus
 framing. Numeric preview/preservation modes retain their 2048-edge and two-pixels-
 per-unit caps. The engine validates the complete raster before handing it to OCR.
+
+Static form rendering uses a version-1 FormFill environment with required
+callbacks implemented as no-ops except lookup of the one already loaded page.
+There is no JavaScript platform, timer service, navigation or event dispatch.
+Page/form handles are closed in order; the callback storage lives until the form
+environment is destroyed. `FPDF_FFLDraw` follows ordinary page rendering so
+widget appearances share the same crop/rotation. Non-V8/non-XFA builds remain
+mandatory. Tests cover explicit/generated text-widget appearances, free text,
+Hidden/NoView screen exclusion, crop origins, rotations and an inert OpenAction.
