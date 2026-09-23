@@ -2,7 +2,7 @@
 use crate::{
     digest, fail, native_pack, native_process, png_pipeline, Cancellation, Result, Source,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::BufReader,
@@ -10,6 +10,22 @@ use std::{
     process::Command,
     time::Duration,
 };
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PdfRenderBox {
+    #[default]
+    Crop,
+    Media,
+}
+impl PdfRenderBox {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Crop => "crop",
+            Self::Media => "media",
+        }
+    }
+}
 
 #[derive(Debug, Serialize)]
 pub struct RenderReceipt {
@@ -20,6 +36,7 @@ pub struct RenderReceipt {
     pub width: u32,
     pub height: u32,
     pub page_index: u32,
+    pub page_box: PdfRenderBox,
     pub renderer_version: String,
 }
 
@@ -69,6 +86,7 @@ pub fn render(
     directory: &Path,
     page: u32,
     maximum: u32,
+    page_box: PdfRenderBox,
     cancel: &Cancellation,
 ) -> Result<RenderReceipt> {
     if page >= 1000
@@ -116,7 +134,8 @@ pub fn render(
         .current_dir(working.path())
         .arg(source.snapshot.path())
         .arg(page.to_string())
-        .arg(maximum.to_string());
+        .arg(maximum.to_string())
+        .arg(page_box.argument());
     let bytes = native_process::run(
         command,
         cancel,
@@ -179,6 +198,7 @@ pub fn render(
         width,
         height,
         page_index: page,
+        page_box,
         renderer_version: pack.version,
     })
 }

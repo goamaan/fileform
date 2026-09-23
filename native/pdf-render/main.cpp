@@ -2,6 +2,7 @@
 // One document/page per process. The Rust supervisor must enforce time/resource
 // limits. This adapter is not a sandbox and does not establish PDF validity.
 #include <fpdfview.h>
+#include <fpdf_transformpage.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -48,7 +49,7 @@ struct Bitmap {
   FPDF_BITMAP value;
   ~Bitmap() { if (value) FPDFBitmap_Destroy(value); }
 };
-int render(const std::filesystem::path& input, int index, int edge) {
+int render(const std::filesystem::path& input, int index, int edge, bool media) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
   std::ifstream source(input, std::ios::binary | std::ios::ate);
@@ -67,6 +68,15 @@ int render(const std::filesystem::path& input, int index, int edge) {
     throw std::runtime_error("Page count or index outside limits");
   Page page{FPDF_LoadPage(document.value, index)};
   if (!page.value) throw std::runtime_error("Cannot load PDF page");
+  if (media) {
+    float left = 0, bottom = 0, right = 0, top = 0;
+    if (!FPDFPage_GetMediaBox(page.value, &left, &bottom, &right, &top) ||
+        !std::isfinite(left) || !std::isfinite(bottom) ||
+        !std::isfinite(right) || !std::isfinite(top) || right <= left || top <= bottom)
+      throw std::runtime_error("Cannot resolve PDF media box");
+    // In-memory viewport only; no document is saved or modified on disk.
+    FPDFPage_SetCropBox(page.value, left, bottom, right, top);
+  }
   const double width = FPDF_GetPageWidthF(page.value);
   const double height = FPDF_GetPageHeightF(page.value);
   if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
@@ -107,10 +117,12 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX MAX_EDGE");
+    if (argc != 4 && argc != 5) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX MAX_EDGE [crop|media]");
+    const auto box = argc == 5 ? std::filesystem::path(argv[4]).string() : "crop";
+    if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  number(std::filesystem::path(argv[3]).string(), 1, 2048));
+                  number(std::filesystem::path(argv[3]).string(), 1, 2048), box == "media");
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

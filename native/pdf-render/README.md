@@ -11,12 +11,14 @@ architecture. The build copies the library alongside the helper and adjusts the
 Mac executable's library reference. Distribution signing is not performed here.
 Retain the archive's LICENSE and complete licenses directory when redistributing.
 
-`fileform-pdf-render SNAPSHOT PAGE_INDEX MAX_EDGE` writes one binary P6 PPM image
+`fileform-pdf-render SNAPSHOT PAGE_INDEX MAX_EDGE [crop|media]` writes one binary P6 PPM image
 to stdout. Page indexes are zero-based; maximum edge is 1–2048 pixels, with a
-second cap of 2 pixels per point. Input is bounded to 512 MiB and 1000 pages.
+second cap of 2 pixels per PDF default coordinate unit. PDFium ignores UserUnit
+for this sizing; the output is a bounded preview, not a physical-DPI export. Input is bounded to 512 MiB and 1000 pages.
 Output is white-backed RGB, at most 2048²×3 bytes plus a short PPM header.
-PDFium supplies effective crop and intrinsic rotation; this is not the Swift
-reference's MediaBox fingerprint. Noninteractive annotations are included;
+The default uses PDFium's effective crop and intrinsic rotation. `media` expands
+the in-memory crop to MediaBox before rendering, without saving the document.
+Graph and geometry evidence must remain independent of bitmap comparisons. Noninteractive annotations are included;
 widgets/popups, forms and XFA do not have appearance parity. No document actions
 or form callbacks are invoked. Text extraction is not implemented.
 
@@ -27,7 +29,7 @@ redecodes the staged PNG before a no-clobber save. Global concurrency limits and
 full process containment remain required before desktop exposure.
 Input-size and bitmap caps do not bound PDFium's internal allocations. Full OS
 containment, process-tree cleanup, immutable snapshot/pack integration, source
-provenance, UserUnit/font/color coverage and signed packaging are pending. The
+provenance, physical-size/font/color coverage and signed packaging are pending. The
 standalone helper is not a safe general-purpose document viewer or a sandbox.
 
 Run `crates/fileform-engine/tests/smoke-pdf-render.py HELPER QPDF` for generated
@@ -40,5 +42,6 @@ copies the helper/library and upstream notices, then hashes both into a local
 manifest. It does not authenticate inputs or produce a signed release. After
 staging, `fileform-native render-pdf-page INPUT OUTPUT.png PACK PAGE_INDEX` renders
 a 512-pixel preview; the `render_pdf_page` worker request accepts `max_dimension`
-from 1 to 2048. The PNG is an explicit caller-owned output. No automatic app cache
+from 1 to 2048 and `page_box` as `crop` (default) or `media`. Use the CLI
+`--media-box` option for the full page, including content outside CropBox. The PNG is an explicit caller-owned output. No automatic app cache
 or preview lifetime policy is implemented yet.

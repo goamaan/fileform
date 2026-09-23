@@ -182,3 +182,21 @@ Windows run 35818479062 verified the archive and attestation but failed compilin
 the helper because Windows headers define min/max macros. The target now defines
 NOMINMAX; a new CI run must verify the fix and full engine path. No Windows runtime
 success is claimed from the failed run.
+
+### MediaBox and richer rendering fixtures
+
+The helper, CLI and worker now select cropped preview or full MediaBox rendering.
+`--media-box` (worker `page_box: "media"`) expands only the in-memory viewport;
+original files remain unchanged. A generated negative-origin fixture proves why
+this matters: changing a shape outside CropBox leaves preview pixels unchanged,
+but changes the MediaBox render. This enables broader preservation checks without
+claiming the checks are already integrated into PDF transformations.
+
+Mac native tests also cover embedded RGB image pixels, half-opacity vector
+blending, all four right-angle rotations and qpdf rewrite equality for both box
+modes. Engine/CLI/worker PNG parity includes the full-page option. PDFium 8066
+ignores UserUnit for raster dimensions: fixtures with values 1 and 2 have identical
+pixels. Raster scale is therefore capped per default coordinate unit, not physical
+points; independent qpdf geometry/UserUnit checks are mandatory for preservation.
+Color profiles, masks, complex fonts, form appearances and exact text verification
+remain incomplete. Windows CI runs the same expanded fixtures after this commit.

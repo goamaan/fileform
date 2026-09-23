@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pdf_fixtures import fixture
+from pdf_fixtures import fixture, visual_fixture
 
 root = Path(__file__).resolve().parents[3]
 pack = Path(sys.argv[1]).resolve()
@@ -41,6 +41,18 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-engine-') as folder:
     worker_receipt = json.loads(result.stdout)['result']
     assert worker_receipt['sha256'] == receipt['sha256']
     assert worker_output.read_bytes() == saved
+    visual = base / 'geometry.pdf'
+    visual_fixture(visual)
+    media_output = base / 'media.png'
+    media = run(cli, 'render-pdf-page', visual, media_output, pack, 0, '--media-box')
+    assert media.returncode == 0, media.stderr
+    media_receipt = json.loads(media.stdout)
+    assert (media_receipt['width'], media_receipt['height'], media_receipt['page_box']) == (160, 200, 'media')
+    assert receipt['page_box'] == 'crop'
+    request.update(input=str(visual), output=str(base / 'worker-media.png'), page_box='media')
+    result = subprocess.run([str(worker)], input=json.dumps(request)+'\n', text=True,
+                            capture_output=True, timeout=90, check=True)
+    assert json.loads(result.stdout)['result']['sha256'] == media_receipt['sha256']
     for page in [2, 1000]:
         rejected = base / f'rejected-{page}.png'
         assert run(cli, 'render-pdf-page', source, rejected, pack, page).returncode != 0

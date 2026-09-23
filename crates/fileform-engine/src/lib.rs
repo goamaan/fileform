@@ -43,6 +43,7 @@ mod pdf_inspect;
 mod pdf_pages;
 mod pdf_render;
 pub use image_crop::PixelCrop;
+pub use pdf_render::PdfRenderBox;
 mod image_orientation;
 mod image_preview;
 mod jpeg_output;
@@ -106,6 +107,7 @@ pub enum Request {
         output: PathBuf,
         directory: PathBuf,
         page_index: u32,
+        page_box: Option<PdfRenderBox>,
         max_dimension: Option<u32>,
     },
     InspectPdfPages {
@@ -881,6 +883,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         output,
         directory,
         page_index,
+        page_box,
         max_dimension,
     } = &request
     {
@@ -890,6 +893,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             *page_index,
             max_dimension.unwrap_or(512),
+            page_box.unwrap_or_default(),
             cancellation,
         )
         .map(Response::PdfPageRender);
