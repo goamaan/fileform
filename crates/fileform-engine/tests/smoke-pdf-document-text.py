@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='fileform-document-text-') as folder:
     single=base/'single.txt'
     result=run(cli,'export-pdf-text',unicode,single,pdf,renderer)
     assert result.returncode==0,result.stderr
-    assert single.read_text()=='Ω中😀́\n'
+    assert single.read_bytes()=='Ω中😀́\n'.encode('utf-8')
     unicode_fixture(unicode,invalid=True)
     invalid=base/'invalid.txt'
     assert run(cli,'export-pdf-text',unicode,invalid,pdf,renderer).returncode!=0 and not invalid.exists()

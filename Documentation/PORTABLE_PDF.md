@@ -394,3 +394,8 @@ Windows run [35821665428](https://github.com/goamaan/fileform/actions/runs/35821
 passed at a140e5f, including split-folder publication, existing-folder rejection,
 later-group rollback and cancellation after the first staged part. Whole-document
 embedded-text export is newer and awaits its own Windows result.
+
+Windows run 35822052666 passed the native renderer, compression, composition,
+images and split tests but failed the new document-text test because Python used
+Windows CP1252 to read a UTF-8 file. The assertion now checks the exact UTF-8 bytes
+instead of the host default text encoding; a new Windows result is required.
