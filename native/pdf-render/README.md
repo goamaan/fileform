@@ -91,3 +91,12 @@ environment is destroyed. `FPDF_FFLDraw` follows ordinary page rendering so
 widget appearances share the same crop/rotation. Non-V8/non-XFA builds remain
 mandatory. Tests cover explicit/generated text-widget appearances, free text,
 Hidden/NoView screen exclusion, crop origins, rotations and an inert OpenAction.
+
+`raster:WIDTHxHEIGHT` is an internal exact-target mode for the forthcoming DPI
+export pipeline. Each side must be 1–16384 pixels and the product at most
+64 million pixels; invalid requests fail before document loading. It accepts
+resolved `crop` or `media` coordinates and optional absolute quarter-turns. The
+caller must derive targets from validated geometry/DPI/UserUnit. The helper does
+not clamp exact targets to preview size. Output can approach 192 MB, so production
+export must use bounded file-backed transport rather than renderer IPC. This mode
+alone does not encode image files or establish full raster-export parity.

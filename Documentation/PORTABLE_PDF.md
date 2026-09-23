@@ -433,3 +433,23 @@ rotations, rewrite stability and unchanged sources. Explicit-English OCR can now
 read these rendered appearances; an empty initial OCR result gets one adaptive
 threshold retry within the same deadline. XFA/encryption remain unsupported for
 OCR, and wider form/recognition coverage is still required.
+
+### Explicit-resolution raster preparation
+
+`plan-pdf-raster INPUT PDF_PACK DPI` / worker `plan_pdf_raster` now computes
+read-only page targets for 36–600 DPI from effective crop boxes, native rotation
+and UserUnit. Dimensions round upward; targets above 16384 pixels per side or
+64 million pixels fail instead of reducing resolution. The helper's internal
+`raster:WIDTHxHEIGHT` mode renders exact bounded targets and accepts resolved crop
+coordinates/rotation. Preview and OCR sizing retain their separate policies.
+
+Mac fixtures verify 600-DPI targets beyond the preview cap, inherited geometry,
+UserUnit scaling, native/extra rotation arithmetic, CLI/worker plan equality,
+exact helper output lengths, existing appearance pixels, XFA rejection and
+oversized-target failures. This is preparation, not the complete page-image
+export feature: bounded file-backed raster transport, PNG/JPEG encoding with DPI
+metadata, selected/batch publication and final app integration still remain.
+
+Windows [PDF run 35829743560](https://github.com/goamaan/fileform/actions/runs/35829743560)
+passed at 61f2caa, including static forms, adaptive OCR and normalized line endings.
+It predates this exact-resolution work, which has a new Windows fixture step.

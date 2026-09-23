@@ -151,7 +151,7 @@ int extract_text(FPDF_PAGE page) {
   return 0;
 }
 int render(const std::filesystem::path& input, int index, int edge, bool media,
-           const std::vector<float>& resolved_box, int rotation, bool ocr) {
+           const std::vector<float>& resolved_box, int rotation, bool ocr, int exact_width, int exact_height) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
   std::ifstream source(input, std::ios::binary | std::ios::ate);
@@ -188,6 +188,11 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
     // In-memory viewport only; no document is saved or modified on disk.
     FPDFPage_SetCropBox(page.value, left, bottom, right, top);
   }
+  if (!media && !resolved_box.empty()) {
+    if (resolved_box[2] <= resolved_box[0] || resolved_box[3] <= resolved_box[1])
+      throw std::runtime_error("Invalid resolved crop box");
+    FPDFPage_SetCropBox(page.value, resolved_box[0], resolved_box[1], resolved_box[2], resolved_box[3]);
+  }
   const double width = FPDF_GetPageWidthF(page.value);
   const double height = FPDF_GetPageHeightF(page.value);
   if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
@@ -195,9 +200,11 @@ int render(const std::filesystem::path& input, int index, int edge, bool media,
     throw std::runtime_error("Unsupported page dimensions");
   FormEnvironment forms(document.value, page.value, index);
   const double scale = ocr ? edge / std::max(width, height) : std::min(2.0, edge / std::max(width, height));
-  const int w = std::clamp(static_cast<int>(std::ceil(width * scale)), 1, edge);
-  const int h = std::clamp(static_cast<int>(std::ceil(height * scale)), 1, edge);
-  const int stride = w * 4; // edge <= 4096; all products fit int and size_t.
+  const int w = exact_width > 0 ? exact_width : std::clamp(static_cast<int>(std::ceil(width * scale)), 1, edge);
+  const int h = exact_height > 0 ? exact_height : std::clamp(static_cast<int>(std::ceil(height * scale)), 1, edge);
+  if (w > 16384 || h > 16384 || static_cast<std::uint64_t>(w) * h > 64000000)
+    throw std::runtime_error("Raster exceeds the side or pixel limit");
+  const int stride = w * 4; // Validated dimensions keep products in range.
   std::vector<unsigned char> pixels(static_cast<std::size_t>(stride) * h, 255);
   Bitmap bitmap{FPDFBitmap_CreateEx(w, h, FPDFBitmap_BGRA, pixels.data(), stride)};
   if (!bitmap.value || !FPDFBitmap_FillRect(bitmap.value, 0, 0, w, h, 0xffffffff))
@@ -230,15 +237,25 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4 && argc != 5 && argc != 9 && argc != 10) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|ocr|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP [QUARTER_TURNS]]]}");
+    if (argc != 4 && argc != 5 && argc != 9 && argc != 10) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|ocr|raster:WIDTHxHEIGHT|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP [QUARTER_TURNS]]]}");
     const auto operation = std::filesystem::path(argv[3]).string();
     if (operation == "text" && argc != 4) throw std::runtime_error("Text extraction does not accept a box option");
+    int exact_width = 0, exact_height = 0;
+    const bool exact = operation.rfind("raster:", 0) == 0;
+    if (exact) {
+      const auto separator = operation.find('x', 7);
+      if (separator == std::string::npos) throw std::runtime_error("Expected raster:WIDTHxHEIGHT");
+      exact_width = number(operation.substr(7, separator - 7), 1, 16384);
+      exact_height = number(operation.substr(separator + 1), 1, 16384);
+      if (static_cast<std::uint64_t>(exact_width) * exact_height > 64000000)
+        throw std::runtime_error("Raster exceeds 64 million pixels");
+    }
     const auto box = argc >= 5 ? std::filesystem::path(argv[4]).string() : (operation == "ocr" ? "media" : "crop");
     if (operation == "ocr" && box != "media") throw std::runtime_error("OCR requires the full media box");
     if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
     std::vector<float> resolved_box;
     if (argc >= 9) {
-      if (box != "media") throw std::runtime_error("Resolved coordinates require media mode");
+      if (box != "media" && !exact) throw std::runtime_error("Resolved crop coordinates require exact raster mode");
       for (int i = 5; i < 9; ++i) {
         const auto value = std::filesystem::path(argv[i]).string();
         std::size_t used = 0;
@@ -250,8 +267,8 @@ int main(int argc, char** argv) {
     }
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  operation == "text" ? 0 : (operation == "ocr" ? 4096 : number(operation, 1, 2048)), box == "media", resolved_box,
-                  argc == 10 ? number(std::filesystem::path(argv[9]).string(), 0, 3) : -1, operation == "ocr");
+                  operation == "text" ? 0 : (operation == "ocr" ? 4096 : (exact ? 16384 : number(operation, 1, 2048))), box == "media", resolved_box,
+                  argc == 10 ? number(std::filesystem::path(argv[9]).string(), 0, 3) : -1, operation == "ocr", exact_width, exact_height);
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;
