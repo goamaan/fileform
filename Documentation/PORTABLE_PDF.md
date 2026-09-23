@@ -134,3 +134,11 @@ build, system-DLL audit, native Rust build and real PDF inspection/graph suite.
 The changed drawing stream was detected and the structural rewrite preserved its
 graph. That revision predates special-feature and page-geometry additions; it does
 not prove those newer paths, rendering, output operations or final app packaging.
+
+## Renderer evaluation
+
+See [PDFium research](PDFIUM_RESEARCH.md) for pinned candidate artifacts and
+verified Mac arm64 archive/attestation evidence, and
+[rendering acceptance](PDF_RENDER_ACCEPTANCE.md) for reference-derived checks.
+The generated qpdf smoke fixture now also includes standard-font text alongside
+vector shapes. This is preparation for rendering tests, not rendering parity.
