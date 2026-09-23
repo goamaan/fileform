@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from pdf_fixtures import fixture, visual_fixture
+from pdf_fixtures import fixture, visual_fixture, unicode_fixture
 
 helper = Path(sys.argv[1]).resolve()
 qpdf = Path(sys.argv[2]).resolve()
@@ -23,6 +23,15 @@ def raster(path, page=0, edge=512, box="crop"):
     assert len(data) == width * height * 3
     return width, height, data
 
+def text(path, page=0):
+    result = run(helper, path, page, 'text')
+    assert result.returncode == 0, result.stderr
+    magic, counts, payload = result.stdout.split(b'\n', 2)
+    scalars, length = map(int, counts.split())
+    value = payload.decode('utf-8')
+    assert magic == b'FT1' and len(value) == scalars and len(payload) == length
+    return value
+
 with tempfile.TemporaryDirectory(prefix='fileform-render-') as folder:
     base = Path(folder)
     source = base / 'text and shapes ü.pdf'
@@ -39,12 +48,22 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-') as folder:
     rewrite = run(qpdf, '--object-streams=generate', '--stream-data=compress', source, rewritten)
     assert rewrite.returncode == 0, rewrite.stderr
     assert raster(rewritten) == first
+    assert text(source) == text(rewritten) == 'Fileform page 1'
+    assert text(source, 1) == 'Fileform page 2'
     changed = base / 'changed.pdf'
     changed.write_bytes(source.read_bytes().replace(b'1 0 0 rg', b'0 1 0 rg'))
     assert raster(changed) != first
     plain = base / 'shapes.pdf'
     fixture(plain)
     assert raster(plain) != first  # Text removal is detected.
+    assert text(plain) == ''
+    unicode = base / 'unicode.pdf'
+    unicode_fixture(unicode)
+    assert text(unicode) == 'Ω中😀́'
+    for invalid, supplementary in [(True, b'D83DDE00'), (False, b'D83D'), (False, b'DE00')]:
+        unicode_fixture(unicode, invalid=invalid, supplementary=supplementary)
+        result = run(helper, unicode, 0, 'text')
+        assert result.returncode != 0 and not result.stdout
     inherited = base / 'inherited.pdf'
     fixture(inherited, inherited=True)
     assert raster(inherited)[:2] == (512, 342)  # Crop 200x300, rotation 270.
@@ -91,4 +110,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-') as folder:
     assert encrypted.returncode == 0, encrypted.stderr
     assert run(helper, protected, 0, 512).returncode != 0
     assert hashlib.sha256(source.read_bytes()).hexdigest() == original
-print('PDF renderer: pixels, text presence, rewrite equality, change detection, crop/media bounds, all rotations, embedded image/transparency, UserUnit limitation, bounds, Unicode path, invalid/protected input and source safety passed')
+print('PDF renderer: pixels, Unicode extraction/rejection, text presence, rewrite equality, change detection, crop/media bounds, all rotations, embedded image/transparency, UserUnit limitation, bounds, Unicode path, invalid/protected input and source safety passed')

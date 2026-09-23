@@ -42,6 +42,7 @@ mod pdf_graph;
 mod pdf_inspect;
 mod pdf_pages;
 mod pdf_render;
+mod pdf_text;
 pub use image_crop::PixelCrop;
 pub use pdf_render::PdfRenderBox;
 mod image_orientation;
@@ -102,6 +103,12 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ExtractPdfText {
+        input: PathBuf,
+        output: PathBuf,
+        directory: PathBuf,
+        page_index: u32,
+    },
     RenderPdfPage {
         input: PathBuf,
         output: PathBuf,
@@ -293,6 +300,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfText(pdf_text::TextReceipt),
     PdfPageRender(pdf_render::RenderReceipt),
     PdfPages(pdf_pages::PageInspection),
     PdfGraphInspection(pdf_graph::GraphInspection),
@@ -878,6 +886,16 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::ExtractPdfText {
+        input,
+        output,
+        directory,
+        page_index,
+    } = &request
+    {
+        return pdf_text::extract(input, output, directory, *page_index, cancellation)
+            .map(Response::PdfText);
+    }
     if let Request::RenderPdfPage {
         input,
         output,
@@ -1178,7 +1196,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::RenderPdfPage { .. }
+        Request::ExtractPdfText { .. }
+        | Request::RenderPdfPage { .. }
         | Request::InspectPdfPages { .. }
         | Request::InspectPdfGraph { .. }
         | Request::VerifyPdfPack { .. }
@@ -1210,7 +1229,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::RenderPdfPage { .. }
+        Request::ExtractPdfText { .. }
+        | Request::RenderPdfPage { .. }
         | Request::InspectPdfPages { .. }
         | Request::InspectPdfGraph { .. }
         | Request::VerifyPdfPack { .. }

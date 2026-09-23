@@ -20,7 +20,7 @@ The default uses PDFium's effective crop and intrinsic rotation. `media` expands
 the in-memory crop to MediaBox before rendering, without saving the document.
 Graph and geometry evidence must remain independent of bitmap comparisons. Noninteractive annotations are included;
 widgets/popups, forms and XFA do not have appearance parity. No document actions
-or form callbacks are invoked. Text extraction is not implemented.
+or form callbacks are invoked. Per-page text extraction is described below.
 
 The helper reads a private snapshot into memory. The engine now supervises a
 direct child with a 60-second timeout, cancellation and bounded output; it checks
@@ -45,3 +45,20 @@ a 512-pixel preview; the `render_pdf_page` worker request accepts `max_dimension
 from 1 to 2048 and `page_box` as `crop` (default) or `media`. Use the CLI
 `--media-box` option for the full page, including content outside CropBox. The PNG is an explicit caller-owned output. No automatic app cache
 or preview lifetime policy is implemented yet.
+
+`fileform-pdf-render SNAPSHOT PAGE_INDEX text` extracts a bounded text stream.
+Its FT1 header declares Unicode scalar and UTF-8 byte counts, followed by the
+exact payload. At most one million PDFium character entries and four million
+UTF-8 bytes are accepted. The adapter joins valid UTF-16 surrogate pairs exposed
+by PDFium, rejects unmapped/invalid scalars and invalid mapping reports, and emits
+no partial result on those failures. It preserves generated whitespace and does
+not normalize Unicode or promise semantic reading order. This is not OCR.
+
+`fileform-native extract-pdf-text INPUT OUTPUT.txt PACK PAGE_INDEX` and worker
+`extract_pdf_text` publish one page's UTF-8 text without a BOM. They validate the
+framing, UTF-8, scalar and byte counts before a synced no-clobber save, with the
+same pack verification, source snapshot and process supervision as rendering.
+A page without text produces an empty file; image-only pages are not OCRed.
+Synthetic ToUnicode fixtures verify Greek/CJK/supplementary/combining mappings,
+not font appearance or full language/layout coverage. Whole-document extraction
+and complex reading-order/font acceptance remain incomplete.

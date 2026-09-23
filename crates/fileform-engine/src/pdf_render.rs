@@ -104,31 +104,8 @@ pub fn render(
     if output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
-    let library = if cfg!(windows) {
-        "pdfium.dll"
-    } else {
-        "libpdfium.dylib"
-    };
-    let pack = native_pack::verify_with_libraries(
-        directory,
-        cancel,
-        "app.fileform.pdf-render",
-        &["fileform-pdf-render"],
-        &[library],
-        false,
-    )?;
+    let (mut command, version) = command(directory, cancel)?;
     let mut source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024)?;
-    let root = directory.canonicalize()?;
-    let mut command = Command::new(root.join(if cfg!(windows) {
-        "bin/fileform-pdf-render.exe"
-    } else {
-        "bin/fileform-pdf-render"
-    }));
-    command.env_clear();
-    #[cfg(windows)]
-    if let Some(system) = std::env::var_os("SystemRoot") {
-        command.env("SystemRoot", system);
-    }
     let working = tempfile::tempdir()?;
     command
         .current_dir(working.path())
@@ -199,8 +176,36 @@ pub fn render(
         height,
         page_index: page,
         page_box,
-        renderer_version: pack.version,
+        renderer_version: version,
     })
+}
+
+pub(crate) fn command(directory: &Path, cancel: &Cancellation) -> Result<(Command, String)> {
+    let library = if cfg!(windows) {
+        "pdfium.dll"
+    } else {
+        "libpdfium.dylib"
+    };
+    let pack = native_pack::verify_with_libraries(
+        directory,
+        cancel,
+        "app.fileform.pdf-render",
+        &["fileform-pdf-render"],
+        &[library],
+        false,
+    )?;
+    let root = directory.canonicalize()?;
+    let mut command = Command::new(root.join(if cfg!(windows) {
+        "bin/fileform-pdf-render.exe"
+    } else {
+        "bin/fileform-pdf-render"
+    }));
+    command.env_clear();
+    #[cfg(windows)]
+    if let Some(system) = std::env::var_os("SystemRoot") {
+        command.env("SystemRoot", system);
+    }
+    Ok((command, pack.version))
 }
 
 #[cfg(test)]

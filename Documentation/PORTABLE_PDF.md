@@ -200,3 +200,30 @@ pixels. Raster scale is therefore capped per default coordinate unit, not physic
 points; independent qpdf geometry/UserUnit checks are mandatory for preservation.
 Color profiles, masks, complex fonts, form appearances and exact text verification
 remain incomplete. Windows CI runs the same expanded fixtures after this commit.
+
+### Bounded page text extraction
+
+The helper/engine/CLI/worker now extract a selected page into UTF-8 TXT through
+`extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX` / `extract_pdf_text`.
+No OCR, language reordering or Unicode normalization is performed. One million
+PDFium character entries and four million bytes are the per-page limits; process
+timeout/cancellation, pack/library hashes, source checks and no-clobber saving
+match the rendering adapter. Invalid Unicode mappings fail without partial files.
+
+A real synthetic ToUnicode fixture revealed that PDFium's GetUnicode returns
+surrogate entries for an emoji. The adapter joins validated adjacent pairs and
+rejects orphan surrogates, zero/unmapped characters and mapping errors. Mac tests
+verify exact Greek/CJK/emoji/combining UTF-8, scalar/byte/hash receipts, CLI/worker
+parity, empty text, collisions, invalid-mapping cleanup, and identical text after
+a qpdf rewrite. These fixtures do not establish CJK font rendering or semantic
+reading-order parity. Whole-document export and complex font/layout tests remain.
+
+Windows run [35818862988](https://github.com/goamaan/fileform/actions/runs/35818862988)
+passed at 6f9e6e0, including the fixed helper build, verified archive/attestation,
+real renderer fixture checks and Rust CLI/worker PNG tests. It predates MediaBox
+and text extraction; newer runs must validate those independently.
+
+Windows run [35819141366](https://github.com/goamaan/fileform/actions/runs/35819141366)
+then passed at 8d47ad7, adding full MediaBox, embedded image/transparency, all
+rotations, UserUnit limitation and full-page CLI/worker PNG checks. Text extraction
+is newly added after that run and still requires its own Windows result.

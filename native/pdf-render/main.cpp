@@ -3,6 +3,7 @@
 // limits. This adapter is not a sandbox and does not establish PDF validity.
 #include <fpdfview.h>
 #include <fpdf_transformpage.h>
+#include <fpdf_text.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -49,6 +50,60 @@ struct Bitmap {
   FPDF_BITMAP value;
   ~Bitmap() { if (value) FPDFBitmap_Destroy(value); }
 };
+struct TextPage {
+  FPDF_TEXTPAGE value;
+  ~TextPage() { if (value) FPDFText_ClosePage(value); }
+};
+void append_utf8(std::string& output, unsigned int value) {
+  if (value == 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff))
+    throw std::runtime_error("PDF text contains an unmapped or invalid Unicode character");
+  if (value <= 0x7f) output.push_back(static_cast<char>(value));
+  else if (value <= 0x7ff) {
+    output.push_back(static_cast<char>(0xc0 | (value >> 6)));
+    output.push_back(static_cast<char>(0x80 | (value & 0x3f)));
+  } else if (value <= 0xffff) {
+    output.push_back(static_cast<char>(0xe0 | (value >> 12)));
+    output.push_back(static_cast<char>(0x80 | ((value >> 6) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | (value & 0x3f)));
+  } else {
+    output.push_back(static_cast<char>(0xf0 | (value >> 18)));
+    output.push_back(static_cast<char>(0x80 | ((value >> 12) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | ((value >> 6) & 0x3f)));
+    output.push_back(static_cast<char>(0x80 | (value & 0x3f)));
+  }
+}
+int extract_text(FPDF_PAGE page) {
+  TextPage text{FPDFText_LoadPage(page)};
+  if (!text.value) throw std::runtime_error("Cannot inspect PDF text");
+  const int count = FPDFText_CountChars(text.value);
+  if (count < 0 || count > 1000000) throw std::runtime_error("PDF text exceeds the character limit");
+  std::string output;
+  output.reserve(static_cast<std::size_t>(count) * 4);
+  int scalars = 0;
+  for (int i = 0; i < count; ++i) {
+    if (FPDFText_HasUnicodeMapError(text.value, i) != 0)
+      throw std::runtime_error("PDF text has an invalid Unicode mapping");
+    unsigned int value = FPDFText_GetUnicode(text.value, i);
+    // Some ToUnicode mappings are exposed as UTF-16 surrogate entries even
+    // though GetUnicode returns an unsigned int. Join only a valid adjacent pair.
+    if (value >= 0xd800 && value <= 0xdbff) {
+      if (++i >= count || FPDFText_HasUnicodeMapError(text.value, i) != 0)
+        throw std::runtime_error("PDF text contains an incomplete Unicode pair");
+      const unsigned int low = FPDFText_GetUnicode(text.value, i);
+      if (low < 0xdc00 || low > 0xdfff)
+        throw std::runtime_error("PDF text contains an invalid Unicode pair");
+      value = 0x10000 + ((value - 0xd800) << 10) + (low - 0xdc00);
+    }
+    append_utf8(output, value);
+    ++scalars;
+  }
+  // Framing lets Rust distinguish valid empty text from missing/truncated output.
+  std::cout << "FT1\n" << scalars << ' ' << output.size() << '\n';
+  std::cout.write(output.data(), static_cast<std::streamsize>(output.size()));
+  std::cout.flush();
+  if (!std::cout) throw std::runtime_error("Cannot write extracted text");
+  return 0;
+}
 int render(const std::filesystem::path& input, int index, int edge, bool media) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
@@ -68,6 +123,7 @@ int render(const std::filesystem::path& input, int index, int edge, bool media) 
     throw std::runtime_error("Page count or index outside limits");
   Page page{FPDF_LoadPage(document.value, index)};
   if (!page.value) throw std::runtime_error("Cannot load PDF page");
+  if (edge == 0) return extract_text(page.value);
   if (media) {
     float left = 0, bottom = 0, right = 0, top = 0;
     if (!FPDFPage_GetMediaBox(page.value, &left, &bottom, &right, &top) ||
@@ -117,12 +173,14 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4 && argc != 5) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX MAX_EDGE [crop|media]");
+    if (argc != 4 && argc != 5) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media]}");
+    const auto operation = std::filesystem::path(argv[3]).string();
+    if (operation == "text" && argc != 4) throw std::runtime_error("Text extraction does not accept a box option");
     const auto box = argc == 5 ? std::filesystem::path(argv[4]).string() : "crop";
     if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  number(std::filesystem::path(argv[3]).string(), 1, 2048), box == "media");
+                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media");
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

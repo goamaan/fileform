@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pdf_fixtures import fixture, visual_fixture
+from pdf_fixtures import fixture, visual_fixture, unicode_fixture
 
 root = Path(__file__).resolve().parents[3]
 pack = Path(sys.argv[1]).resolve()
@@ -57,6 +57,31 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-engine-') as folder:
         rejected = base / f'rejected-{page}.png'
         assert run(cli, 'render-pdf-page', source, rejected, pack, page).returncode != 0
         assert not rejected.exists()
+    unicode = base / 'unicode.pdf'
+    unicode_fixture(unicode)
+    text_output = base / 'text.txt'
+    result = run(cli, 'extract-pdf-text', unicode, text_output, pack, 0)
+    assert result.returncode == 0, result.stderr
+    text_receipt = json.loads(result.stdout)
+    expected_text = 'Ω中😀́'.encode('utf-8')
+    assert text_output.read_bytes() == expected_text
+    assert text_receipt['unicode_scalars'] == 4
+    assert text_receipt['bytes'] == len(expected_text)
+    assert text_receipt['sha256'] == hashlib.sha256(expected_text).hexdigest()
+    assert run(cli, 'extract-pdf-text', unicode, text_output, pack, 0).returncode != 0
+    assert text_output.read_bytes() == expected_text
+    request = {'operation':'extract_pdf_text', 'input':str(unicode), 'output':str(base/'worker.txt'),
+               'directory':str(pack), 'page_index':0}
+    response = subprocess.run([str(worker)],input=json.dumps(request)+'\n',text=True,capture_output=True,check=True,timeout=90)
+    assert json.loads(response.stdout)['result']['sha256'] == text_receipt['sha256']
+    assert (base/'worker.txt').read_bytes() == expected_text
+    unicode_fixture(unicode, invalid=True)
+    bad_text = base / 'bad-text.txt'
+    assert run(cli, 'extract-pdf-text', unicode, bad_text, pack, 0).returncode != 0
+    assert not bad_text.exists()
+    empty = base / 'empty-text.txt'
+    assert run(cli, 'extract-pdf-text', visual, empty, pack, 0).returncode == 0
+    assert empty.read_bytes() == b''
     bad_pack = base / 'tampered-pack'
     shutil.copytree(pack, bad_pack)
     library = bad_pack / 'bin' / ('pdfium.dll' if sys.platform == 'win32' else 'libpdfium.dylib')
@@ -67,4 +92,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-render-engine-') as folder:
     assert result.returncode != 0 and not rejected.exists()
     assert b'engine_unavailable' in result.stderr
     assert source.read_bytes() == original
-print('PDF engine render: CLI/worker PNG parity, dimensions/hashes, no-clobber, invalid-page cleanup, library tamper rejection and unchanged input passed')
+print('PDF engine render: CLI/worker PNG and Unicode text parity, dimensions/hashes, no-clobber, invalid-page cleanup, library tamper rejection and unchanged input passed')

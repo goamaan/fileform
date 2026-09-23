@@ -38,3 +38,21 @@ def visual_fixture(path, rotation=0, user_unit=1):
         b'<< /Type /ExtGState /ca 0.5 /CA 0.5 >>',
     ]
     write_pdf(path, objects)
+
+
+def unicode_fixture(path, invalid=False, supplementary=b"D83DDE00"):
+    """Synthetic ToUnicode mappings; glyph shape/font coverage is not asserted."""
+    cmap = b'/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Fileform) /Ordering (Test) /Supplement 0 >> def\n/CMapName /FileformTest def\n/CMapType 2 def\n1 begincodespacerange\n<00> <FF>\nendcodespacerange\n4 beginbfchar\n<41> <03A9>\n<42> <4E2D>\n<43> <D83DDE00>\n<44> <0301>\nendbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n'
+    cmap = cmap.replace(b"D83DDE00", supplementary)
+    if invalid:
+        cmap = cmap.replace(b'<03A9>', b'<0000>')
+    content = b'BT /F1 12 Tf 20 100 Td (ABCD) Tj ET\n'
+    objects = [
+        b'<< /Type /Catalog /Pages 2 0 R >>',
+        b'<< /Type /Pages /Count 1 /Kids [3 0 R] >>',
+        b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+        f'<< /Length {len(content)} >>\nstream\n'.encode()+content+b'endstream',
+        b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /ToUnicode 6 0 R >>',
+        f'<< /Length {len(cmap)} >>\nstream\n'.encode()+cmap+b'endstream',
+    ]
+    write_pdf(path, objects)
