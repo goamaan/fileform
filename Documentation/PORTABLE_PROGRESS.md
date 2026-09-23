@@ -832,3 +832,15 @@ The new Windows PDF workflow builds the Rust tools and runs the real inspection
 smoke suite. Shell syntax, workflow YAML and existing CI routing checks pass.
 Actual compilation/runtime proof awaits the launched workflow; no Windows PDF
 acceptance or signed-download claim is made yet.
+
+### September 22 — PDF graph preservation evidence and Windows zlib fix
+
+Added bounded reachable-object fingerprinting with exact decimal numbers, scoped
+serialization normalization, reference-cycle handling and required stream data.
+Real qpdf rewrites preserve the digest; changed drawing content does not. Graph
+unit/rejection cases, CLI/worker PDF smoke, table/media regression checks, Clippy,
+release build and Windows target checking pass.
+
+Windows qpdf run 35815982405 compiled but the DLL audit rejected zlib1.dll. Corrected
+the recipe to use qpdf's own static-zlib CMake variable names; the guard was not
+weakened. PDF output operations and independent rendering remain pending.

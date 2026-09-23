@@ -14,13 +14,15 @@ worker=root/'target/release'/('fileform-worker'+suffix)
 qpdf=pack/'bin'/('qpdf'+suffix)
 def run(*args):return subprocess.run([str(x) for x in args],capture_output=True,check=True,timeout=120)
 def fixture(path):
-    objects=[b'<< /Type /Catalog /Pages 2 0 R >>',b'<< /Type /Pages /Count 2 /Kids [3 0 R 4 0 R] >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Resources << >> >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> >>']
+    objects=[b'<< /Type /Catalog /Pages 2 0 R >>',b'<< /Type /Pages /Count 2 /Kids [3 0 R 4 0 R] >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Resources << >> /Contents 5 0 R >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 6 0 R >>']
+    for content in [b'q 1 0 0 rg 10 10 50 50 re f Q\n',b'q 0 0 1 rg 20 20 40 40 re f Q\n']:
+        objects.append(f'<< /Length {len(content)} >>\nstream\n'.encode()+content+b'endstream')
     data=bytearray(b'%PDF-1.7\n');offsets=[0]
     for index,obj in enumerate(objects,1):
         offsets.append(len(data));data.extend(str(index).encode()+b' 0 obj\n'+obj+b'\nendobj\n')
-    xref=len(data);data.extend(b'xref\n0 5\n0000000000 65535 f \n')
+    xref=len(data);data.extend(f'xref\n0 {len(objects)+1}\n0000000000 65535 f \n'.encode())
     for offset in offsets[1:]:data.extend(f'{offset:010} 00000 n \n'.encode())
-    data.extend(f'trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode());path.write_bytes(data)
+    data.extend(f'trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode());path.write_bytes(data)
 with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
     base=Path(folder);source=base/'two-pages.pdf';fixture(source)
     expected=hashlib.sha256(source.read_bytes()).hexdigest()
@@ -29,6 +31,15 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
     assert result['pages']==2 and result['qpdf_check_passed'] and result['sha256']==expected
     response=subprocess.run([str(worker)],input=json.dumps({'operation':'inspect_pdf','input':str(source),'directory':str(pack)})+'\n',text=True,capture_output=True,check=True,timeout=120)
     assert json.loads(response.stdout)['result']==result
+    graph=json.loads(run(cli,'inspect-pdf-graph',source,pack).stdout)
+    worker_graph=subprocess.run([str(worker)],input=json.dumps({'operation':'inspect_pdf_graph','input':str(source),'directory':str(pack)})+'\n',text=True,capture_output=True,check=True,timeout=120)
+    assert json.loads(worker_graph.stdout)['result']==graph
+    rewritten=base/'rewritten.pdf'
+    run(qpdf,'--object-streams=generate','--compress-streams=y','--recompress-flate',source,rewritten)
+    after=json.loads(run(cli,'inspect-pdf-graph',rewritten,pack).stdout)
+    assert graph['graph_sha256']==after['graph_sha256']
+    changed=base/'changed.pdf';changed.write_bytes(source.read_bytes().replace(b'1 0 0 rg',b'0 1 0 rg'))
+    assert json.loads(run(cli,'inspect-pdf-graph',changed,pack).stdout)['graph_sha256']!=graph['graph_sha256']
     damaged=base/'damaged.pdf';damaged.write_bytes(b'%PDF-1.7\ninvalid')
     protected=base/'protected.pdf'
     run(qpdf,'--encrypt','fixture-user','fixture-owner','256','--',source,protected)
@@ -36,4 +47,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
         response=subprocess.run([str(cli),'inspect-pdf',str(path),str(pack)],capture_output=True,timeout=120)
         assert response.returncode!=0
     assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
-    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True}))
+    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True,'rewriteGraphPreserved':True,'changedContentDetected':True}))

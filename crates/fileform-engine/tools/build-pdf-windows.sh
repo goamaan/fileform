@@ -30,7 +30,7 @@ cmake -S qpdf-12.4.1 -B qpdf-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DBUILD_DOC=OFF \
     -DUSE_IMPLICIT_CRYPTO=OFF -DREQUIRE_CRYPTO_NATIVE=ON -DDEFAULT_CRYPTO=native \
     -DPKG_CONFIG_EXECUTABLE=/usr/bin/false -U 'pc_*' \
-    -DZLIB_LIBRARY=/ucrt64/lib/libz.a -DZLIB_INCLUDE_DIR=/ucrt64/include \
+    -DZLIB_LIB_PATH=/ucrt64/lib/libz.a -DZLIB_H_PATH=/ucrt64/include \
     -DLIBJPEG_H_PATH="$FILEFORM_PDF_WORK/jpeg-include" \
     -DLIBJPEG_LIB_PATH="$FILEFORM_PDF_WORK/jpeg-build/libjpeg.a" > qpdf-configure.log 2>&1 || { tail -n 60 qpdf-configure.log >&2; exit 1; }
 cmake --build qpdf-build --target qpdf --parallel "${FILEFORM_BUILD_JOBS:-2}" > qpdf-build.log 2>&1 || { tail -n 60 qpdf-build.log >&2; exit 1; }

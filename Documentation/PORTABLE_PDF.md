@@ -60,3 +60,32 @@ runtime verification are pending the first execution; local shell/YAML checks
 alone do not prove Windows PDF support. Toolchain packages are recorded, not yet
 frozen into a bit-for-bit reproducible snapshot. Retained CI artifacts are unsigned
 and expire after 14 days; final public distribution/signing remain separate gates.
+
+## Reachable-object graph evidence
+
+`fileform-native inspect-pdf-graph FILE PACK_DIRECTORY` and worker
+`inspect_pdf_graph` hash qpdf's generalized-decoded reachable document graph.
+Indirect objects are assigned traversal identities, so object renumbering and
+cycles are handled without relying on physical object numbers. Stream payloads
+must be present. Only stream Length and scoped trailer/xref serialization fields
+are ignored; ordinary content fields with those names remain significant.
+
+JSON numbers retain arbitrary precision and are normalized as exact decimal
+values, not floating-point approximations. Traversal is bounded to 100,000 objects,
+1,000,000 nodes and depth 128; tool output is capped at 128 MiB with a 120-second
+limit. Source identity/hash is rechecked. This graph evidence is not an independent
+rendering proof or authorization to rewrite signed/encrypted/interactive documents;
+those need the reference eligibility guards and additional preservation checks.
+
+Tests verify renumbering/cycles, stream changes, missing references/data and decimal
+values beyond floating-point precision. A real qpdf object-stream/compression rewrite
+keeps the digest, while a changed drawing stream changes it. CLI/worker receipts
+match; table/media regressions remain passing with exact-number JSON enabled.
+
+## Windows static-zlib correction
+
+The first Windows build (35815982405) compiled successfully but failed the DLL audit
+because it imported zlib1.dll. The pinned qpdf CMake source uses ZLIB_LIB_PATH and
+ZLIB_H_PATH, not the standard FindZLIB variable names used in the initial recipe.
+The recipe now supplies qpdf's actual variables for libz.a. The DLL guard remains
+unchanged; corrected Windows build/runtime acceptance is still pending.

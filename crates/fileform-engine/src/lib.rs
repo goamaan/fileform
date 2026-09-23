@@ -38,6 +38,7 @@ pub use media_video::{VideoEncoding, VideoFit};
 pub use media_video_trim::VideoTrimOptions;
 mod native_pack;
 mod native_process;
+mod pdf_graph;
 mod pdf_inspect;
 pub use image_crop::PixelCrop;
 mod image_orientation;
@@ -98,6 +99,10 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    InspectPdfGraph {
+        input: PathBuf,
+        directory: PathBuf,
+    },
     VerifyPdfPack {
         directory: PathBuf,
     },
@@ -273,6 +278,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfGraphInspection(pdf_graph::GraphInspection),
     PdfPackVerification(pdf_inspect::PdfPackVerification),
     PdfInspection(pdf_inspect::PdfInspection),
     MediaPoster(media_poster::Poster),
@@ -855,6 +861,10 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::InspectPdfGraph { input, directory } = &request {
+        return pdf_graph::inspect(input, directory, cancellation)
+            .map(Response::PdfGraphInspection);
+    }
     if let Request::VerifyPdfPack { directory } = &request {
         return pdf_inspect::verify_pack(directory, cancellation)
             .map(Response::PdfPackVerification);
@@ -1128,7 +1138,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::VerifyPdfPack { .. }
+        Request::InspectPdfGraph { .. }
+        | Request::VerifyPdfPack { .. }
         | Request::InspectPdf { .. }
         | Request::MediaPoster { .. }
         | Request::MediaWaveform { .. }
@@ -1157,7 +1168,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::VerifyPdfPack { .. }
+        Request::InspectPdfGraph { .. }
+        | Request::VerifyPdfPack { .. }
         | Request::InspectPdf { .. }
         | Request::MediaPoster { .. }
         | Request::MediaWaveform { .. }
