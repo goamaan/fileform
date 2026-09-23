@@ -41,6 +41,7 @@ mod native_pack;
 mod native_process;
 mod ocr_image;
 mod ocr_pack;
+mod regular_file;
 pub use ocr_image::OcrLanguage;
 mod pdf_compose;
 mod pdf_split;
@@ -774,7 +775,7 @@ impl Source {
         maximum_bytes: u64,
     ) -> Result<Self> {
         cancellation.check()?;
-        let mut input = File::open(path)?;
+        let mut input = regular_file::open(path)?;
         let metadata = input.metadata()?;
         if !metadata.is_file() {
             return Err(fail("invalid_input", "Choose a regular file."));
@@ -813,7 +814,10 @@ impl Source {
         Ok(source)
     }
     fn check(&mut self, path: &Path) -> Result<()> {
-        let identity = same_file::Handle::from_path(path)?;
+        self.cancellation.check()?;
+        let current = regular_file::open(path)
+            .map_err(|_| fail("source_changed", "The source changed. Add the file again."))?;
+        let identity = same_file::Handle::from_file(current)?;
         if self.identity != identity
             || digest(&mut self.input, &self.cancellation, self.maximum_bytes)?.1 != self.hash
         {
@@ -1921,6 +1925,46 @@ mod tests {
         let mut source = Source::open_with_limit(&input, Cancellation::default(), 8).unwrap();
         std::fs::write(&input, b"123456789").unwrap();
         assert_eq!(source.check(&input).unwrap_err().code, "limit");
+    }
+    #[test]
+    #[cfg(unix)]
+    #[ignore = "subprocess fixture; invoked by source_recheck_rejects_a_fifo_without_hanging"]
+    fn fifo_source_recheck_fixture() {
+        let root = PathBuf::from(std::env::var_os("FILEFORM_FIFO_TEST_ROOT").unwrap());
+        let input = root.join("source.csv");
+        let original = root.join("original.csv");
+        std::fs::write(&input, b"name\nvalue\n").unwrap();
+        let mut source = Source::open(&input).unwrap();
+        std::fs::rename(&input, &original).unwrap();
+        assert!(std::process::Command::new("/usr/bin/mkfifo")
+            .arg(&input)
+            .status()
+            .unwrap()
+            .success());
+        assert_eq!(source.check(&input).unwrap_err().code, "source_changed");
+        assert_eq!(std::fs::read(&original).unwrap(), b"name\nvalue\n");
+    }
+    #[test]
+    #[cfg(unix)]
+    fn source_recheck_rejects_a_fifo_without_hanging() {
+        let root = tempfile::tempdir().unwrap();
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "tests::fifo_source_recheck_fixture",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("FILEFORM_FIFO_TEST_ROOT", root.path())
+            .env("TMPDIR", root.path());
+        native_process::run(
+            command,
+            &Cancellation::default(),
+            std::time::Duration::from_secs(2),
+            4096,
+        )
+        .unwrap();
     }
     #[test]
     fn snapshot_seeks_are_independent_of_original_and_cancellable() {

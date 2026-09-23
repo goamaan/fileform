@@ -48,13 +48,7 @@ fn contained_file(root: &Path, relative: &str) -> Result<File> {
     if !path.starts_with(root) {
         return Err(invalid());
     }
-    if !std::fs::metadata(&path)?.is_file() {
-        return Err(invalid());
-    }
-    let file = File::open(path).map_err(|_| invalid())?;
-    if !file.metadata()?.is_file() {
-        return Err(invalid());
-    }
+    let file = crate::regular_file::open(&path).map_err(|_| invalid())?;
     Ok(file)
 }
 /// Checks a pack against its manifest. The manifest must itself come from the

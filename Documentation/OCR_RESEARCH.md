@@ -263,3 +263,9 @@ behavior. Automatic language handling and broader accuracy coverage remain open.
 Windows run [35826134162](https://github.com/goamaan/fileform/actions/runs/35826134162)
 passed at 61c4e9e, validating the preceding mixed scanned/embedded PDF OCR fallback.
 The new form rendering and adaptive retry require a new Windows result.
+
+Windows run 35828117780 passed static annotation/widget rendering and the PDF
+regressions, then exposed CRLF inside OCR text mixed with LF page separators.
+The adapter now normalizes OCR line endings to LF while preserving paragraphs
+and Unicode. The cross-platform exact-output assertion remains unchanged; a new
+Windows result must verify the correction.

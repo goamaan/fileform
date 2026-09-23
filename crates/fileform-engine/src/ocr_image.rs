@@ -37,19 +37,7 @@ fn copy_model(
     cancel: &Cancellation,
 ) -> Result<()> {
     let input = directory.join("tessdata/eng.traineddata");
-    if !std::fs::metadata(&input)?.is_file() {
-        return Err(fail(
-            "engine_unavailable",
-            "The OCR model is not a regular file.",
-        ));
-    }
-    let mut input = File::open(input)?;
-    if !input.metadata()?.is_file() {
-        return Err(fail(
-            "engine_unavailable",
-            "The OCR model is not a regular file.",
-        ));
-    }
+    let mut input = crate::regular_file::open(&input)?;
     std::fs::create_dir(working.join("tessdata"))?;
     let mut output = File::create(working.join("tessdata/eng.traineddata"))?;
     let mut hash = Sha256::new();
@@ -269,9 +257,24 @@ impl OcrSession {
                 return Err(fail("verification", "OCR returned invalid text."));
             }
             if !text.is_empty() {
-                return Ok(Some(text.to_owned()));
+                return Ok(Some(normalize_lines(text)));
             }
         }
         Ok(None)
+    }
+}
+
+fn normalize_lines(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ocr_platform_line_endings_preserve_paragraphs_and_unicode() {
+        assert_eq!(
+            super::normalize_lines("Visible form\r\n\r\nVisible note"),
+            "Visible form\n\nVisible note"
+        );
+        assert_eq!(super::normalize_lines("Ω\ré\n中"), "Ω\né\n中");
     }
 }

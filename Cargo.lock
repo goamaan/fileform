@@ -144,6 +144,7 @@ dependencies = [
  "image",
  "moxcms",
  "png",
+ "rustix",
  "same-file",
  "serde",
  "serde_json",

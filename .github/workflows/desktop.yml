@@ -2,9 +2,9 @@ name: Portable desktop preview
 on:
   push:
     branches: [main]
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
   pull_request:
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,6 +45,8 @@ jobs:
         run: python Tools/smoke-images.py
       - name: Verify cooperative cancellation and cleanup
         run: python Tools/smoke-cancellation.py
+      - name: Verify supported source file types
+        run: python Tools/smoke-source-types.py
       - name: Install desktop dependencies
         working-directory: apps/desktop
         run: npm ci

@@ -46,6 +46,7 @@ cases = {
     'Tools/smoke-portable.py': {'desktop'},
     'Tools/smoke-images.py': {'desktop'},
     'Tools/smoke-cancellation.py': {'desktop'},
+    'Tools/smoke-source-types.py': {'desktop'},
     'Tools/check-ci-routing.py': {'ci', 'desktop'},
     'LICENSE': {'ci', 'desktop'},
     'NOTICE': {'ci', 'desktop'},

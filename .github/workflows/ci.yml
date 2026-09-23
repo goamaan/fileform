@@ -2,9 +2,9 @@ name: Core verification
 on:
   push:
     branches: [main]
-    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', '!Tools/smoke-portable.py', '!Tools/smoke-images.py', '!Tools/smoke-cancellation.py', 'LICENSE', 'NOTICE', 'apps/macos/**', '.github/workflows/ci.yml']
+    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', '!Tools/smoke-portable.py', '!Tools/smoke-images.py', '!Tools/smoke-cancellation.py', '!Tools/smoke-source-types.py', 'LICENSE', 'NOTICE', 'apps/macos/**', '.github/workflows/ci.yml']
   pull_request:
-    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', '!Tools/smoke-portable.py', '!Tools/smoke-images.py', '!Tools/smoke-cancellation.py', 'LICENSE', 'NOTICE', 'apps/macos/**', '.github/workflows/ci.yml']
+    paths: ['Sources/**', 'Tests/**', 'Package.*', 'Tools/**', '!Tools/smoke-portable.py', '!Tools/smoke-images.py', '!Tools/smoke-cancellation.py', '!Tools/smoke-source-types.py', 'LICENSE', 'NOTICE', 'apps/macos/**', '.github/workflows/ci.yml']
   workflow_dispatch:
 permissions:
   contents: read

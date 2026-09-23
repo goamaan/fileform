@@ -865,3 +865,21 @@ graph or rendering evidence.
 Windows run 35816815487 at 77f461c passed the corrected static build/DLL audit and
 its PDF inspection/graph tests. Newer feature guards and geometry still need their
 current-revision Windows run. Rendering and PDF transformations remain open.
+
+## Regular-file opening and source rechecks
+
+A real CLI probe confirmed that a FIFO named as a CSV blocked before the previous
+post-open regular-file check. The shared opener now checks metadata first and
+checks the acquired handle again. Unix opens use safe rustix NONBLOCK/CLOEXEC
+flags, preventing a substituted FIFO from blocking the open itself; ordinary
+files and regular-file symlinks remain supported. Explicit Windows device namespaces, including local pipe paths,
+are rejected before opening. Source identity rechecks use this same opener instead
+of an unguarded path reopen. Native-pack files and OCR model copies share the guard.
+
+Mac unit/CLI tests cover ordinary files, directory/FIFO rejection, symlinks and a
+source replaced by a FIFO after snapshotting. That recheck fixture runs in a
+subprocess with a parent-enforced deadline, so regressions fail instead of hanging
+the test suite. The desktop CI matrix now runs the source-type smoke on Mac and
+Windows. This is specific file-type/open hardening, not a claim that network
+filesystem reads or all hostile path races are solved. rustix was already locked
+as a transitive dependency; it is now an explicit, pinned Unix dependency.
