@@ -74,7 +74,7 @@ fn rect(value: &Value, objects: &Map<String, Value>) -> Result<[f64; 4]> {
     }
     Ok(normalized)
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct PageGeometry {
     pub position: u32,
     pub media_box: [f64; 4],

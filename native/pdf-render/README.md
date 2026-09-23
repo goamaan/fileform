@@ -62,3 +62,9 @@ A page without text produces an empty file; image-only pages are not OCRed.
 Synthetic ToUnicode fixtures verify Greek/CJK/supplementary/combining mappings,
 not font appearance or full language/layout coverage. Whole-document extraction
 and complex reading-order/font acceptance remain incomplete.
+
+For internal preservation checks, `media LEFT BOTTOM RIGHT TOP` supplies a
+qpdf-resolved MediaBox, including inherited values the PDFium direct getter can
+miss. Coordinates must be finite with positive dimensions; bitmap bounds still
+apply. This is a temporary in-memory viewport, never a saved document edit.
+Standalone `media` without coordinates still rejects an unresolved inherited box.

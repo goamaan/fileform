@@ -8,6 +8,33 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let request = match args.as_slice() {
+        [command, input, output, directory, renderer, options @ ..]
+            if command == "compress-pdf" =>
+        {
+            let max_bytes = match options {
+                [] => None,
+                [flag, value] if flag == "--max-bytes" => Some(
+                    value
+                        .to_str()
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or_else(|| {
+                            eprintln!("Choose a positive byte limit.");
+                            std::process::exit(2)
+                        }),
+                ),
+                _ => {
+                    eprintln!("Expected --max-bytes BYTES or no compression option.");
+                    std::process::exit(2)
+                }
+            };
+            Request::OptimizePdf {
+                input: input.into(),
+                output: output.into(),
+                directory: directory.into(),
+                renderer_directory: renderer.into(),
+                max_bytes,
+            }
+        }
         [command, input, output, directory, page] if command == "extract-pdf-text" => {
             let page_index = page
                 .to_str()
@@ -332,7 +359,7 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }

@@ -227,3 +227,43 @@ Windows run [35819141366](https://github.com/goamaan/fileform/actions/runs/35819
 then passed at 8d47ad7, adding full MediaBox, embedded image/transparency, all
 rotations, UserUnit limitation and full-page CLI/worker PNG checks. Text extraction
 is newly added after that run and still requires its own Windows result.
+
+### Lossless structural compression
+
+`compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES]` and worker
+`optimize_pdf` now port the original lossless compression policy. qpdf recompresses
+flate streams at level 9 and generates object streams; no image resizing or lossy
+encoding occurs. Every candidate must pass strict qpdf validation, the exact
+canonical reachable-graph digest, ordered geometry, full MediaBox pixel hashes
+and exact extracted text on every page. Signed/encrypted/annotated/form/outline/
+tagged/interactive documents remain explicitly ineligible under the reference
+policy. PDF version may increase to 1.5.
+
+The input is snapshotted and rechecked, candidates are private and size-monitored
+at 512 MiB, and final saves sync without replacing existing files. Compression
+returns `not_smaller` with no output when the candidate is not smaller. An explicit
+byte target instead requires a fully verified candidate within that target, or
+fails without saving; this matches the original fit policy. Each document's
+render/text verification has a ten-minute subprocess budget and each helper call
+is capped at 60 seconds; qpdf phases retain their separate 60/120-second bounds.
+No per-page disk snapshots or preview artifacts are created in the proof loop;
+each helper still loads the document into bounded input memory.
+
+A real inherited-MediaBox fixture exposed that PDFium's direct getter does not
+resolve parent entries. Preservation now supplies the independently resolved qpdf
+MediaBox coordinates to the helper; it sets only an in-memory viewport. Public
+standalone `--media-box` preview still needs a directly accessible MediaBox and
+fails safely when unavailable. Unifying that preview with qpdf geometry remains
+work for the final app pipeline.
+
+Mac smoke coverage passes text, inherited geometry, images/transparency and
+Unicode documents; CLI/worker operation; real size reduction; unchanged-size
+retention; explicit byte targets; collision handling; and annotation/invalid-text
+rejection. Windows CI now runs the same compression suite. Lossy PDF optimization,
+composition, OCR and broader resource/security/performance release gates remain
+open; this increment does not establish full PDF parity.
+
+Windows run [35819512430](https://github.com/goamaan/fileform/actions/runs/35819512430)
+passed at 9952b5c, including the Unicode helper and CLI/worker text fixtures.
+Lossless compression and resolved inherited-box rendering are newer and await
+their own Windows run.

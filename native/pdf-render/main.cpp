@@ -104,7 +104,8 @@ int extract_text(FPDF_PAGE page) {
   if (!std::cout) throw std::runtime_error("Cannot write extracted text");
   return 0;
 }
-int render(const std::filesystem::path& input, int index, int edge, bool media) {
+int render(const std::filesystem::path& input, int index, int edge, bool media,
+           const std::vector<float>& resolved_box) {
   if (!std::filesystem::is_regular_file(input))
     throw std::runtime_error("Input must be a regular file");
   std::ifstream source(input, std::ios::binary | std::ios::ate);
@@ -126,7 +127,14 @@ int render(const std::filesystem::path& input, int index, int edge, bool media) 
   if (edge == 0) return extract_text(page.value);
   if (media) {
     float left = 0, bottom = 0, right = 0, top = 0;
-    if (!FPDFPage_GetMediaBox(page.value, &left, &bottom, &right, &top) ||
+    if (!resolved_box.empty()) {
+      left = resolved_box[0]; bottom = resolved_box[1];
+      right = resolved_box[2]; top = resolved_box[3];
+      FPDFPage_SetMediaBox(page.value, left, bottom, right, top);
+    } else if (!FPDFPage_GetMediaBox(page.value, &left, &bottom, &right, &top)) {
+      throw std::runtime_error("Cannot resolve PDF media box");
+    }
+    if (
         !std::isfinite(left) || !std::isfinite(bottom) ||
         !std::isfinite(right) || !std::isfinite(top) || right <= left || top <= bottom)
       throw std::runtime_error("Cannot resolve PDF media box");
@@ -173,14 +181,26 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
   try {
-    if (argc != 4 && argc != 5) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media]}");
+    if (argc != 4 && argc != 5 && argc != 9) throw std::runtime_error("Usage: fileform-pdf-render SNAPSHOT PAGE_INDEX {text|MAX_EDGE [crop|media [LEFT BOTTOM RIGHT TOP]]}");
     const auto operation = std::filesystem::path(argv[3]).string();
     if (operation == "text" && argc != 4) throw std::runtime_error("Text extraction does not accept a box option");
-    const auto box = argc == 5 ? std::filesystem::path(argv[4]).string() : "crop";
+    const auto box = argc >= 5 ? std::filesystem::path(argv[4]).string() : "crop";
     if (box != "crop" && box != "media") throw std::runtime_error("Choose crop or media box");
+    std::vector<float> resolved_box;
+    if (argc == 9) {
+      if (box != "media") throw std::runtime_error("Resolved coordinates require media mode");
+      for (int i = 5; i < 9; ++i) {
+        const auto value = std::filesystem::path(argv[i]).string();
+        std::size_t used = 0;
+        const auto coordinate = std::stof(value, &used);
+        if (used != value.size() || !std::isfinite(coordinate))
+          throw std::runtime_error("Invalid resolved media box coordinate");
+        resolved_box.push_back(coordinate);
+      }
+    }
     return render(std::filesystem::path(argv[1]),
                   number(std::filesystem::path(argv[2]).string(), 0, 999),
-                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media");
+                  operation == "text" ? 0 : number(operation, 1, 2048), box == "media", resolved_box);
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

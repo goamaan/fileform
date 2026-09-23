@@ -46,7 +46,7 @@ fn invalid() -> crate::Failure {
         "The PDF renderer returned an invalid image.",
     )
 }
-fn raster(bytes: &[u8], maximum: u32) -> Result<(u32, u32, &[u8])> {
+pub(crate) fn raster(bytes: &[u8], maximum: u32) -> Result<(u32, u32, &[u8])> {
     let mut lines = bytes.splitn(4, |b| *b == b'\n');
     if lines.next() != Some(b"P6") {
         return Err(invalid());

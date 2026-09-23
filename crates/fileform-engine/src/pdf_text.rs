@@ -23,7 +23,7 @@ fn invalid() -> crate::Failure {
         "The PDF helper returned invalid or incomplete text.",
     )
 }
-fn decode(bytes: &[u8]) -> Result<&str> {
+pub(crate) fn decode(bytes: &[u8]) -> Result<&str> {
     let mut lines = bytes.splitn(3, |b| *b == b'\n');
     if lines.next() != Some(b"FT1") {
         return Err(invalid());
