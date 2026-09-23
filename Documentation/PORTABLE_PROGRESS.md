@@ -853,3 +853,15 @@ Rust tests, Clippy, release/Windows target checks and PDF smoke. This prevents a
 future graph-only success result from bypassing signed/interactive-document rules.
 Rendering and transformation-specific proof remain open. Corrected Windows qpdf
 run 35816815487 is still actively building its pack.
+
+### September 22 — ordered PDF page geometry and Windows baseline
+
+Added inherited/local box resolution, rotation, UserUnit and effective crop
+inspection with cycle, depth, page/object and response bounds. Real inherited-box,
+local-override and null-default fixtures pass alongside Rust tests, Clippy,
+release/Windows target checks and PDF smoke. Geometry is not substituted for exact
+graph or rendering evidence.
+
+Windows run 35816815487 at 77f461c passed the corrected static build/DLL audit and
+its PDF inspection/graph tests. Newer feature guards and geometry still need their
+current-revision Windows run. Rendering and PDF transformations remain open.

@@ -8,7 +8,7 @@ use std::{
     path::Path,
     time::Duration,
 };
-fn reference(value: &str) -> bool {
+pub(crate) fn reference(value: &str) -> bool {
     let mut parts = value.split(' ');
     let (Some(number), Some(generation), Some("R"), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())

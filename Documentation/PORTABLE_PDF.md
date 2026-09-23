@@ -105,3 +105,32 @@ checks and transformation-specific eligibility remain required. Real annotated
 PDF and unit reachability cases pass; all 83 active Rust tests, Clippy, release
 build, Windows target check and PDF smoke pass locally. The corrected Windows
 pack build is still active; no PDF output operation is declared complete.
+
+## Page geometry and order
+
+`fileform-native inspect-pdf-pages FILE PACK_DIRECTORY` and worker
+`inspect_pdf_pages` report ordered media/crop/bleed/trim/art boxes, effective crop,
+normalized right-angle rotation and page UserUnit. MediaBox/CropBox/Rotate follow
+bounded parent inheritance; bleed/trim/art boxes and UserUnit remain page-local.
+Null entries use PDF defaults/inheritance. Indirect geometry values are resolved
+with cycle/depth checks. Boxes are normalized for inspection; exact preservation
+comparisons still use the graph proof, not rounded display coordinates.
+
+The reader checks page object types/order, at most 1000 pages/100000 objects,
+finite positive geometry, the reference million-unit size bound, valid UserUnit,
+64 MiB tool output and a bounded reply. It snapshots/rechecks the source. This is
+geometry evidence, not a render or completed composition operation.
+
+Real generated PDFs verify mixed page sizes, inherited media/crop/rotation, local
+bleed overrides and null trim defaults. Unit tests reject cyclic ancestry. All 84
+active Rust tests, Clippy, release build, Windows target check and PDF smoke pass
+locally. Windows execution of this new reader is pending the next revision.
+
+## Windows PDF baseline
+
+Run [35816815487](https://github.com/goamaan/fileform/actions/runs/35816815487) at
+`77f461c8bfb428b298971236d56ea59e3aa72e87` passed the corrected static qpdf/JPEG/zlib
+build, system-DLL audit, native Rust build and real PDF inspection/graph suite.
+The changed drawing stream was detected and the structural rewrite preserved its
+graph. That revision predates special-feature and page-geometry additions; it does
+not prove those newer paths, rendering, output operations or final app packaging.

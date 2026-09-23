@@ -40,6 +40,7 @@ mod native_pack;
 mod native_process;
 mod pdf_graph;
 mod pdf_inspect;
+mod pdf_pages;
 pub use image_crop::PixelCrop;
 mod image_orientation;
 mod image_preview;
@@ -99,6 +100,10 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    InspectPdfPages {
+        input: PathBuf,
+        directory: PathBuf,
+    },
     InspectPdfGraph {
         input: PathBuf,
         directory: PathBuf,
@@ -278,6 +283,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfPages(pdf_pages::PageInspection),
     PdfGraphInspection(pdf_graph::GraphInspection),
     PdfPackVerification(pdf_inspect::PdfPackVerification),
     PdfInspection(pdf_inspect::PdfInspection),
@@ -861,6 +867,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::InspectPdfPages { input, directory } = &request {
+        return pdf_pages::inspect(input, directory, cancellation).map(Response::PdfPages);
+    }
     if let Request::InspectPdfGraph { input, directory } = &request {
         return pdf_graph::inspect(input, directory, cancellation)
             .map(Response::PdfGraphInspection);
@@ -1138,7 +1147,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::InspectPdfGraph { .. }
+        Request::InspectPdfPages { .. }
+        | Request::InspectPdfGraph { .. }
         | Request::VerifyPdfPack { .. }
         | Request::InspectPdf { .. }
         | Request::MediaPoster { .. }
@@ -1168,7 +1178,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::InspectPdfGraph { .. }
+        Request::InspectPdfPages { .. }
+        | Request::InspectPdfGraph { .. }
         | Request::VerifyPdfPack { .. }
         | Request::InspectPdf { .. }
         | Request::MediaPoster { .. }

@@ -13,8 +13,12 @@ cli=root/'target/release'/('fileform-native'+suffix)
 worker=root/'target/release'/('fileform-worker'+suffix)
 qpdf=pack/'bin'/('qpdf'+suffix)
 def run(*args):return subprocess.run([str(x) for x in args],capture_output=True,check=True,timeout=120)
-def fixture(path, annotated=False):
+def fixture(path, annotated=False, inherited=False):
     objects=[b'<< /Type /Catalog /Pages 2 0 R >>',b'<< /Type /Pages /Count 2 /Kids [3 0 R 4 0 R] >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Resources << >> /Contents 5 0 R >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << >> /Contents 6 0 R >>']
+    if inherited:
+        objects[1]=objects[1].replace(b' >>',b' /MediaBox [-10 -20 210 320] /CropBox [0 0 200 300] /Rotate -90 >>')
+        objects[2]=objects[2].replace(b'/MediaBox [0 0 200 300] ',b'/BleedBox [1 2 100 200] ')
+        objects[3]=objects[3].replace(b'/MediaBox [0 0 300 200] ',b'/TrimBox null ')
     if annotated: objects[2]=objects[2].replace(b'/Resources',b'/Annots [] /Resources')
     for content in [b'q 1 0 0 rg 10 10 50 50 re f Q\n',b'q 0 0 1 rg 20 20 40 40 re f Q\n']:
         objects.append(f'<< /Length {len(content)} >>\nstream\n'.encode()+content+b'endstream')
@@ -32,6 +36,13 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
     assert result['pages']==2 and result['qpdf_check_passed'] and result['sha256']==expected
     response=subprocess.run([str(worker)],input=json.dumps({'operation':'inspect_pdf','input':str(source),'directory':str(pack)})+'\n',text=True,capture_output=True,check=True,timeout=120)
     assert json.loads(response.stdout)['result']==result
+    geometry=json.loads(run(cli,'inspect-pdf-pages',source,pack).stdout)
+    assert [p['media_box'] for p in geometry['pages']]==[[0,0,200,300],[0,0,300,200]]
+    inherited=base/'inherited.pdf';fixture(inherited,inherited=True)
+    inherited_geometry=json.loads(run(cli,'inspect-pdf-pages',inherited,pack).stdout)
+    assert all(p['rotation']==270 and p['media_box']==[-10,-20,210,320] and p['crop_box']==[0,0,200,300] for p in inherited_geometry['pages'])
+    assert inherited_geometry['pages'][0]['bleed_box']==[1,2,100,200]
+    assert inherited_geometry['pages'][1]['trim_box']==[0,0,200,300]
     graph=json.loads(run(cli,'inspect-pdf-graph',source,pack).stdout)
     worker_graph=subprocess.run([str(worker)],input=json.dumps({'operation':'inspect_pdf_graph','input':str(source),'directory':str(pack)})+'\n',text=True,capture_output=True,check=True,timeout=120)
     assert json.loads(worker_graph.stdout)['result']==graph
@@ -51,4 +62,4 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-') as folder:
         response=subprocess.run([str(cli),'inspect-pdf',str(path),str(pack)],capture_output=True,timeout=120)
         assert response.returncode!=0
     assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
-    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True,'rewriteGraphPreserved':True,'changedContentDetected':True,'specialPreservationKeysDetected':True}))
+    print(json.dumps({'pages':2,'qpdfCheckPassed':True,'workerMatchesCli':True,'malformedRejected':True,'passwordProtectedRejected':True,'sourceUnchanged':True,'rewriteGraphPreserved':True,'changedContentDetected':True,'specialPreservationKeysDetected':True,'pageGeometryAndInheritanceVerified':True}))
