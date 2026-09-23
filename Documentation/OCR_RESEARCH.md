@@ -141,7 +141,7 @@ models. [Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/5.5.
 above with their recorded archive hashes, disables optional Leptonica codecs and
 Tesseract network/archive/graphics/training features, and stages an explicitly
 `evaluationOnly` pack. It retains source archives, all three license notices, model
-hashes and local build logs/commands. No OCR engine adapter consumes this pack yet.
+hashes and local build logs/commands. No OCR execution adapter consumes this pack yet.
 The recipe supports a Windows x64 build route, whose new CI job must still prove it.
 
 A fresh Mac arm64 source build completed and the binary linked only system
@@ -163,6 +163,24 @@ Downloaded model SHA-256 values at the pinned fast-model commit:
 - OSD: `9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff`.
 
 English is the only recognition language currently in this evaluation pack. OSD
-does not close automatic-language parity. Native pack/model verification in Rust,
+does not close automatic-language parity. OCR execution in Rust,
 image/PDF normalization, bounded OCR supervision, cancellation, accuracy coverage,
 multilingual selection, Windows runtime and signing remain implementation gates.
+
+## Native pack verification and Windows build correction
+
+`verify-ocr-pack PACK` and worker `verify_ocr_pack` now verify the executable plus
+English/OSD model hashes, required offline declaration, architecture and pack
+identity. Models are bounded to 64 MiB each and confined to the pack root. The
+receipt explicitly reports English recognition only and no automatic language
+detection. This is manifest integrity, not publisher authentication or OCR
+execution. Unit and real CLI/worker checks reject missing/modified models, outside-
+pack symlinks, cancellation and an enabled-network declaration.
+
+Windows run 35823036206 built Leptonica but failed linking Tesseract because the
+C runtimes differed. Leptonica's CMake 3.10 policy baseline left CMP0091 unset,
+so the modern static-runtime property was ignored. The Windows recipe now supplies
+`CMAKE_POLICY_DEFAULT_CMP0091=NEW` along with the static runtime setting. A fresh
+Windows build is required to verify that correction; no Windows OCR success is
+claimed from the failed run. The workflow also exercises native CLI/worker model
+verification after its controlled recognition baseline.

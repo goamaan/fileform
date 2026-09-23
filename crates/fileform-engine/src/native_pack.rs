@@ -19,6 +19,8 @@ struct Manifest {
     libraries: BTreeMap<String, String>,
     #[serde(default)]
     audio_encoders: Vec<String>,
+    #[serde(default)]
+    assets: BTreeMap<String, String>,
 }
 #[derive(Debug)]
 pub(crate) struct VerifiedPack {
@@ -26,6 +28,7 @@ pub(crate) struct VerifiedPack {
     pub architecture: String,
     pub audio_encoders: Vec<String>,
     pub executables: BTreeMap<String, String>,
+    pub assets: BTreeMap<String, String>,
 }
 fn invalid() -> crate::Failure {
     fail(
@@ -73,6 +76,43 @@ pub(crate) fn verify_with_libraries(
     libraries: &[&str],
     require_offline: bool,
 ) -> Result<VerifiedPack> {
+    verify_contents(
+        directory,
+        cancellation,
+        id,
+        names,
+        libraries,
+        &[],
+        require_offline,
+    )
+}
+pub(crate) fn verify_with_assets(
+    directory: &Path,
+    cancellation: &Cancellation,
+    id: &str,
+    names: &[&str],
+    assets: &[&str],
+    require_offline: bool,
+) -> Result<VerifiedPack> {
+    verify_contents(
+        directory,
+        cancellation,
+        id,
+        names,
+        &[],
+        assets,
+        require_offline,
+    )
+}
+fn verify_contents(
+    directory: &Path,
+    cancellation: &Cancellation,
+    id: &str,
+    names: &[&str],
+    libraries: &[&str],
+    assets: &[&str],
+    require_offline: bool,
+) -> Result<VerifiedPack> {
     cancellation.check()?;
     let root = directory.canonicalize().map_err(|_| invalid())?;
     let manifest_file = contained_file(&root, "manifest.json")?;
@@ -105,12 +145,40 @@ pub(crate) fn verify_with_libraries(
             expected,
             cancellation,
             true,
+            BINARY_LIMIT,
         )?;
         verified.insert(name.into(), actual);
     }
     for &name in libraries {
         let expected = manifest.libraries.get(name).ok_or_else(invalid)?;
-        verify_file(&root, &format!("bin/{name}"), expected, cancellation, false)?;
+        verify_file(
+            &root,
+            &format!("bin/{name}"),
+            expected,
+            cancellation,
+            false,
+            BINARY_LIMIT,
+        )?;
+    }
+    let mut verified_assets = BTreeMap::new();
+    for &relative in assets {
+        if relative.contains([':', '\\'])
+            || !Path::new(relative)
+                .components()
+                .all(|v| matches!(v, std::path::Component::Normal(_)))
+        {
+            return Err(invalid());
+        }
+        let expected = manifest.assets.get(relative).ok_or_else(invalid)?;
+        let actual = verify_file(
+            &root,
+            relative,
+            expected,
+            cancellation,
+            false,
+            64 * 1024 * 1024,
+        )?;
+        verified_assets.insert(relative.to_owned(), actual);
     }
     cancellation.check()?;
     Ok(VerifiedPack {
@@ -118,6 +186,7 @@ pub(crate) fn verify_with_libraries(
         architecture: std::env::consts::ARCH.into(),
         audio_encoders: manifest.audio_encoders,
         executables: verified,
+        assets: verified_assets,
     })
 }
 
@@ -127,6 +196,7 @@ fn verify_file(
     expected: &str,
     cancellation: &Cancellation,
     executable: bool,
+    maximum: u64,
 ) -> Result<String> {
     #[cfg(not(unix))]
     let _ = executable;
@@ -139,7 +209,7 @@ fn verify_file(
     }
     let mut file = contained_file(root, relative)?;
     let metadata = file.metadata()?;
-    if metadata.len() == 0 || metadata.len() > BINARY_LIMIT {
+    if metadata.len() == 0 || metadata.len() > maximum {
         return Err(invalid());
     }
     #[cfg(unix)]
@@ -159,7 +229,7 @@ fn verify_file(
             break;
         }
         total += count as u64;
-        if total > BINARY_LIMIT {
+        if total > maximum {
             return Err(invalid());
         }
         hash.update(&buffer[..count]);

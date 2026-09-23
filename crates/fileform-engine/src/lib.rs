@@ -39,6 +39,7 @@ pub use media_video_trim::VideoTrimOptions;
 mod directory_transaction;
 mod native_pack;
 mod native_process;
+mod ocr_pack;
 mod pdf_compose;
 mod pdf_split;
 pub use pdf_split::Split as PdfSplit;
@@ -113,6 +114,9 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    VerifyOcrPack {
+        directory: PathBuf,
+    },
     ExportPdfText(PdfTextExport),
     SplitPdf(PdfSplit),
     ComposePdf(PdfComposition),
@@ -320,6 +324,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    OcrPackVerification(ocr_pack::OcrPackVerification),
     PdfDocumentText(pdf_document_text::DocumentTextReceipt),
     SplitPdf(pdf_split::SplitReceipt),
     ComposedPdf(pdf_compose::CompositionReceipt),
@@ -910,6 +915,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::VerifyOcrPack { directory } = &request {
+        return ocr_pack::verify(directory, cancellation).map(Response::OcrPackVerification);
+    }
     if let Request::ExportPdfText(options) = &request {
         return pdf_document_text::export(options, cancellation).map(Response::PdfDocumentText);
     }
@@ -1247,7 +1255,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ExportPdfText(..)
+        Request::VerifyOcrPack { .. }
+        | Request::ExportPdfText(..)
         | Request::SplitPdf(..)
         | Request::ComposePdf(..)
         | Request::OptimizePdf { .. }
@@ -1284,7 +1293,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ExportPdfText(..)
+        Request::VerifyOcrPack { .. }
+        | Request::ExportPdfText(..)
         | Request::SplitPdf(..)
         | Request::ComposePdf(..)
         | Request::OptimizePdf { .. }

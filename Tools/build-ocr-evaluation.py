@@ -53,7 +53,7 @@ lept,tess=extract(lept_archive),extract(tess_archive)
 prefix=work/'install'
 windows=sys.platform=='win32'
 common=['-DCMAKE_BUILD_TYPE=Release',f'-DCMAKE_INSTALL_PREFIX={prefix}','-DBUILD_SHARED_LIBS=OFF']
-common+=['-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'] if windows else ['-G','Ninja','-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0']
+common+=['-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded','-DCMAKE_POLICY_DEFAULT_CMP0091=NEW'] if windows else ['-G','Ninja','-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0']
 commands=[]
 def run(command,label):
     commands.append(command)
