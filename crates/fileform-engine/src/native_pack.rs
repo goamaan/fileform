@@ -16,6 +16,8 @@ struct Manifest {
     network_protocols: Option<bool>,
     executables: BTreeMap<String, String>,
     #[serde(default)]
+    libraries: BTreeMap<String, String>,
+    #[serde(default)]
     audio_encoders: Vec<String>,
 }
 #[derive(Debug)]
@@ -61,6 +63,16 @@ pub(crate) fn verify(
     names: &[&str],
     require_offline: bool,
 ) -> Result<VerifiedPack> {
+    verify_with_libraries(directory, cancellation, id, names, &[], require_offline)
+}
+pub(crate) fn verify_with_libraries(
+    directory: &Path,
+    cancellation: &Cancellation,
+    id: &str,
+    names: &[&str],
+    libraries: &[&str],
+    require_offline: bool,
+) -> Result<VerifiedPack> {
     cancellation.check()?;
     let root = directory.canonicalize().map_err(|_| invalid())?;
     let manifest_file = contained_file(&root, "manifest.json")?;
@@ -86,50 +98,19 @@ pub(crate) fn verify(
     for &name in names {
         cancellation.check()?;
         let expected = manifest.executables.get(name).ok_or_else(invalid)?;
-        if expected.len() != 64
-            || !expected
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        {
-            return Err(invalid());
-        }
         let suffix = if cfg!(windows) { ".exe" } else { "" };
-        let mut file = contained_file(&root, &format!("bin/{name}{suffix}"))?;
-        let metadata = file.metadata()?;
-        if metadata.len() == 0 || metadata.len() > BINARY_LIMIT {
-            return Err(invalid());
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if metadata.permissions().mode() & 0o111 == 0 {
-                return Err(invalid());
-            }
-        }
-        let mut hash = Sha256::new();
-        let mut buffer = [0; 64 * 1024];
-        let mut total = 0u64;
-        loop {
-            cancellation.check()?;
-            let count = file.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            total += count as u64;
-            if total > BINARY_LIMIT {
-                return Err(invalid());
-            }
-            hash.update(&buffer[..count]);
-        }
-        let actual = hash
-            .finalize()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>();
-        if total != metadata.len() || actual != *expected {
-            return Err(invalid());
-        }
+        let actual = verify_file(
+            &root,
+            &format!("bin/{name}{suffix}"),
+            expected,
+            cancellation,
+            true,
+        )?;
         verified.insert(name.into(), actual);
+    }
+    for &name in libraries {
+        let expected = manifest.libraries.get(name).ok_or_else(invalid)?;
+        verify_file(&root, &format!("bin/{name}"), expected, cancellation, false)?;
     }
     cancellation.check()?;
     Ok(VerifiedPack {
@@ -138,4 +119,58 @@ pub(crate) fn verify(
         audio_encoders: manifest.audio_encoders,
         executables: verified,
     })
+}
+
+fn verify_file(
+    root: &Path,
+    relative: &str,
+    expected: &str,
+    cancellation: &Cancellation,
+    executable: bool,
+) -> Result<String> {
+    #[cfg(not(unix))]
+    let _ = executable;
+    if expected.len() != 64
+        || !expected
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(invalid());
+    }
+    let mut file = contained_file(root, relative)?;
+    let metadata = file.metadata()?;
+    if metadata.len() == 0 || metadata.len() > BINARY_LIMIT {
+        return Err(invalid());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if executable && metadata.permissions().mode() & 0o111 == 0 {
+            return Err(invalid());
+        }
+    }
+    let mut hash = Sha256::new();
+    let mut buffer = [0; 64 * 1024];
+    let mut total = 0u64;
+    loop {
+        cancellation.check()?;
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        total += count as u64;
+        if total > BINARY_LIMIT {
+            return Err(invalid());
+        }
+        hash.update(&buffer[..count]);
+    }
+    let actual = hash
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if total != metadata.len() || actual != expected {
+        return Err(invalid());
+    }
+    Ok(actual)
 }

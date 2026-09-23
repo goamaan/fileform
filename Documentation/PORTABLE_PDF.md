@@ -159,3 +159,26 @@ fonts/color/forms and full preservation coverage remain open. See its README for
 limits and the required supervisor/containment integration. Windows CI now builds
 and exercises the same helper against a hash-pinned, attestation-verified archive;
 the result must be checked before claiming Windows acceptance.
+
+### Engine rendering integration
+
+`render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX` and worker operation
+`render_pdf_page` now render through a separate `app.fileform.pdf-render` pack.
+The shared verifier checks the helper and required platform library SHA-256.
+Rendering uses the source snapshot, a private working directory, cleared child
+environment (Windows SystemRoot retained), a 60-second deadline, direct-child
+cancellation/reaping and bounded raster output. Rust strictly validates dimensions
+and payload length, encodes PNG, fully redecodes/compares pixels, rechecks the
+source/folder, then syncs and saves without replacing an existing file.
+
+Mac real CLI/worker tests verify identical PNGs and receipt hashes, invalid-page
+cleanup, source preservation, collision rejection and modified-library rejection.
+Rust unit coverage rejects truncated, oversized and ambiguous helper replies.
+This does not provide OS sandboxing, global resource limits, signed pack
+authentication or final preview-cache ownership. PDFium internal allocations and
+pack replacement races remain release-hardening work.
+
+Windows run 35818479062 verified the archive and attestation but failed compiling
+the helper because Windows headers define min/max macros. The target now defines
+NOMINMAX; a new CI run must verify the fix and full engine path. No Windows runtime
+success is claimed from the failed run.

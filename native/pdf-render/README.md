@@ -1,8 +1,8 @@
 # PDF renderer helper — evaluation
 
 This native adapter evaluates the pinned non-V8 PDFium distribution documented in
-`Documentation/PDFIUM_RESEARCH.md`. It is not yet a production tool pack or a
-public engine command. JavaScript/XFA build flags are checked at configure time;
+`Documentation/PDFIUM_RESEARCH.md`. It is not yet a production tool pack. The native engine exposes an explicit
+render command for evaluation packs; the desktop has not integrated it. JavaScript/XFA build flags are checked at configure time;
 the caller must independently verify archive hashes and provenance first.
 
 Build with CMake, setting `PDFIUM_ROOT` to the extracted verified archive. On
@@ -20,8 +20,11 @@ reference's MediaBox fingerprint. Noninteractive annotations are included;
 widgets/popups, forms and XFA do not have appearance parity. No document actions
 or form callbacks are invoked. Text extraction is not implemented.
 
-The helper reads a private snapshot into memory. It must run under the engine's
-timeout, cancellation, output and concurrency controls before user exposure.
+The helper reads a private snapshot into memory. The engine now supervises a
+direct child with a 60-second timeout, cancellation and bounded output; it checks
+both executable and library hashes, validates PPM framing, and independently
+redecodes the staged PNG before a no-clobber save. Global concurrency limits and
+full process containment remain required before desktop exposure.
 Input-size and bitmap caps do not bound PDFium's internal allocations. Full OS
 containment, process-tree cleanup, immutable snapshot/pack integration, source
 provenance, UserUnit/font/color coverage and signed packaging are pending. The
@@ -31,3 +34,11 @@ Run `crates/fileform-engine/tests/smoke-pdf-render.py HELPER QPDF` for generated
 text/vector fixtures, graph-neutral rewrites, deliberate changes, crop/rotation,
 Unicode paths, bounds, rejected malformed/protected input and source safety.
 Tests compare one renderer against itself, not pixels across different platforms.
+
+`stage-evaluation.py BUILD_DIRECTORY VERIFIED_ARCHIVE_DIRECTORY NEW_PACK_DIRECTORY`
+copies the helper/library and upstream notices, then hashes both into a local
+manifest. It does not authenticate inputs or produce a signed release. After
+staging, `fileform-native render-pdf-page INPUT OUTPUT.png PACK PAGE_INDEX` renders
+a 512-pixel preview; the `render_pdf_page` worker request accepts `max_dimension`
+from 1 to 2048. The PNG is an explicit caller-owned output. No automatic app cache
+or preview lifetime policy is implemented yet.
