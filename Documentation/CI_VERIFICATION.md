@@ -1,15 +1,17 @@
 # Verification workflows
 
-Both workflows remain manually dispatchable. A release candidate needs successful
+The verification workflows remain manually dispatchable. A release candidate needs successful
 full Core verification and Portable desktop preview runs for its exact source,
 plus the documented signing, artifact and installation acceptance checks. Path
 filtering during development is not a substitute for release verification.
 
 - Core verification: Swift source/tests/package, native macOS reference, reference
-  tools, workflow configuration and shipped LICENSE/NOTICE. Its three Rust-only
+  tools, workflow configuration and shipped LICENSE/NOTICE. Its four Rust-only
   smoke scripts are excluded so their edits do not cancel a long reference run.
-- Portable desktop preview: Rust workspace/toolchain, Electron app, the three
+- Portable desktop preview: Rust workspace/toolchain, Electron app, the four
   portable smoke scripts, routing check, workflow configuration and LICENSE/NOTICE.
+- Dedicated Windows media, PDF and OCR workflows build/check native dependencies
+  and real fixtures. Their evidence does not establish desktop GUI acceptance.
 - Website changes use the website build/publication workflow, not either native
   engine matrix merely because they share a repository.
 
@@ -38,3 +40,10 @@ Desktop layout commit `d9089e2fd224f4240b84dbefd779a0c95e6f8e60` passed portable
 workflow run `35773207660` on both macOS 26 and Windows 2025 (September 22, 2026).
 This proves the configured build/tests and installer packaging, not manual Windows
 GUI acceptance or signed public distribution.
+
+## September 23 checkpoint
+
+[Desktop run 35829743542](https://github.com/goamaan/fileform/actions/runs/35829743542)
+passed both macOS 26 and Windows 2025 jobs at 61f2caa. This includes the source-type
+smoke and native tests/builds plus preview packaging; it does not establish manual
+Windows GUI acceptance or final bundled-tool release readiness.

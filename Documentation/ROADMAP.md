@@ -13,6 +13,9 @@ Detailed scope is retained in [REQUIREMENTS.json](REQUIREMENTS.json). Historical
 reference statuses are not portable acceptance. Each completed row needs actual
 source/build/content/UI evidence appropriate to its scope.
 
+See [PARITY_STATUS.md](PARITY_STATUS.md) for the current native-versus-desktop
+checklist and work order. Media/PDF/OCR backend progress is not yet desktop parity.
+
 ## Release and parity
 
 - **UX01** — File import through picker, drag/drop, menu and keyboard.

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-14",
-  "note": "Reference ledger statuses are historical, not proof of portable completion. Commerce requirements were cancelled by the user; all remaining scope is retained here.",
+  "updated": "2026-09-23",
+  "note": "Reference ledger statuses are historical, not proof of portable completion. Native implementation and Electron integration are distinct; see PARITY_STATUS.md. Commerce requirements remain cancelled and all remaining scope is retained.",
   "requirements": [
     {
       "id": "UX01",
@@ -98,29 +98,37 @@
       "id": "IMG01",
       "title": "Image conversion, including existing PNG/JPEG and HEIC input routes",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "PNG/JPEG/TIFF native routes and desktop wiring exist.",
+      "remaining": "Existing HEIC input and remaining original format cases; final UI acceptance."
     },
     {
       "id": "IMG02",
       "title": "Image crop and resize",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native crop/resize and current image UI controls exist.",
+      "remaining": "Unified file-first workflow and final interaction/accessibility acceptance."
     },
     {
       "id": "IMG03",
       "title": "Verified size limits and quality controls",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native quality/byte fitting and image UI options exist.",
+      "remaining": "Remaining original policies and final app-level acceptance."
     },
     {
       "id": "IMG04",
       "title": "Image color profile and metadata policies",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Orientation, ICC/sRGB, alpha and selected metadata policies have native tests.",
+      "remaining": "Unsupported color/format cases and final platform/UI acceptance."
     },
     {
       "id": "IMG05",
@@ -140,36 +148,46 @@
       "id": "MED01",
       "title": "Audio/video conversion and audio extraction",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native audio/video conversion and extraction routes exist with explicit limits.",
+      "remaining": "Track/format/color gaps and all Electron integration."
     },
     {
       "id": "MED02",
       "title": "MP3 conversion",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "LAME-backed native MP3 conversion has Mac/Windows evidence.",
+      "remaining": "Remaining policy limits and Electron integration."
     },
     {
       "id": "MED03",
       "title": "Exact and fast media trimming",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native exact/fast trim routes have bounded clock/content checks.",
+      "remaining": "VFR, track selection, remaining lossy trim policies and editors."
     },
     {
       "id": "MED04",
       "title": "Audio/video task routing",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native requests distinguish audio/video operations.",
+      "remaining": "User-facing action routing and context selection."
     },
     {
       "id": "MED05",
       "title": "Media size limits and resolution controls",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native audio/video byte fitting and video resize exist.",
+      "remaining": "Remaining policies, platform limits and UI controls."
     },
     {
       "id": "MED06",
@@ -189,8 +207,10 @@
       "id": "DATA02",
       "title": "Local text extraction and scan recognition",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Embedded PDF text plus explicit-English image/PDF OCR exist.",
+      "remaining": "Automatic multilingual behavior, wider accuracy/form coverage and UI."
     },
     {
       "id": "DATA03",
@@ -217,36 +237,46 @@
       "id": "PDF01",
       "title": "Combine PDFs and images",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native PDF/PNG/JPEG/TIFF composition exists.",
+      "remaining": "Desktop integration and remaining original policies."
     },
     {
       "id": "PDF02",
       "title": "Organize, rotate, remove and insert pages",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native explicit page selections support order, duplicates and rotations.",
+      "remaining": "Page editing, source insertion/removal UI and complete original policy coverage."
     },
     {
       "id": "PDF03",
       "title": "Split PDFs by markers, intervals and ranges",
       "reference_ledger_status": "verified",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native explicit groups and per-page split use complete-folder publication.",
+      "remaining": "Marker/range/interval planning and desktop workflow."
     },
     {
       "id": "PDF04",
       "title": "Page image export and embedded-image extraction",
       "reference_ledger_status": "verified",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Bounded single-page PNG rendering and static form appearances exist.",
+      "remaining": "Full-resolution DPI-based PNG/JPEG export and embedded-image extraction."
     },
     {
       "id": "PDF05",
       "title": "Lossless and image-based PDF compression",
       "reference_ledger_status": "verified",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Lossless compression checks all pages, graph, geometry, text and pixels.",
+      "remaining": "Targeted lossy image optimization, fit policies and desktop integration."
     },
     {
       "id": "PDF06",
@@ -357,8 +387,10 @@
       "id": "WEB01",
       "title": "Minimal free-project website",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Free-project website source and an earlier deployment exist.",
+      "remaining": "Final richer-minimal design, copy, current screenshots and release links."
     },
     {
       "id": "WEB02",
@@ -371,52 +403,68 @@
       "id": "WEB03",
       "title": "Accurate platform status, privacy and license information",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Free/open-source and platform messaging exists.",
+      "remaining": "Update stale preview/capability wording against the final release."
     },
     {
       "id": "REL01",
       "title": "Signed application delivery and secure updates",
       "reference_ledger_status": "planned",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Mac signing/notarization was verified for an earlier Electron preview.",
+      "remaining": "Current complete native packs, Windows signing, secure updates and installed-app acceptance."
     },
     {
       "id": "REL02",
       "title": "Independent free CLI and reproducible engine packs",
       "reference_ledger_status": "implementing",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Independent Rust CLI and source-pinned evaluation packs exist.",
+      "remaining": "All original CLI routes, reproducible production packs, notices and distribution."
     },
     {
       "id": "WIN01",
       "title": "Real Windows executable and installer builds",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Real Windows Rust binaries and NSIS preview builds exist.",
+      "remaining": "Final feature-complete bundled/signed release artifacts."
     },
     {
       "id": "WIN02",
       "title": "Windows runtime and UI verification, with manual gaps recorded",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Windows CI exercises native media/PDF/OCR increments.",
+      "remaining": "Final integration/runtime checks; manual Windows GUI gap remains explicit."
     },
     {
       "id": "OSS01",
       "title": "One reviewed public repository and contributor/security documentation",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Reviewed public repository and contributor/security/license documents exist.",
+      "remaining": "Final dependency/notice/publication audit and release contributor instructions."
     },
     {
       "id": "SEC01",
       "title": "Native worker isolation and cross-platform file-safety hardening",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Snapshots, bounded child execution, model checks, no-clobber output and source-type guards exist.",
+      "remaining": "Process-tree/OS isolation, hard-kill cleanup, hostile path races and release security verification."
     },
     {
       "id": "PERF01",
       "title": "Measured startup, memory and transformation performance",
-      "portable_status": "pending",
-      "priority": "release-and-parity"
+      "portable_status": "partial",
+      "priority": "release-and-parity",
+      "evidence_notes": "Native table benchmarks and operational bounds are documented.",
+      "remaining": "Current application startup/idle memory and representative transformation/concurrency benchmarks."
     }
   ]
 }

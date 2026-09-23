@@ -1,7 +1,9 @@
 # Cross-platform desktop decision and implementation plan
 
-September 14, 2026. Status: Electron selected; first real table workflow implemented. Full portable
-parity and benchmarks are not yet complete. See PORTABLE_PROGRESS.md. Read USER_REQUIREMENTS.md for the full mandate.
+Decision recorded September 14, 2026; status reviewed September 23. Electron is
+selected. Tables/images are wired into the preview; media/PDF/OCR native work has
+advanced but is not yet integrated into the desktop. Full parity and benchmarks
+remain incomplete. See PARITY_STATUS.md and USER_REQUIREMENTS.md.
 
 ## Selected architecture
 
@@ -23,14 +25,13 @@ custom interfaces; Windows portability, not an inability to style SwiftUI, is th
 reason to change. This remains a substantial UI rewrite plus backend port, not
 merely wrapping the existing application in an Electron window.
 
-## Current architecture: what carries over
+## Reference architecture: what carries over
 
-The current app uses SwiftUI/AppKit. Swift domain records and most orchestration
+The preserved reference app uses SwiftUI/AppKit. Swift domain records and most orchestration
 are memory-safe application code. FFmpeg/ffprobe and qpdf run as native processes,
-and a separate Swift worker handles native operations. Electron is not currently
-used anywhere in file processing.
+and a separate Swift worker handles native operations. Electron remains outside heavy file processing.
 
-The engine itself is macOS-dependent: ImageIO/CoreGraphics handle image encoding,
+The reference engine is macOS-dependent: ImageIO/CoreGraphics handle image encoding,
 PDFKit/AppKit handle PDF composition/rendering/text and verification, Vision does
 OCR, and Darwin/POSIX APIs implement file identity, descriptor passing and child
 process handling. Replacing the GUI does not make these paths work on Windows.
