@@ -63,13 +63,31 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     if options.output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
+    let mut state = prepare(&options.inputs, &options.directory, cancel)?;
+    compose_prepared(options, &mut state, cancel, 512 * 1024 * 1024)
+}
+
+pub(crate) struct Prepared {
+    sources: Vec<Source>,
+    geometries: Vec<Vec<pdf_pages::PageGeometry>>,
+    prepared: Vec<tempfile::NamedTempFile>,
+    documents: Vec<PathBuf>,
+}
+pub(crate) fn prepare(
+    inputs: &[PathBuf],
+    directory: &Path,
+    cancel: &Cancellation,
+) -> Result<Prepared> {
+    if !(1..=128).contains(&inputs.len()) {
+        return Err(fail("limit", "Choose 1–128 sources."));
+    }
     let mut sources = Vec::new();
     let mut geometries = Vec::new();
     let mut prepared = Vec::new();
     let mut documents = Vec::new();
     let mut prepared_bytes = 0;
     let mut total = 0;
-    for input in &options.inputs {
+    for input in inputs {
         let mut source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024 - total)?;
         total += source.snapshot.as_file().metadata()?.len();
         let mut signature = [0u8; 8];
@@ -82,7 +100,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         let document = if is_image {
             let page = crate::pdf_images::prepare(
                 source.snapshot.path(),
-                &options.directory,
+                directory,
                 512 * 1024 * 1024 - prepared_bytes,
                 cancel,
             )?;
@@ -93,8 +111,8 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         } else {
             source.snapshot.path().to_path_buf()
         };
-        let info = pdf_inspect::inspect(&document, &options.directory, cancel)?;
-        let geometry = pdf_pages::inspect(&document, &options.directory, cancel)?.pages;
+        let info = pdf_inspect::inspect(&document, directory, cancel)?;
+        let geometry = pdf_pages::inspect(&document, directory, cancel)?.pages;
         documents.push(document);
         if geometry.len() != info.pages as usize {
             return Err(fail("verification", "PDF page inspections disagree."));
@@ -102,6 +120,44 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         sources.push(source);
         geometries.push(geometry);
     }
+    Ok(Prepared {
+        sources,
+        geometries,
+        prepared,
+        documents,
+    })
+}
+pub(crate) fn individual_pages(state: &Prepared) -> Vec<Vec<PdfPageSelection>> {
+    state
+        .geometries
+        .iter()
+        .enumerate()
+        .flat_map(|(source_index, pages)| {
+            (0..pages.len()).map(move |page_index| {
+                vec![PdfPageSelection {
+                    source_index,
+                    page_index: page_index as u32,
+                    clockwise_rotation: 0,
+                }]
+            })
+        })
+        .collect()
+}
+pub(crate) fn compose_prepared(
+    options: &Composition,
+    state: &mut Prepared,
+    cancel: &Cancellation,
+    maximum_bytes: u64,
+) -> Result<CompositionReceipt> {
+    if maximum_bytes == 0 {
+        return Err(fail("limit", "The PDF output byte budget is exhausted."));
+    }
+    let Prepared {
+        sources,
+        geometries,
+        prepared,
+        documents,
+    } = state;
     let all;
     let selected = match &options.pages {
         Some(pages) => pages,
@@ -195,7 +251,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         cancel,
         Duration::from_secs(120),
         64 * 1024,
-        Some((temporary.path(), 512 * 1024 * 1024)),
+        Some((temporary.path(), maximum_bytes)),
     )?;
     let after = pdf_inspect::inspect(temporary.path(), &options.directory, cancel)?;
     let geometry = pdf_pages::inspect(temporary.path(), &options.directory, cancel)?.pages;
@@ -224,7 +280,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
             "Assembled PDF page text or appearance changed. No output was saved.",
         ));
     }
-    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, 512 * 1024 * 1024)?;
+    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, maximum_bytes)?;
     for (source, input) in sources.iter_mut().zip(&options.inputs) {
         source.check(input)?;
     }
@@ -251,8 +307,15 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         output: options.output.clone(),
         bytes,
         sha256,
-        source_sha256: sources.into_iter().map(|v| v.hash).collect(),
+        source_sha256: sources.iter().map(|v| v.hash.clone()).collect(),
         pages: selected.len(),
         warnings,
     })
+}
+
+pub(crate) fn check_sources(state: &mut Prepared, inputs: &[PathBuf]) -> Result<()> {
+    for (source, input) in state.sources.iter_mut().zip(inputs) {
+        source.check(input)?;
+    }
+    Ok(())
 }

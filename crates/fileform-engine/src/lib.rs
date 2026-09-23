@@ -36,9 +36,12 @@ mod media_video_trim;
 mod media_waveform;
 pub use media_video::{VideoEncoding, VideoFit};
 pub use media_video_trim::VideoTrimOptions;
+mod directory_transaction;
 mod native_pack;
 mod native_process;
 mod pdf_compose;
+mod pdf_split;
+pub use pdf_split::Split as PdfSplit;
 mod pdf_graph;
 mod pdf_images;
 mod pdf_inspect;
@@ -108,6 +111,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    SplitPdf(PdfSplit),
     ComposePdf(PdfComposition),
     OptimizePdf {
         input: PathBuf,
@@ -313,6 +317,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    SplitPdf(pdf_split::SplitReceipt),
     ComposedPdf(pdf_compose::CompositionReceipt),
     OptimizedPdf(pdf_optimize::OptimizationReceipt),
     PdfText(pdf_text::TextReceipt),
@@ -901,6 +906,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::SplitPdf(options) = &request {
+        return pdf_split::split(options, cancellation).map(Response::SplitPdf);
+    }
     if let Request::ComposePdf(options) = &request {
         return pdf_compose::compose(options, cancellation).map(Response::ComposedPdf);
     }
@@ -1232,7 +1240,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ComposePdf(..)
+        Request::SplitPdf(..)
+        | Request::ComposePdf(..)
         | Request::OptimizePdf { .. }
         | Request::ExtractPdfText { .. }
         | Request::RenderPdfPage { .. }
@@ -1267,7 +1276,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ComposePdf(..)
+        Request::SplitPdf(..)
+        | Request::ComposePdf(..)
         | Request::OptimizePdf { .. }
         | Request::ExtractPdfText { .. }
         | Request::RenderPdfPage { .. }

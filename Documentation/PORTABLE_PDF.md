@@ -2,8 +2,8 @@
 
 Status: the portable engine has bounded PDF inspection, graph/geometry evidence,
 page rendering/text extraction, lossless compression, and selected-page composition
-with PDF/PNG/JPEG/TIFF inputs. These are native CLI/worker capabilities; the desktop
-has not yet integrated them. Split-directory output, lossy optimization, embedded
+with PDF/PNG/JPEG/TIFF inputs and split-folder publication. These are native CLI/worker capabilities; the desktop
+has not yet integrated them. Lossy optimization, embedded
 image extraction, OCR, whole-document text export and broader format/resource
 acceptance remain parity work. Preserve the Swift implementations as references;
 historical completion is not portable acceptance.
@@ -328,3 +328,39 @@ embedded-stream checks remain exact. Windows CI runs the same image suite.
 Windows run [35820493422](https://github.com/goamaan/fileform/actions/runs/35820493422)
 passed at f140c0e, covering PDF-only merge, selection, duplication and independent
 rotation. The new still-image assembly paths require their own Windows result.
+
+### Complete split-folder publication
+
+`split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT...` creates one PDF per source
+page. Worker `split_pdf` accepts the composition inputs/pack paths and explicit
+`allow_document_changes`, plus optional `groups` of page selections for custom
+parts. Names are `part-0001.pdf`, etc. Every part uses the same geometry, text and
+render verification as composition. Sources and prepared image pages are shared
+across groups instead of re-decoded for each part.
+
+All parts stay inside an owned staging directory until the entire set succeeds.
+Source checks are repeated immediately before one no-replace directory move.
+Limits are 1000 total selected pages and 512 MiB combined output; each new part
+receives the remaining monitored byte budget. The receipt stores the output root
+once, compact part names/hashes and shared source hashes/warnings, and must fit
+the worker response budget before publication. A failure or cancellation removes
+the owned staging tree without publishing a partial folder.
+
+Do not replace this with a preflight existence check followed by ordinary rename:
+[standard rename can replace an empty directory](https://doc.rust-lang.org/std/fs/fn.rename.html).
+The pinned `tempfile` 3.27.0 no-clobber implementation uses macOS RENAME_EXCL and
+Windows MoveFileExW without REPLACE_EXISTING. The enclosing TempDir owns cleanup;
+TempPath cleanup is disabled for this directory adapter. Unsupported filesystem
+operations fail closed. Mac unit tests cover destinations created after staging
+(file, empty folder, populated folder), success, cancellation and cleanup. Broader
+hostile parent-path races and crash durability remain shared release-hardening
+requirements, not claims established by these tests.
+
+Mac real-worker tests pass default and custom-group splits, receipt hashes,
+existing-folder protection, rollback after a successful first part followed by an
+invalid second group, and cancellation after observing the first staged part.
+Windows CI includes these tests; its result is still required.
+
+Windows run [35821016403](https://github.com/goamaan/fileform/actions/runs/35821016403)
+passed at 266496a, including mixed PNG/JPEG/TIFF/PDF assembly and orientation/alpha
+fixtures. This predates the split implementation.
