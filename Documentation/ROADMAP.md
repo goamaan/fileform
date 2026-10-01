@@ -16,6 +16,10 @@ source/build/content/UI evidence appropriate to its scope.
 See [PARITY_STATUS.md](PARITY_STATUS.md) for the current native-versus-desktop
 checklist and work order. Media/PDF/OCR backend progress is not yet desktop parity.
 
+October 1 priority: [breadth-first parity](BREADTH_FIRST_PARITY.md). Connect all
+main file/action flows using the existing engine before adding more specialized
+backend detail. This changes sequencing, not required scope or safety gates.
+
 ## Release and parity
 
 - **UX01** — File import through picker, drag/drop, menu and keyboard.

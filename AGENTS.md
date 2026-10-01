@@ -33,6 +33,13 @@ Repeated launches must focus/restore the existing window, preserving active work
 
 Final UX is file-first: one drop/choose surface, then contextual actions; also
 allow action-first tasks such as PDF merging. Tables/Images workspaces are only a
-temporary migration UI, explicitly rejected as the final structure. Restore
-original-app parity before the complete UX pass; revisit the generated HTML's
-richer composition. Do not keep polishing category-specific entry screens.
+temporary migration UI, explicitly rejected as the final structure. Revisit the
+generated HTML's richer composition; do not polish category-specific entry screens.
+
+The user changed execution priority to breadth first on October 1, 2026. Follow
+Documentation/BREADTH_FIRST_PARITY.md. Connect every main existing file/action flow
+through the app and package its required tools before expanding niche backend
+options or fidelity corpora. Preserve all prior work and requirements. Restore
+broad app parity first, then deepen each domain and finish visual/release polish.
+File safety, output validation, cancellation and honest limits remain mandatory
+throughout. Native-only completion is not application parity.

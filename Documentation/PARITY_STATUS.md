@@ -26,33 +26,22 @@ Request inventory: `crates/fileform-engine/src/lib.rs`. Desktop exposure:
 The current desktop bridge exposes table/image operations, cancellation, reveal,
 Open File and appearance settings; it does not expose the media/PDF/OCR APIs yet.
 
-## Work order
+## Work order — breadth first
 
-1. Finish original advertised native behavior. PDF page selection,
-   marker/range/interval planning and fail/rename policies now have native routes.
-   Automatic OCR language handling remains required. Retain the media/image/URL
-   gaps above; do not quietly reduce them to the tested subset.
-2. Connect restored capabilities to a coherent desktop workflow. Final entry is
-   **one file-drop/choose surface with contextual actions**, plus action-first
-   shortcuts such as Merge PDFs. The Tables/Images categories are temporary and
-   explicitly rejected as the final navigation. Revisit the generated HTML's
-   richer composition; keep restrained Linear/Vicinae-inspired typography/motion.
-3. Complete mixed batches, task search, saved setups, workspace/recent-result
-   persistence, useful progress/retry, output-folder/conflict policies, result
-   opening/sharing/dragging, keyboard access and settings. Native success alone
-   does not close UX01–UX13.
-4. Package and test the actual release. The current Electron builder bundles the
-   Rust worker and notices, **not the media/PDF/render/OCR packs**. Include reviewed
-   binaries/models/licenses; keep the standalone CLI usable. Complete resource
-   budgets, process-tree/hard-kill cleanup, file safety and measured performance.
-5. Sign/notarize a current feature-complete Mac candidate, complete Windows signing
-   and secure update delivery, and test install/update/re-download paths. Produce
-   Windows artifacts and automated runtime evidence; label unavailable manual
-   Windows GUI testing explicitly.
-6. Finish app-wide and website copy/design QA, current screenshots and truthful
-   downloads/docs/contribution links. The site needs current platform/capability
-   wording before release. Public source is available; a release is not established
-   merely by a public repository, preview installer or green native test suite.
+The user's October 1 steering supersedes native-domain-first work. Follow
+[BREADTH_FIRST_PARITY.md](BREADTH_FIRST_PARITY.md) for the actionable sequence:
+
+1. Bundle the native foundation and establish shared file-first intake/jobs/results.
+2. Connect the existing table/image/PDF/audio/video/text routes into working app flows.
+3. Close broad URL/automatic OCR, batch, editing, setup and persistence gaps.
+4. Run every main action end-to-end in the actual application and Windows builds.
+5. Then deepen recorded domain edge cases, finish safety/performance acceptance,
+   final UI/copy polish and signed download/update verification.
+
+Preserve all native work and original scope. Do not expand PDF/HEIC corner-case
+coverage while another main family has no desktop route. Safety, truthful limits
+and relevant verification apply in every phase. Current builder bundles the Rust
+worker/notices, not all required native packs; packaging belongs in the foundation.
 
 ## Existing foundations to preserve
 

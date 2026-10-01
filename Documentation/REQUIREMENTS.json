@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "updated": "2026-10-01",
-  "note": "Reference ledger statuses are historical, not proof of portable completion. Native implementation and Electron integration are distinct; see PARITY_STATUS.md. Commerce requirements remain cancelled and all remaining scope is retained.",
+  "note": "Historical reference statuses are not portable acceptance. October 1 priority is breadth-first app parity: shared intake, all main file/action flows, broad gaps, then detailed domain acceptance and release polish. Full requirements and cancelled commerce scope are retained.",
   "requirements": [
     {
       "id": "UX01",
@@ -466,5 +466,6 @@
       "evidence_notes": "Native table benchmarks and operational bounds are documented.",
       "remaining": "Current application startup/idle memory and representative transformation/concurrency benchmarks."
     }
-  ]
+  ],
+  "execution_plan": "BREADTH_FIRST_PARITY.md"
 }

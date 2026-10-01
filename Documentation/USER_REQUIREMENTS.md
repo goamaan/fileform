@@ -94,3 +94,19 @@ Useful external references checked September 22:
 [FilePane's file-adaptive actions](https://mymixapps.com/how-filepane-works) and
 [Shutter Encoder's file list/function workflow](https://www.shutterencoder.com/documentation/).
 These inform interaction patterns, not copied branding or additional feature scope.
+
+
+### Breadth-first execution priority — October 1, 2026
+
+The user identified overinvestment in specialized PDF/HEIC details while whole
+file families/main actions remain absent from the desktop app. Close the current
+increment at a stable, verified checkpoint, then prioritize breadth across file
+types and main workflows. This supersedes native-domain-first sequencing and the
+interpretation that all deep native fidelity work must precede desktop integration.
+
+Use the existing native engine to connect all main actions into the shared
+file-first/action-first app, fill broad gaps, verify real outputs end-to-end, then
+return to detailed domain implementations/fixtures and final polish. Keep every
+original requirement, known limitation and deferred feature in the ledger. Do not
+leave a newly exposed flow half wired, claim parity from backend presence alone,
+or compromise preservation/safety to gain coverage. See BREADTH_FIRST_PARITY.md.
