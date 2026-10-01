@@ -130,11 +130,12 @@ pub fn trim(
     output: &Path,
     directory: &Path,
     interval: MediaInterval,
+    selected: Option<u32>,
     expected: Option<&str>,
     cancellation: &Cancellation,
 ) -> Result<TimedAudioReceipt> {
     interval.validate()?;
-    let timeline = media_timeline::inspect(input, directory, cancellation)?;
+    let timeline = media_timeline::inspect(input, directory, selected, cancellation)?;
     if expected.is_some_and(|hash| hash != timeline.sha256) {
         return Err(fail("source_changed", "The inspected source changed."));
     }
@@ -145,7 +146,10 @@ pub fn trim(
         directory,
         Some(&timeline.sha256),
         Some(samples),
-        None,
+        media_audio::AudioEncoding {
+            bitrate: None,
+            stream_index: Some(timeline.stream_index),
+        },
         cancellation,
     )?;
     Ok(TimedAudioReceipt {

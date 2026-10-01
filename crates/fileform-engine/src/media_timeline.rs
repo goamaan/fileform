@@ -118,21 +118,12 @@ fn continuous(
 pub fn inspect(
     input: &Path,
     directory: &Path,
+    selected: Option<u32>,
     cancellation: &Cancellation,
 ) -> Result<AudioTimeline> {
     let mut source = Source::open_with_limit(input, cancellation.clone(), 2 * 1024 * 1024 * 1024)?;
     let info = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
-    if info.audio_tracks != 1 {
-        return Err(fail(
-            "unsupported",
-            "Choose one audio track for timeline inspection.",
-        ));
-    }
-    let audio = info
-        .streams
-        .iter()
-        .find(|s| s.codec_type == "audio")
-        .expect("counted audio");
+    let audio = media_probe::audio(&info, selected)?;
     let rate = audio
         .sample_rate
         .as_deref()

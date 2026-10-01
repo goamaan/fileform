@@ -1,11 +1,12 @@
 # Portable media migration
 
-Status: media-pack verification and bounded media inspection are available in
-Rust/CLI/worker. WAV/FLAC/M4A/MP3 audio conversion and extraction are implemented;
-exact decoded-sample WAV/FLAC trimming, MP4/MOV stream copying and H.264 video
-re-encoding/resizing are implemented. Audio byte-limit fitting is implemented. Audio and video byte-limit fitting are implemented. Source-clock/fast/video
-trimming remains open. Media operations are not yet exposed by the portable
-app. Preserve the original Swift implementations as parity references.
+Status: verified native packs, bounded media inspection, WAV/FLAC/M4A/MP3
+conversion/extraction and size fitting, WAV/FLAC/M4A exact trims, AAC packet-copy
+trims, MP4/MOV remuxing and SDR H.264 conversion/resize/fit, exact/keyframe video
+trims, measured waveforms and posters exist. Audio-only routes now expose explicit
+stream selection. VFR video trim, video track selection, wider original policies,
+playback proxies, Electron integration and release packaging remain open.
+Preserve the original Swift implementations as parity references.
 
 Current Windows runtime evidence: run 35786756236 at `fa0dd71` passed the full
 native media and video suites, including the small-frame adapter. Earlier pending
@@ -650,3 +651,32 @@ Mac CLI/worker tests prove frame 3 for 0.35 seconds, exact independent RGBA pixe
 selection and rejection of the end boundary. Rust tests, Clippy, release build,
 Windows target check and full media smoke pass. The UI will own temporary preview
 leases; this backend currently writes an explicitly requested PNG destination.
+
+
+## Explicit audio tracks and exact M4A trim — October 1, 2026
+
+Audio conversion/extraction, fit, exact sample/time trim, fast AAC trim, timeline
+inspection and waveform requests accept optional `audio_stream` (actual ffprobe
+stream index). Their CLI routes accept `--audio-stream INDEX`. One audio track
+still works without a selection; ambiguous files require one. Missing/nonaudio
+indices fail before publication. Inspection retains language/title tags and
+rejects duplicate stream indices. Receipts identify the selected source stream.
+Every encode, packet proof and decoded-PCM proof maps that same selected track;
+output indices are checked independently. No implicit mixing occurs.
+
+Exact trimming now also writes M4A, matching the original supported trim formats.
+It selects source sample onsets before AAC encoding, fully decodes the result and
+checks measured duration within one AAC frame plus one source sample. AAC remains
+lossy; WAV/FLAC keep their existing exact decoded-PCM proofs. MP3 trimming remains
+unsupported, as in the original reference. MP3 byte fitting uses discrete rates
+at or above the requested floor; AAC can attempt its exact numeric bitrate floor.
+
+Mac real-tool acceptance: distinct two-track PCM recordings, per-track language
+labels, exact WAV/FLAC conversion/fit, sample/time trims, measured timelines and
+waveforms, exact M4A trims with measured content/duration, actual nonordinal
+indices in a picture+two-audio file, selected AAC packet-copy proofs, invalid,
+missing, repeated, nonaudio and stale selections, cancellation and staging cleanup.
+The complete prior audio/video regression suite also passes. Workspace 99 active
+Rust tests, Clippy, release build and Windows target check pass. Windows runtime
+acceptance is pending the new `smoke-audio-selection.py` workflow step. Video
+operations do not yet accept this audio selection and desktop integration is open.

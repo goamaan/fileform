@@ -29,6 +29,7 @@ pub struct Stream {
     pub color_transfer: Option<String>,
     pub sample_aspect_ratio: Option<String>,
     pub disposition: Option<Disposition>,
+    pub tags: Option<std::collections::BTreeMap<String, String>>,
 }
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct SideData {
@@ -60,6 +61,28 @@ pub struct MediaInspection {
     pub audio_tracks: usize,
     pub video_tracks: usize,
 }
+pub(crate) fn audio(info: &MediaInspection, selected: Option<u32>) -> Result<&Stream> {
+    if let Some(index) = selected {
+        return info
+            .streams
+            .iter()
+            .find(|s| s.index == index && s.codec_type == "audio")
+            .ok_or_else(|| fail("invalid_request", "Choose an existing audio stream index."));
+    }
+    if info.audio_tracks == 0 {
+        return Err(fail("unsupported", "No audio track was found."));
+    }
+    if info.audio_tracks != 1 {
+        return Err(fail(
+            "unsupported",
+            "Choose an audio track when the file contains multiple tracks.",
+        ));
+    }
+    info.streams
+        .iter()
+        .find(|s| s.codec_type == "audio")
+        .ok_or_else(|| fail("unsupported", "No audio track was found."))
+}
 fn parse(bytes: &[u8]) -> Result<(Probe, f64, usize, usize)> {
     let probe: Probe = serde_json::from_slice(bytes)
         .map_err(|_| fail("unsupported", "Invalid media inspection response."))?;
@@ -78,9 +101,13 @@ fn parse(bytes: &[u8]) -> Result<(Probe, f64, usize, usize)> {
     if probe.streams.len() > 64 {
         return Err(fail("limit", "The media contains too many streams."));
     }
+    let mut identities = std::collections::BTreeSet::new();
     let mut audio = 0;
     let mut video = 0;
     for stream in &probe.streams {
+        if !identities.insert(stream.index) {
+            return Err(fail("verification", "Duplicate media stream indices."));
+        }
         if stream.codec_type == "audio" {
             audio += 1;
         }
@@ -120,7 +147,7 @@ pub fn inspect(
             command.env("SystemRoot", system);
         }
     }
-    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration,start_time:stream=index,codec_type,codec_name,duration,duration_ts,nb_frames,time_base,start_time,start_pts,width,height,channels,sample_rate,sample_fmt,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_side_data=rotation","-of","json"]);
+    command.args(["-v","error","-max_alloc","268435456","-threads","2","-protocol_whitelist","file,pipe","-format_whitelist","mov,matroska,webm,avi,wav,flac,mp3,ogg,aac","-show_entries","format=format_name,duration,start_time:stream=index,codec_type,codec_name,duration,duration_ts,nb_frames,time_base,start_time,start_pts,width,height,channels,sample_rate,sample_fmt,bits_per_sample,bits_per_raw_sample,pix_fmt,color_transfer,color_primaries,color_space,color_range,sample_aspect_ratio:stream_disposition=attached_pic:stream_tags=language,title:stream_side_data=rotation","-of","json"]);
     command.arg(source.snapshot.path());
     let bytes = native_process::run(command, cancellation, Duration::from_secs(30), 512 * 1024)?;
     let (probe, duration_seconds, audio_tracks, video_tracks) = parse(&bytes)?;

@@ -11,7 +11,7 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 | --- | --- | --- | --- |
 | Tables | CSV, TSV, flat JSON conversion and verification | Picker, conversion, save/reveal | Unified intake, mixed batches, persistence and final UX checks |
 | Images | PNG/JPEG/TIFF conversion, crop, resize, quality/byte fit, orientation/color checks | These limited routes are wired | Existing HEIC input parity; remaining original format/color cases; final preview/UX acceptance |
-| Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, exact lossless trims and fast AAC trim | Not wired | Track selection, remaining trim/format policies, playback and editor integration |
+| Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, selected audio tracks, exact WAV/FLAC/M4A trims and fast AAC trim | Not wired | Video audio-track selection, wider trim/format policies, playback and editor integration |
 | Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters | Not wired | VFR/track/extended-color gaps, playback proxies and editor integration |
 | PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, range/interval/marker split and complete-folder publication | Not wired | Editing UI and remaining original policies |
 | PDF compression | All-page lossless rewrite and targeted image recompression/resize/byte fit with exact expected-graph checks | Not wired | Wider original-policy acceptance and desktop integration |

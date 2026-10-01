@@ -201,6 +201,7 @@ pub enum Request {
         max_dimension: Option<u32>,
     },
     MediaWaveform {
+        audio_stream: Option<u32>,
         input: PathBuf,
         directory: PathBuf,
         bins: Option<u32>,
@@ -213,6 +214,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     CopyAudioTrim {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -236,6 +238,7 @@ pub enum Request {
         directory: PathBuf,
     },
     TrimAudioTime {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -243,6 +246,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     InspectAudioTimeline {
+        audio_stream: Option<u32>,
         input: PathBuf,
         directory: PathBuf,
     },
@@ -254,6 +258,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     FitAudio {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -275,6 +280,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     TrimAudio {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -282,6 +288,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     ConvertAudio {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -1096,13 +1103,20 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::MediaPoster);
     }
     if let Request::MediaWaveform {
+        audio_stream,
         input,
         directory,
         bins,
     } = &request
     {
-        return media_waveform::waveform(input, directory, bins.unwrap_or(512), cancellation)
-            .map(Response::MediaWaveform);
+        return media_waveform::waveform(
+            input,
+            directory,
+            bins.unwrap_or(512),
+            *audio_stream,
+            cancellation,
+        )
+        .map(Response::MediaWaveform);
     }
     if let Request::CopyVideoTrim {
         input,
@@ -1123,6 +1137,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::CopiedVideoTrim);
     }
     if let Request::CopyAudioTrim {
+        audio_stream,
         input,
         output,
         directory,
@@ -1135,6 +1150,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             directory,
             *interval,
+            *audio_stream,
             expected_source_sha256.as_deref(),
             cancellation,
         )
@@ -1172,6 +1188,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             .map(Response::VideoTimeline);
     }
     if let Request::TrimAudioTime {
+        audio_stream,
         input,
         output,
         directory,
@@ -1184,13 +1201,19 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             directory,
             *interval,
+            *audio_stream,
             expected_source_sha256.as_deref(),
             cancellation,
         )
         .map(Response::TimedAudio);
     }
-    if let Request::InspectAudioTimeline { input, directory } = &request {
-        return media_timeline::inspect(input, directory, cancellation)
+    if let Request::InspectAudioTimeline {
+        input,
+        directory,
+        audio_stream,
+    } = &request
+    {
+        return media_timeline::inspect(input, directory, *audio_stream, cancellation)
             .map(Response::AudioTimeline);
     }
     if let Request::FitVideo {
@@ -1212,6 +1235,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::SavedVideo);
     }
     if let Request::FitAudio {
+        audio_stream,
         input,
         output,
         directory,
@@ -1224,8 +1248,11 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             input,
             output,
             directory,
-            *max_bytes,
-            *minimum_bitrate,
+            media_audio::AudioFit {
+                maximum: *max_bytes,
+                minimum_bitrate: *minimum_bitrate,
+                stream_index: *audio_stream,
+            },
             expected_source_sha256.as_deref(),
             cancellation,
         )
@@ -1270,6 +1297,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::SavedVideo);
     }
     if let Request::TrimAudio {
+        audio_stream,
         input,
         output,
         directory,
@@ -1283,12 +1311,16 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             expected_source_sha256.as_deref(),
             Some(*samples),
-            None,
+            media_audio::AudioEncoding {
+                bitrate: None,
+                stream_index: *audio_stream,
+            },
             cancellation,
         )
         .map(Response::SavedAudio);
     }
     if let Request::ConvertAudio {
+        audio_stream,
         input,
         output,
         directory,
@@ -1301,7 +1333,10 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             expected_source_sha256.as_deref(),
             None,
-            None,
+            media_audio::AudioEncoding {
+                bitrate: None,
+                stream_index: *audio_stream,
+            },
             cancellation,
         )
         .map(Response::SavedAudio);

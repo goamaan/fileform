@@ -124,6 +124,7 @@ pub fn waveform(
     input: &Path,
     directory: &Path,
     bins: u32,
+    selected: Option<u32>,
     cancel: &Cancellation,
 ) -> Result<Waveform> {
     if !(16..=4096).contains(&bins) {
@@ -133,7 +134,7 @@ pub fn waveform(
         ));
     }
     let mut source = Source::open_with_limit(input, cancel.clone(), 2 * 1024 * 1024 * 1024)?;
-    let timeline = media_timeline::inspect(source.snapshot.path(), directory, cancel)?;
+    let timeline = media_timeline::inspect(source.snapshot.path(), directory, selected, cancel)?;
     let info = media_probe::inspect(source.snapshot.path(), directory, cancel)?;
     let count = info
         .streams

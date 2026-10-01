@@ -28,10 +28,22 @@ impl SampleRange {
         )
     }
 }
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct AudioEncoding {
+    pub bitrate: Option<u32>,
+    pub stream_index: Option<u32>,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AudioFit {
+    pub maximum: u64,
+    pub minimum_bitrate: Option<u32>,
+    pub stream_index: Option<u32>,
+}
 const MAX_OUTPUT: u64 = 512 * 1024 * 1024;
 #[derive(Debug, Serialize)]
 pub struct AudioReceipt {
     pub output: std::path::PathBuf,
+    pub source_stream_index: u32,
     pub bytes: u64,
     pub sha256: String,
     pub duration_seconds: f64,
@@ -118,9 +130,10 @@ pub fn convert(
     directory: &Path,
     expected: Option<&str>,
     trim: Option<SampleRange>,
-    bitrate: Option<u32>,
+    options: AudioEncoding,
     cancellation: &Cancellation,
 ) -> Result<AudioReceipt> {
+    let bitrate = options.bitrate;
     let (muxer, encoder) = format(output)?;
     let lossy = matches!(encoder, "aac" | "libmp3lame");
     if bitrate.is_some_and(|rate| !(48000..=128000).contains(&rate))
@@ -134,10 +147,10 @@ pub fn convert(
     let audio_rate = bitrate.unwrap_or(128000);
     if let Some(range) = trim {
         range.count()?;
-        if !matches!(muxer, "wav" | "flac") {
+        if !matches!(muxer, "wav" | "flac" | "ipod") {
             return Err(fail(
                 "unsupported",
-                "Exact sample trimming currently writes WAV or FLAC.",
+                "Exact sample trimming writes WAV, FLAC or M4A. MP3 trimming is not supported.",
             ));
         }
     }
@@ -162,17 +175,7 @@ pub fn convert(
         ));
     }
     let inspection = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
-    if inspection.audio_tracks != 1 {
-        return Err(fail(
-            "unsupported",
-            "Choose media with exactly one audio track. Track selection is not available yet.",
-        ));
-    }
-    let audio = inspection
-        .streams
-        .iter()
-        .find(|s| s.codec_type == "audio")
-        .expect("counted audio");
+    let audio = media_probe::audio(&inspection, options.stream_index)?;
     if trim.is_some() {
         validate_trim_source(audio, encoder == "flac")?;
     }
@@ -251,7 +254,7 @@ pub fn convert(
     let mut encode = command(&executable);
     encode.arg("-i").arg(source.snapshot.path()).args([
         "-map",
-        "0:a:0",
+        &format!("0:{}", audio.index),
         "-vn",
         "-sn",
         "-dn",
@@ -334,7 +337,7 @@ pub fn convert(
             "Output codec, tracks, duration or audio layout differ from the requested result.",
         ));
     }
-    if let Some(range) = trim {
+    if let Some(range) = trim.filter(|_| encoder != "aac") {
         let track = output_audio.expect("verified audio");
         if track.duration_ts.and_then(|n| u64::try_from(n).ok()) != Some(range.count()?)
             || track.time_base.as_deref() != Some(format!("1/{rate}").as_str())
@@ -362,23 +365,42 @@ pub fn convert(
                 ))
             }
         };
-        let hash_audio = |path: &Path, selection: Option<SampleRange>| -> Result<Vec<u8>> {
-            let mut hash = command(&executable);
-            hash.arg("-i")
-                .arg(path)
-                .args(["-map", "0:a:0", "-vn", "-sn", "-dn"]);
-            if let Some(range) = selection {
-                hash.args(["-af", &range.filter()]);
-            }
-            hash.args(["-c:a", pcm, "-f", "hash", "-hash", "sha256", "-"]);
-            native_process::run(hash, cancellation, deadline, 4096)
-        };
-        let expected_hash = hash_audio(source.snapshot.path(), Some(range))?;
-        let actual_hash = hash_audio(temporary.path(), None)?;
+        let hash_audio =
+            |path: &Path, index: u32, selection: Option<SampleRange>| -> Result<Vec<u8>> {
+                let mut hash = command(&executable);
+                hash.arg("-i")
+                    .arg(path)
+                    .args(["-map", &format!("0:{index}"), "-vn", "-sn", "-dn"]);
+                if let Some(range) = selection {
+                    hash.args(["-af", &range.filter()]);
+                }
+                hash.args(["-c:a", pcm, "-f", "hash", "-hash", "sha256", "-"]);
+                native_process::run(hash, cancellation, deadline, 4096)
+            };
+        let expected_hash = hash_audio(source.snapshot.path(), audio.index, Some(range))?;
+        let actual_hash = hash_audio(temporary.path(), track.index, None)?;
         if expected_hash != actual_hash || !expected_hash.starts_with(b"SHA256=") {
             return Err(fail(
                 "verification",
                 "Trimmed audio samples do not match the selected source interval.",
+            ));
+        }
+    }
+    if let Some(range) = trim.filter(|_| encoder == "aac") {
+        let track = output_audio.expect("verified audio");
+        let time_base = crate::media_timeline::TimeBase::parse(track.time_base.as_deref())?;
+        let duration = track
+            .duration_ts
+            .filter(|v| *v > 0)
+            .ok_or_else(|| fail("verification", "The trimmed AAC duration is missing."))?;
+        let measured =
+            duration as f64 * f64::from(time_base.numerator) / f64::from(time_base.denominator);
+        // AAC is lossy and decodes in frames. Verify measured duration within one
+        // codec frame plus one source sample, rather than claim identical PCM.
+        if (measured - range.count()? as f64 / rate as f64).abs() > 1025.0 / rate as f64 {
+            return Err(fail(
+                "verification",
+                "The trimmed AAC duration exceeds one codec frame of the selected sample interval.",
             ));
         }
     }
@@ -406,6 +428,7 @@ pub fn convert(
         )
     })?;
     Ok(AudioReceipt {
+        source_stream_index: audio.index,
         output: output.to_path_buf(),
         bytes,
         sha256,
@@ -423,11 +446,12 @@ pub fn fit(
     input: &Path,
     output: &Path,
     directory: &Path,
-    maximum: u64,
-    minimum: Option<u32>,
+    options: AudioFit,
     expected: Option<&str>,
     cancellation: &Cancellation,
 ) -> Result<AudioReceipt> {
+    let maximum = options.maximum;
+    let minimum = options.minimum_bitrate;
     if maximum == 0 || maximum > MAX_OUTPUT {
         return Err(fail(
             "invalid_request",
@@ -484,7 +508,10 @@ pub fn fit(
             directory,
             Some(&source.hash),
             None,
-            rate,
+            AudioEncoding {
+                bitrate: rate,
+                stream_index: options.stream_index,
+            },
             cancellation,
         )?;
         if result.bytes > maximum {

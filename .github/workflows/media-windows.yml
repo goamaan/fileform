@@ -99,6 +99,11 @@ jobs:
         run: |
           python crates/fileform-engine/tests/smoke-media.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/media-smoke-windows.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify selected Windows audio tracks
+        shell: pwsh
+        run: |
+          python crates/fileform-engine/tests/smoke-audio-selection.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/audio-selection-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Probe Media Foundation parameters for diagnostic runs
         if: inputs.pack_run_id != ''
         shell: pwsh
@@ -122,6 +127,7 @@ jobs:
             Artifacts/pack-origin.json
             Artifacts/media-foundation-probe.jsonl
             Artifacts/media-smoke-windows.json
+            Artifacts/audio-selection-windows.txt
             Artifacts/video-encoder-windows.jsonl
             Artifacts/engine-build-windows/*.log
             Artifacts/engine-build-windows/verification.txt

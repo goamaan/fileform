@@ -8,6 +8,7 @@ use std::path::PathBuf;
 fn main() {
     let raw: Vec<_> = std::env::args_os().skip(1).collect();
     let (args, collision) = collision_argument(raw);
+    let (args, audio_stream) = audio_stream_argument(args);
     let mut request = match args.as_slice() {
         [command, input, output, directory, renderer, tail @ ..]
             if command == "optimize-pdf-images" =>
@@ -364,6 +365,7 @@ fn main() {
             }
         }
         [command, input, directory] if command == "waveform" => Request::MediaWaveform {
+            audio_stream: None,
             input: PathBuf::from(input),
             directory: PathBuf::from(directory),
             bins: None,
@@ -377,6 +379,7 @@ fn main() {
                 })
             };
             Request::CopyAudioTrim {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -475,6 +478,7 @@ fn main() {
                 })
             };
             Request::TrimAudioTime {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -487,6 +491,7 @@ fn main() {
         }
         [command, input, directory] if command == "inspect-audio-timeline" => {
             Request::InspectAudioTimeline {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 directory: PathBuf::from(directory),
             }
@@ -520,6 +525,7 @@ fn main() {
                     std::process::exit(2)
                 });
             Request::FitAudio {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -573,6 +579,7 @@ fn main() {
                     })
             };
             Request::TrimAudio {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -585,6 +592,7 @@ fn main() {
         }
         [command, input, output, directory] if command == "convert-audio" => {
             Request::ConvertAudio {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -618,11 +626,23 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native optimize-pdf-images INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--quality 0.8] [--minimum-quality 0.5] [--max-dimension PIXELS] [--max-bytes BYTES] [--dry-run] | extract-pdf-images FOLDER PDF_PACK INPUT... [--pages RANGES] [--collision fail|rename] | plan-pdf-images PDF_PACK INPUT... [--pages RANGES] | export-pdf-images FOLDER PDF_PACK RENDER_PACK png|jpeg DPI INPUT... [--pages RANGES] [--quality 5-100] [--collision fail|rename] | export-pdf-jpeg INPUT OUTPUT.jpg PDF_PACK RENDER_PACK PAGE DPI [QUALITY] | export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI | plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... [--every COUNT | --ranges GROUPS | --after POSITIONS] [--dry-run] | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT... [--pages RANGES] [--collision fail|rename] | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native optimize-pdf-images INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--quality 0.8] [--minimum-quality 0.5] [--max-dimension PIXELS] [--max-bytes BYTES] [--dry-run] | extract-pdf-images FOLDER PDF_PACK INPUT... [--pages RANGES] [--collision fail|rename] | plan-pdf-images PDF_PACK INPUT... [--pages RANGES] | export-pdf-images FOLDER PDF_PACK RENDER_PACK png|jpeg DPI INPUT... [--pages RANGES] [--quality 5-100] [--collision fail|rename] | export-pdf-jpeg INPUT OUTPUT.jpg PDF_PACK RENDER_PACK PAGE DPI [QUALITY] | export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI | plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... [--every COUNT | --ranges GROUPS | --after POSITIONS] [--dry-run] | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT... [--pages RANGES] [--collision fail|rename] | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac,m4a}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac,m4a}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
     };
+    if let Some(index) = audio_stream {
+        match &mut request {
+            Request::MediaWaveform { audio_stream, .. }
+            | Request::CopyAudioTrim { audio_stream, .. }
+            | Request::TrimAudioTime { audio_stream, .. }
+            | Request::InspectAudioTimeline { audio_stream, .. }
+            | Request::FitAudio { audio_stream, .. }
+            | Request::TrimAudio { audio_stream, .. }
+            | Request::ConvertAudio { audio_stream, .. } => *audio_stream = Some(index),
+            _ => argument_error("This route does not yet accept audio track selection."),
+        }
+    }
     if let Some(policy) = collision {
         match &mut request {
             Request::OptimizePdfImages(options) => options.collision = policy,
@@ -878,4 +898,32 @@ fn collision_argument(
         }
     }
     (cleaned, collision)
+}
+
+fn audio_stream_argument(args: Vec<std::ffi::OsString>) -> (Vec<std::ffi::OsString>, Option<u32>) {
+    let mut cleaned = Vec::new();
+    let mut selected = None;
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--" {
+            cleaned.extend_from_slice(&args[index..]);
+            break;
+        }
+        if args[index] == "--audio-stream" {
+            if selected.is_some() {
+                argument_error("Repeated audio track selection.");
+            }
+            selected = Some(
+                args.get(index + 1)
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or_else(|| argument_error("Choose an existing audio stream index.")),
+            );
+            index += 2;
+        } else {
+            cleaned.push(args[index].clone());
+            index += 1;
+        }
+    }
+    (cleaned, selected)
 }

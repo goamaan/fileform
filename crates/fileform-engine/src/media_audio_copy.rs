@@ -8,6 +8,7 @@ use std::{path::Path, process::Command, time::Duration};
 #[derive(Debug, Serialize)]
 pub struct CopyReceipt {
     pub output: std::path::PathBuf,
+    pub source_stream_index: u32,
     pub bytes: u64,
     pub sha256: String,
     pub requested_interval: MediaInterval,
@@ -24,6 +25,7 @@ pub fn trim(
     output: &Path,
     directory: &Path,
     interval: MediaInterval,
+    selected: Option<u32>,
     expected: Option<&str>,
     cancel: &Cancellation,
 ) -> Result<CopyReceipt> {
@@ -43,17 +45,13 @@ pub fn trim(
         return Err(fail("source_changed", "The inspected source changed."));
     }
     let info = media_probe::inspect(source.snapshot.path(), directory, cancel)?;
-    if info.audio_tracks != 1 || !info.format.split(',').any(|v| v == "mov") {
+    if !info.format.split(',').any(|v| v == "mov") {
         return Err(fail(
             "unsupported",
             "Fast audio trim requires one AAC track in an MP4/MOV-family file.",
         ));
     }
-    let audio = info
-        .streams
-        .iter()
-        .find(|s| s.codec_type == "audio")
-        .expect("counted audio");
+    let audio = media_probe::audio(&info, selected)?;
     crate::media_audio::validate_trim_source(audio, false)?;
     if audio.codec_name.as_deref() != Some("aac") {
         return Err(fail("unsupported", "Fast audio trim requires AAC packets."));
@@ -265,6 +263,7 @@ pub fn trim(
         )
     })?;
     Ok(CopyReceipt {
+        source_stream_index: audio.index,
         output: output.to_path_buf(),
         bytes,
         sha256,
