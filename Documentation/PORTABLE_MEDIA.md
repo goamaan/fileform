@@ -743,3 +743,8 @@ Windows [36926000283](https://github.com/goamaan/fileform/actions/runs/369260002
 at `90d400c` passed selected-video-audio fixtures and all prior media suites. This
 supersedes the pending video-selection statement above; it does not establish
 playback acceptance, desktop integration or a signed release.
+
+Windows [36926777751](https://github.com/goamaan/fileform/actions/runs/36926777751)
+at `5b305ec` now passes complete native playback exports and all prior media suites.
+This supersedes the pending playback runtime statement above. Electron player,
+lease/cache management and final release acceptance remain open.

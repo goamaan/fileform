@@ -70,3 +70,13 @@ the subsequent selected-video-audio increment requires its own runtime evidence.
 at `90d400c` passed remux/convert/fit/exact/keyframe video selection with real distinct
 tracks, picture/audio/packet proofs, mute and rejection checks, plus prior media
 and audio selection suites. Native playback export is a subsequent increment.
+
+[Windows playback run 36926777751](https://github.com/goamaan/fileform/actions/runs/36926777751)
+at `5b305ec` passed complete selected audio/video playback exports with offset
+normalization, content/duration/dimension/hash verification, cancellation and
+changed-source cleanup, plus prior native media suites. Player/cache integration
+and signed-packaged-app acceptance remain open.
+
+[Windows HEIC dependency build 36927492490](https://github.com/goamaan/fileform/actions/runs/36927492490)
+at `6ac9bed` passed the pinned libheif/libde265 shared-library source build. It proves
+dependencies only; the subsequent isolated helper and runtime fixtures have a new CI gate.

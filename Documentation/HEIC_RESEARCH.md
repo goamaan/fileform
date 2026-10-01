@@ -175,3 +175,32 @@ HDR/gain-map rejection (including tone-map/compact-container representations),
 Rust image/OCR/PDF integration, native runtime tests on both systems, library
 replacement/rebuild packaging and Electron end-to-end integration. Do not replace
 these gates with a basic dependency build or advertise restored HEIC input yet.
+
+
+## Isolated decode helper evaluation — October 1, 2026
+
+`native/heic-decode` now builds a separate C++ helper against the pinned prefix.
+Its fixed-file reader bounds reads/seeks to a regular source of at most 512 MiB.
+Context limits precede container parsing (80 million pixels, bounded items/tiles,
+ICC and tracked allocations); no plugin loading, sequence, multiple top-level
+images, high-depth primary samples, PQ/HLG or detected gain-map/tone-map items are
+accepted. Strict decoding rejects warnings. Decode preserves source NCLX/ICC,
+applies HEIF geometry, bounds/checks the actual interleaved plane dimensions and
+stride, and emits bounded FH1 metadata + original ICC/EXIF + tightly packed RGBA.
+Library allocation accounting is not a whole-process or OS sandbox guarantee.
+
+Synthetic source-owned fixtures generated with `Tools/generate-heic-fixtures.swift`
+cover ordinary sRGB, Display-P3 ICC, alpha, all eight orientations and multiple
+images. Mac helper output agrees with independently oriented ImageIO decoder-space
+pixels within two 8-bit levels; alpha comparison accounts for premultiplication.
+Malformed/truncated/empty inputs and Unicode paths pass. Generator, metadata,
+pixel oracles and SHA-256 inventory are checked in. Embedded profile metadata
+originates from macOS. These are small owned fixtures, not private/user files.
+
+Windows source build `36927492490` at `6ac9bed` passed; the new workflow also builds
+the helper and runs these same fixtures. Its runtime acceptance is pending. No
+Rust adapter, image conversion route, OCR/PDF input route or Electron feature is
+closed by this prototype. Remaining gates include ICC/NCLX-to-sRGB ownership and
+broader transfer profiles, EXIF-only/conflicting orientation, grids, real gain-map
+and high-depth fixtures, resource/cancellation supervision, relocatable library
+packaging and LGPL replacement/rebuild paths. Keep HEIC advertised as pending.

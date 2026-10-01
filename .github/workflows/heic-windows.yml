@@ -22,6 +22,16 @@ jobs:
         run: |
           python Tools/build-heic-evaluation.py --work Artifacts/heic-dependency-evaluation --jobs 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and exercise isolated HEIC helper
+        shell: pwsh
+        run: |
+          $prefix = (Resolve-Path Artifacts/heic-dependency-evaluation/install).Path
+          cmake -S native/heic-decode -B Artifacts/heic-helper-evaluation -A x64 "-DHEIC_ROOT=$prefix" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build Artifacts/heic-helper-evaluation --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python native/heic-decode/smoke.py Artifacts/heic-helper-evaluation/Release/fileform-heic-decode.exe native/heic-decode/fixtures | Tee-Object -FilePath Artifacts/heic-helper-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain source build evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -34,4 +44,6 @@ jobs:
             Artifacts/heic-dependency-evaluation/*.tar.gz
             Artifacts/heic-dependency-evaluation/licenses/
             Artifacts/heic-dependency-evaluation/install/
+            Artifacts/heic-helper-evaluation/Release/
+            Artifacts/heic-helper-windows.txt
           retention-days: 14
