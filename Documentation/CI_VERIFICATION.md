@@ -65,3 +65,8 @@ run `36924240663` at the same commit passed their existing suites.
 at `10975e7` passed real distinct-track selection, exact M4A trimming, existing
 media smoke and Media Foundation encoding/decoding. This covers audio-only routes;
 the subsequent selected-video-audio increment requires its own runtime evidence.
+
+[Windows selected video audio run 36926000283](https://github.com/goamaan/fileform/actions/runs/36926000283)
+at `90d400c` passed remux/convert/fit/exact/keyframe video selection with real distinct
+tracks, picture/audio/packet proofs, mute and rejection checks, plus prior media
+and audio selection suites. Native playback export is a subsequent increment.

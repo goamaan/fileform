@@ -33,6 +33,12 @@ pub fn trim(
     cancel: &Cancellation,
 ) -> Result<CopyReceipt> {
     options.interval.validate()?;
+    if options.max_dimension.is_some() {
+        return Err(fail(
+            "invalid_request",
+            "Fast trim copies original pictures and cannot resize.",
+        ));
+    }
     let muxer = match output
         .extension()
         .and_then(|s| s.to_str())

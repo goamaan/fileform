@@ -21,8 +21,10 @@ mod jpeg_input;
 mod media_audio;
 mod media_audio_copy;
 pub use media_audio::SampleRange;
+pub use media_playback::Playback as MediaPlayback;
 mod media_pack;
 mod media_packets;
+mod media_playback;
 mod media_poster;
 mod media_probe;
 mod media_time_trim;
@@ -135,6 +137,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    MediaPlaybackPreview(MediaPlayback),
     OptimizePdfImages(PdfImageOptimization),
     ExtractPdfImages(PdfImageExtraction),
     ExportPdfImages(PdfRasterBatch),
@@ -373,6 +376,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    MediaPlaybackPreview(media_playback::PlaybackReceipt),
     OptimizedPdfImages(pdf_lossy_optimize::ImageOptimizationReceipt),
     PdfExtractedImages(pdf_image_extraction::ExtractionReceipt),
     PdfImages(pdf_raster_batch::BatchReceipt),
@@ -974,6 +978,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::MediaPlaybackPreview(options) = &request {
+        return media_playback::export(options, cancellation).map(Response::MediaPlaybackPreview);
+    }
     if let Request::OptimizePdfImages(options) = &request {
         return pdf_lossy_optimize::optimize(options, cancellation)
             .map(Response::OptimizedPdfImages);
@@ -1386,7 +1393,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::OptimizePdfImages(..)
+        Request::MediaPlaybackPreview(..)
+        | Request::OptimizePdfImages(..)
         | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)
@@ -1431,7 +1439,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::OptimizePdfImages(..)
+        Request::MediaPlaybackPreview(..)
+        | Request::OptimizePdfImages(..)
         | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)

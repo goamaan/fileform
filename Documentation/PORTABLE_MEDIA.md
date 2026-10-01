@@ -711,3 +711,35 @@ Windows [36925202391](https://github.com/goamaan/fileform/actions/runs/369252023
 at `10975e7` now passes all native audio selection/M4A trim tests and previous
 media/Media Foundation regressions. This supersedes the pending audio-only runtime
 statement above; selected-video-audio acceptance remains pending its new CI run.
+
+
+## Complete playback export — October 1, 2026
+
+Native `media_playback_preview` and CLI `playback-preview INPUT OUTPUT.{wav,mp4}
+MEDIA_PACK` create a complete normalized playback recording. Audio-only input
+writes WAV; picture input writes H.264/AAC MP4. Options are `audio_stream`, explicit
+`mute_audio` for video, and a video `max_dimension` from 64 to 1920 (default 1280).
+The CLI uses `--audio-stream`, `--mute-audio`, and `--max-dimension`. Requests can
+bind `expected_source_sha256`. Ambiguous audio requires selection. Original CFR,
+SDR, channel/clock/format limits apply; mute and track selection cannot conflict.
+
+The outer operation snapshots the original, creates the recording in owned private
+staging, verifies selected stream counts, normalized zero clock, measured full
+duration, dimensions and content through the existing trim encoders/proofs, then
+hashes/syncs/rechecks the original and exclusively publishes the same artifact.
+A preview never replaces a source or existing output. Audio uses explicit 16-bit
+PCM; video is lossy. Final editor transformations must continue to bind the
+original source, not the preview file. This export does not yet implement the
+Electron player, cache/lease lifetime or crash cleanup.
+
+Mac CLI/worker fixtures pass selected audio and picture recordings with one-second
+source origins, complete duration, zero output clock, bounded pictures, exact WAV
+content, measured AAC content, hashes, explicit mute, invalid/missing/nonaudio/stale
+selection rejection, collisions, active cancellation and changed-source cleanup.
+The selected-video regression, Rust tests, Clippy and Windows cross-check pass.
+Windows playback runtime acceptance remains pending the new workflow step.
+
+Windows [36926000283](https://github.com/goamaan/fileform/actions/runs/36926000283)
+at `90d400c` passed selected-video-audio fixtures and all prior media suites. This
+supersedes the pending video-selection statement above; it does not establish
+playback acceptance, desktop integration or a signed release.

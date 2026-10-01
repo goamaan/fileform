@@ -9,6 +9,7 @@ use std::path::Path;
 #[serde(deny_unknown_fields)]
 pub struct VideoTrimOptions {
     pub audio_stream: Option<u32>,
+    pub max_dimension: Option<u32>,
     pub interval: MediaInterval,
     #[serde(default)]
     pub mute_audio: bool,
@@ -137,7 +138,10 @@ pub fn trim(
         (realized.end.ticks - realized.start.ticks) as f64 / f64::from(realized.end.timescale);
     let operation = media_video::VideoOperation {
         audio_stream: options.audio_stream,
-        encoding: Some(VideoEncoding::default()),
+        encoding: Some(VideoEncoding {
+            max_dimension: options.max_dimension,
+            ..Default::default()
+        }),
         encode_audio: true,
         mute_audio: options.mute_audio,
         selection: Some(media_video::VideoSelection {

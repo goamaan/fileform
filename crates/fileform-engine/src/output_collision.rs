@@ -71,6 +71,31 @@ pub(crate) fn publish_file(
         "No free output name within the collision policy.",
     ))
 }
+pub(crate) fn publish_path(
+    mut file: tempfile::TempPath,
+    destination: &Path,
+    policy: OutputCollision,
+    cancel: &Cancellation,
+) -> Result<PathBuf> {
+    for candidate in candidates(destination, false, policy) {
+        cancel.check()?;
+        let candidate = candidate?;
+        match file.persist_noclobber(&candidate) {
+            Ok(()) => return Ok(candidate),
+            Err(error) => {
+                if !collision(&error.error, &candidate) {
+                    return Err(error.error.into());
+                }
+                file = error.path;
+            }
+        }
+    }
+    Err(fail(
+        "collision",
+        "No free output name within the collision policy.",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
