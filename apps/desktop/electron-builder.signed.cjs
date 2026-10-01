@@ -1,6 +1,9 @@
 const path = require('node:path');
 const base = require('./electron-builder.cjs');
 const identity = process.env.FILEFORM_SIGNING_IDENTITY;
+// Full-runtime signing must regenerate nested pack manifests after signing.
+// Do not silently use the earlier worker-only signature recipe on this bundle.
+throw new Error('Full native-runtime signing and manifest refresh must be completed before a signed release build.');
 if (process.platform !== 'darwin' || !identity?.trim()) {
   throw new Error('Signed macOS builds require FILEFORM_SIGNING_IDENTITY and a Mac.');
 }

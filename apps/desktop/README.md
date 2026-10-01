@@ -4,28 +4,46 @@ Electron + React UI with an isolated, optimized Rust worker. This is the first
 working migration slice, not the full Fileform replacement or a public release.
 The native macOS reference remains in `apps/macos` with the broader capabilities.
 
-Current flow: native picker → CSV/TSV inspection → native save dialog → verified
-JSON output → reveal in Finder/Explorer. Files are not processed in the renderer.
+Current app flow covers tables and PNG/JPEG/TIFF/HEIC images, including crop,
+resize and fitting. The complete reviewed media/PDF/render/OCR/HEIC tool runtime
+is now bundled for the next broad integration pass. Media/PDF/OCR desktop actions
+are still being connected. Follow Documentation/BREADTH_FIRST_PARITY.md.
 Light/dark/system appearance and normal display-filling launch are implemented.
-No account, activation, trial, device limit or payment integration exists.
+No accounts, activation or payments are part of Fileform.
 
 ## Build on the target operating system
 
-From the repository root:
+Build the Rust CLI/worker on the target operating system, then stage all five
+reviewed native packs using `Tools/stage-desktop-runtime.py`. Pass `--worker`,
+`--cli`, `--media`, `--pdf`, `--renderer`, `--ocr`, `--heic` and a new
+`--destination Artifacts/DesktopRuntime`. The stager verifies declared file hashes,
+architecture, licenses and actual native loading before publishing the runtime.
 
 ```sh
 cargo build --release --workspace --locked
 npm ci --prefix apps/desktop
 npm run build --prefix apps/desktop
+npm run notices --prefix apps/desktop
 cd apps/desktop
 npx electron-builder --dir --config electron-builder.cjs
 ```
 
-On Windows, use `npx electron-builder --win nsis --x64 --config electron-builder.cjs`
-for an installer after building the native Windows worker. Do not package a Mac
-worker into a Windows app. CI is configured to build on native Windows/macOS hosts.
-`private: true` in package.json prevents accidental npm publication; this source is
-open source under the root Apache-2.0 license.
+`FILEFORM_RUNTIME_ROOT` can select a separately staged development runtime.
+Packaged apps resolve their own `Contents/Resources/native` (Mac) or equivalent
+Windows resources. No developer environment variable or external tool installation
+is required by the packaged image/table flows.
+
+Windows CI imports successful recipe-matching main tool-pack builds, stages them
+with the current Rust worker and produces an NSIS installer. Mac CI builds the
+pinned tools and stages a matching arm64 runtime. Intel Mac staging has not yet
+been added to this evaluated build route. Current Mac media/PDF packs require
+macOS 14; the installer declares that actual floor.
+
+`private: true` prevents accidental npm publication; this source is Apache-2.0.
+Native dependency notices and source archives remain in their packaged folders.
+The unsigned development runtime is not a production release. The old worker-only
+signing recipe now refuses a full-runtime build until nested tool signing, pack
+manifest refresh and enclosing bundle verification are implemented correctly.
 
 ## Boundaries
 
@@ -47,12 +65,12 @@ appearance persistence, existing-output rejection and Finder reveal. Saved bytes
 match the standalone CLI and an independent CSV parser. The hardened package was
 retested after changing the protocol, environment and fuses.
 
-Nine Rust tests and Clippy pass. The Rust workspace passes a Windows MSVC-target
-check on this Mac. This is **not** a linked Windows executable or Windows runtime
-acceptance. The new CI workflow has not run yet because public repository
-consolidation/publication is still pending.
+Native Mac/Windows runtime tests and the current Rust test suite are documented
+in Documentation/CI_VERIFICATION.md. Full-runtime package evidence is recorded in
+Documentation/ELECTRON_RELEASE.md. Native success does not establish desktop
+exposure or signed-release acceptance.
 
-Before public release: full operation parity, Windows build/runtime acceptance,
-worker cancellation/job recovery and directory-race hardening, persistence/data
-migration, performance benchmarks, complete third-party notices, code signing,
-notarization, updates, release metadata and the redesigned website.
+Remaining: shared file-first intake, all main actions, batches/setups/persistence,
+Windows packaged-app checks, native isolation/crash cleanup, final performance,
+complete licensing/rebuild delivery, full-runtime signing/notarization, secure
+updates and final website/copy acceptance.

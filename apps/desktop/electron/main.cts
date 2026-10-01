@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { basename, dirname, join, parse, resolve, relative, isAbsolute, sep } from 'node:path';
+import {loadRuntime,runtimeRoot,type NativeRuntime} from './runtime.cjs';
 import {validateImageExport,outputDimensions} from '../src/image-export.js';
 import { pathToFileURL } from 'node:url';
 import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
@@ -16,6 +17,8 @@ let windowCreation:Promise<void>|null=null;
 let busy=false;
 let cancelCurrent:(()=>void)|null=null;
 let mode:Appearance='system';
+let runtimePromise:Promise<NativeRuntime>|null=null;
+function nativeRuntime(){return runtimePromise??=loadRuntime(runtimeRoot(app.isPackaged,process.resourcesPath,resolve(__dirname,'../../../..')));}
 const children=new Set<ChildProcess>();
 const sources=new Map<string,SourceFile & {path:string;sha256:string}>();
 const saved=new Map<string,string>();
@@ -31,11 +34,11 @@ async function exclusive<T>(work:()=>Promise<T>):Promise<T> {
   busy=true; try { return await work(); } finally { busy=false; }
 }
 function worker(request:unknown):Promise<any> {
-  const filename='fileform-worker'+(process.platform==='win32'?'.exe':'');
-  const executable=app.isPackaged ? join(process.resourcesPath,'native',filename) : resolve(__dirname,'../../../../target/release',filename);
+  return nativeRuntime().then(runtime=>{
+  const executable=runtime.worker;
   return new Promise((resolve,reject)=>{
     const temp=app.getPath('temp');
-    const environment:NodeJS.ProcessEnv={TMPDIR:temp,TMP:temp,TEMP:temp};
+    const environment:NodeJS.ProcessEnv={TMPDIR:temp,TMP:temp,TEMP:temp,FILEFORM_HEIC_PACK:runtime.pack('heic')};
     if(process.platform==='win32'){environment.SystemRoot=process.env.SystemRoot;environment.PATH=join(process.env.SystemRoot??'C:\\Windows','System32');}else{environment.PATH='/usr/bin:/bin';}
     const child=spawn(executable,[],{stdio:['pipe','pipe','pipe'],windowsHide:true,env:environment});
     children.add(child);
@@ -49,7 +52,9 @@ function worker(request:unknown):Promise<any> {
       hardStop=setTimeout(()=>{stopped=true;child.kill('SIGKILL');},2000);
     };
     cancelCurrent=cancel;
-    const timer=setTimeout(cancel,45_000);
+    const operation=(request as {operation?:unknown})?.operation;
+    const timeout=typeof operation==='string'&&(/media|audio|video/.test(operation))?43_260_000:1_200_000;
+    const timer=setTimeout(cancel,timeout);
     child.stdout.on('data',(data:Buffer)=>{bytes+=data.length;if(bytes>1_048_576){stopped=true;child.kill();}else chunks.push(data);});
     child.stderr.resume();
     child.on('error',()=>{clearTimeout(timer);clearTimeout(hardStop);children.delete(child);if(cancelCurrent===cancel)cancelCurrent=null;reject(new Error('The native worker could not start.'));});
@@ -65,6 +70,7 @@ function worker(request:unknown):Promise<any> {
     });
     child.stdin.on('error',()=>{});
     child.stdin.write(JSON.stringify({request,cancel_on_disconnect:true})+'\n');
+  });
   });
 }
 ipcMain.handle('fileform:cancel',(event)=>{authorize(event);cancelCurrent?.();});
@@ -85,7 +91,7 @@ ipcMain.handle('fileform:choose',async(event)=>{
 ipcMain.handle('fileform:choose-image',async(event)=>{
   authorize(event);
   return exclusive(async()=>{
-    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg','tif','tiff']}]});
+    const result=await dialog.showOpenDialog(window!,{properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg','tif','tiff','heic','heif']}]});
     if(result.canceled||result.filePaths.length!==1)return null;
     const path=await fs.realpath(result.filePaths[0]);
     const info=await worker({operation:'inspect_image',input:path,preview:true});

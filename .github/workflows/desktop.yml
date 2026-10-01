@@ -2,12 +2,13 @@ name: Portable desktop preview
 on:
   push:
     branches: [main]
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'Tools/stage-desktop-runtime.py', 'Tools/build-desktop-runtime-mac.py', 'Tools/import-windows-runtime-packs.py', 'native/**', 'Tools/build-ocr-evaluation.py', 'Tools/build-heic-evaluation.py', 'Tools/build-media-pack.sh', 'Tools/build-pdf-pack.sh', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
   pull_request:
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'apps/desktop/**', 'Tools/smoke-portable.py', 'Tools/smoke-images.py', 'Tools/smoke-cancellation.py', 'Tools/smoke-source-types.py', 'Tools/check-ci-routing.py', 'Tools/stage-desktop-runtime.py', 'Tools/build-desktop-runtime-mac.py', 'Tools/import-windows-runtime-packs.py', 'native/**', 'Tools/build-ocr-evaluation.py', 'Tools/build-heic-evaluation.py', 'Tools/build-media-pack.sh', 'Tools/build-pdf-pack.sh', 'LICENSE', 'NOTICE', '.github/workflows/desktop.yml']
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: true
@@ -18,7 +19,7 @@ jobs:
       matrix:
         os: [macos-26, windows-2025]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify CI file routing
@@ -47,6 +48,28 @@ jobs:
         run: python Tools/smoke-cancellation.py
       - name: Verify supported source file types
         run: python Tools/smoke-source-types.py
+      - name: Build complete Mac processing runtime
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILEFORM_BUILD_JOBS: '4'
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        shell: bash
+        run: |
+          command -v gpg || brew install gnupg
+          command -v ninja || brew install ninja
+          python3 Tools/build-desktop-runtime-mac.py --destination Artifacts/DesktopRuntime
+      - name: Import and verify complete Windows processing runtime
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          python Tools/import-windows-runtime-packs.py --repository $env:GITHUB_REPOSITORY --destination Artifacts/desktop-native-imports
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packs = (Get-Content Artifacts/desktop-native-imports/imports.json | ConvertFrom-Json).paths
+          python Tools/stage-desktop-runtime.py --worker target/release/fileform-worker.exe --cli target/release/fileform-native.exe --media $packs.'MediaPack-Windows' --pdf $packs.'PDFPack-Windows' --renderer $packs.'PDFRenderPack-Windows' --ocr $packs.OCRPack --heic $packs.'HEICPack-Windows' --destination Artifacts/DesktopRuntime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install desktop dependencies
         working-directory: apps/desktop
         run: npm ci
@@ -79,4 +102,6 @@ jobs:
             Artifacts/Verification/portable-smoke.json
             Artifacts/Verification/portable-cancellation.json
             Artifacts/Verification/portable-images.json
+            Artifacts/DesktopRuntime/runtime.json
+            Artifacts/desktop-native-imports/imports.json
           retention-days: 14

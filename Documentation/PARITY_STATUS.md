@@ -40,8 +40,8 @@ The user's October 1 steering supersedes native-domain-first work. Follow
 
 Preserve all native work and original scope. Do not expand PDF/HEIC corner-case
 coverage while another main family has no desktop route. Safety, truthful limits
-and relevant verification apply in every phase. Current builder bundles the Rust
-worker/notices, not all required native packs; packaging belongs in the foundation.
+and relevant verification apply in every phase. The builder now requires a complete staged native runtime. Mac package loading
+and HEIC GUI export pass; new full-runtime CI and production signing remain open.
 
 ## Existing foundations to preserve
 
