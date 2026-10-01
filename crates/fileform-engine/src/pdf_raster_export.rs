@@ -50,8 +50,9 @@ fn line(reader: &mut impl BufRead, expected: &[u8]) -> Result<()> {
     }
     Ok(())
 }
-#[derive(Clone, Copy)]
-pub(crate) enum Format {
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Format {
     Png,
     Jpeg,
 }
@@ -60,6 +61,38 @@ pub(crate) fn export(
     format: Format,
     cancel: &Cancellation,
 ) -> Result<RasterReceipt> {
+    validate(options, format)?;
+    let mut source = Source::open_with_limit(&options.input, cancel.clone(), 512 * 1024 * 1024)?;
+    let inspection = pdf_pages::inspect(source.snapshot.path(), &options.directory, cancel)?;
+    if inspection
+        .special_preservation_keys
+        .iter()
+        .any(|v| matches!(v.as_str(), "/Encrypt" | "/XFA"))
+    {
+        return Err(fail(
+            "unsupported",
+            "Page export requires an unencrypted PDF without XFA forms.",
+        ));
+    }
+    let geometry = inspection
+        .pages
+        .get(options.page_index as usize)
+        .ok_or_else(|| fail("invalid_request", "The selected PDF page does not exist."))?;
+    let candidate = render_prepared(
+        options,
+        format,
+        PreparedRaster {
+            document: source.snapshot.path(),
+            geometry,
+            source_sha256: &source.hash,
+        },
+        512 * 1024 * 1024,
+        cancel,
+    )?;
+    source.check(&options.input)?;
+    candidate.publish(cancel)
+}
+pub(crate) fn validate(options: &PageExport, format: Format) -> Result<()> {
     let extension = options
         .output
         .extension()
@@ -81,29 +114,59 @@ pub(crate) fn export(
     if options.output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
-    let mut source = Source::open_with_limit(&options.input, cancel.clone(), 512 * 1024 * 1024)?;
-    let inspection = pdf_pages::inspect(source.snapshot.path(), &options.directory, cancel)?;
-    if inspection
-        .special_preservation_keys
-        .iter()
-        .any(|v| matches!(v.as_str(), "/Encrypt" | "/XFA"))
-    {
-        return Err(fail(
-            "unsupported",
-            "Page export requires an unencrypted PDF without XFA forms.",
-        ));
+    Ok(())
+}
+pub(crate) struct PreparedRaster<'a> {
+    pub document: &'a Path,
+    pub geometry: &'a pdf_pages::PageGeometry,
+    pub source_sha256: &'a str,
+}
+pub(crate) struct RasterCandidate {
+    temporary: tempfile::NamedTempFile,
+    pub receipt: RasterReceipt,
+    parent: PathBuf,
+    identity: same_file::Handle,
+}
+impl RasterCandidate {
+    pub(crate) fn publish(self, cancel: &Cancellation) -> Result<RasterReceipt> {
+        if self.identity != same_file::Handle::from_path(self.parent)? {
+            return Err(fail("output_changed", "Output folder changed."));
+        }
+        self.temporary.as_file().sync_all()?;
+        cancel.check()?;
+        self.temporary
+            .persist_noclobber(&self.receipt.output)
+            .map_err(|e| {
+                fail(
+                    if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                        "collision"
+                    } else {
+                        "io"
+                    },
+                    e.error.to_string(),
+                )
+            })?;
+        Ok(self.receipt)
     }
-    let geometry = inspection
-        .pages
-        .get(options.page_index as usize)
-        .ok_or_else(|| fail("invalid_request", "The selected PDF page does not exist."))?;
-    let plan = pdf_raster_plan::dimensions(geometry, options.dpi, 0)?;
+}
+pub(crate) fn render_prepared(
+    options: &PageExport,
+    format: Format,
+    prepared: PreparedRaster<'_>,
+    maximum_bytes: u64,
+    cancel: &Cancellation,
+) -> Result<RasterCandidate> {
+    validate(options, format)?;
+    if maximum_bytes == 0 {
+        return Err(fail("limit", "Page-image output budget is exhausted."));
+    }
+    let plan = pdf_raster_plan::dimensions(prepared.geometry, options.dpi, 0)?;
     let working = tempfile::tempdir()?;
     let mut raster = tempfile::NamedTempFile::new_in(working.path())?;
     let (mut command, _) = pdf_render::command(&options.renderer_directory, cancel)?;
     command
         .current_dir(working.path())
-        .arg(source.snapshot.path())
+        .arg(prepared.document)
         .arg(options.page_index.to_string())
         .arg(format!("raster:{}x{}", plan.width, plan.height))
         .arg("crop")
@@ -141,6 +204,7 @@ pub(crate) fn export(
             &mut temporary,
             &plan,
             options.dpi,
+            maximum_bytes,
             cancel,
         )?),
         Format::Jpeg => {
@@ -150,37 +214,22 @@ pub(crate) fn export(
                 &plan,
                 options.dpi,
                 quality.expect("JPEG quality"),
+                maximum_bytes,
                 cancel,
             )?;
             None
         }
     };
-    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, 512 * 1024 * 1024)?;
-    source.check(&options.input)?;
-    if identity != same_file::Handle::from_path(parent)? {
-        return Err(fail("output_changed", "Output folder changed."));
-    }
-    temporary.as_file().sync_all()?;
-    cancel.check()?;
-    temporary.persist_noclobber(&options.output).map_err(|e| {
-        fail(
-            if e.error.kind() == std::io::ErrorKind::AlreadyExists {
-                "collision"
-            } else {
-                "io"
-            },
-            e.error.to_string(),
-        )
-    })?;
+    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, maximum_bytes)?;
     let mut warnings=vec!["Rendered as an image. Searchable text, vectors, interactive behavior and document metadata are not retained."];
     if quality.is_some() {
         warnings.push("JPEG adds lossy encoding at the requested quality.");
     }
-    Ok(RasterReceipt {
+    let receipt = RasterReceipt {
         output: options.output.clone(),
         bytes,
         sha256,
-        source_sha256: source.hash,
+        source_sha256: prepared.source_sha256.to_owned(),
         page_index: options.page_index,
         width: plan.width,
         height: plan.height,
@@ -192,6 +241,12 @@ pub(crate) fn export(
         },
         quality,
         warnings,
+    };
+    Ok(RasterCandidate {
+        temporary,
+        receipt,
+        parent: parent.into(),
+        identity,
     })
 }
 
@@ -200,6 +255,7 @@ fn encode_png(
     temporary: &mut tempfile::NamedTempFile,
     plan: &pdf_raster_plan::RasterPagePlan,
     dpi: u16,
+    maximum_bytes: u64,
     cancel: &Cancellation,
 ) -> Result<u32> {
     let ppm = (f64::from(dpi) / 0.0254).round() as u32;
@@ -209,7 +265,7 @@ fn encode_png(
             inner: temporary.as_file_mut(),
             cancellation: cancel.clone(),
             bytes: 0,
-            maximum_bytes: 512 * 1024 * 1024,
+            maximum_bytes,
         };
         let mut encoder = png::Encoder::new(limited, plan.width, plan.height);
         encoder.set_color(png::ColorType::Rgb);
@@ -290,6 +346,7 @@ fn encode_jpeg(
     plan: &pdf_raster_plan::RasterPagePlan,
     dpi: u16,
     quality: u8,
+    maximum_bytes: u64,
     cancel: &Cancellation,
 ) -> Result<()> {
     use image::ImageEncoder;
@@ -311,7 +368,7 @@ fn encode_jpeg(
             inner: temporary.as_file_mut(),
             cancellation: cancel.clone(),
             bytes: 0,
-            maximum_bytes: 512 * 1024 * 1024,
+            maximum_bytes,
         };
         let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(limited, quality);
         encoder.set_pixel_density(image::codecs::jpeg::PixelDensity::dpi(dpi));

@@ -68,10 +68,11 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
 }
 
 pub(crate) struct Prepared {
-    sources: Vec<Source>,
-    geometries: Vec<Vec<pdf_pages::PageGeometry>>,
+    pub(crate) sources: Vec<Source>,
+    pub(crate) geometries: Vec<Vec<pdf_pages::PageGeometry>>,
     prepared: Vec<tempfile::NamedTempFile>,
-    documents: Vec<PathBuf>,
+    pub(crate) special: Vec<Vec<String>>,
+    pub(crate) documents: Vec<PathBuf>,
 }
 pub(crate) fn prepare(
     inputs: &[PathBuf],
@@ -83,6 +84,7 @@ pub(crate) fn prepare(
     }
     let mut sources = Vec::new();
     let mut geometries = Vec::new();
+    let mut special = Vec::new();
     let mut prepared = Vec::new();
     let mut documents = Vec::new();
     let mut prepared_bytes = 0;
@@ -112,7 +114,9 @@ pub(crate) fn prepare(
             source.snapshot.path().to_path_buf()
         };
         let info = pdf_inspect::inspect(&document, directory, cancel)?;
-        let geometry = pdf_pages::inspect(&document, directory, cancel)?.pages;
+        let page_info = pdf_pages::inspect(&document, directory, cancel)?;
+        let geometry = page_info.pages;
+        special.push(page_info.special_preservation_keys);
         documents.push(document);
         if geometry.len() != info.pages as usize {
             return Err(fail("verification", "PDF page inspections disagree."));
@@ -125,6 +129,7 @@ pub(crate) fn prepare(
         geometries,
         prepared,
         documents,
+        special,
     })
 }
 pub(crate) fn individual_pages(state: &Prepared) -> Vec<Vec<PdfPageSelection>> {
@@ -157,6 +162,7 @@ pub(crate) fn compose_prepared(
         geometries,
         prepared,
         documents,
+        ..
     } = state;
     let all;
     let selected = match &options.pages {

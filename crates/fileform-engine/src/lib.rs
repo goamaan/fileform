@@ -54,7 +54,10 @@ pub use pdf_compose::{Composition as PdfComposition, PdfPageSelection};
 mod pdf_document_text;
 mod pdf_pages;
 mod pdf_preservation;
+mod pdf_raster_batch;
 mod pdf_raster_export;
+pub use pdf_raster_batch::RasterBatch as PdfRasterBatch;
+pub use pdf_raster_export::Format as PdfRasterFormat;
 mod pdf_raster_plan;
 pub use pdf_raster_export::PageExport as PdfPngExport;
 pub use pdf_raster_export::PageExport as PdfJpegExport;
@@ -121,6 +124,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ExportPdfImages(PdfRasterBatch),
     ExportPdfPng(PdfPngExport),
     ExportPdfJpeg(PdfJpegExport),
     PlanPdfRaster {
@@ -344,6 +348,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfImages(pdf_raster_batch::BatchReceipt),
     PdfPng(pdf_raster_export::RasterReceipt),
     PdfJpeg(pdf_raster_export::RasterReceipt),
     PdfRasterPlan(pdf_raster_plan::RasterPlan),
@@ -942,6 +947,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::ExportPdfImages(options) = &request {
+        return pdf_raster_batch::export(options, cancellation).map(Response::PdfImages);
+    }
     if let Request::ExportPdfPng(options) = &request {
         return pdf_raster_export::export(options, pdf_raster_export::Format::Png, cancellation)
             .map(Response::PdfPng);
@@ -1309,7 +1317,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ExportPdfJpeg(..)
+        Request::ExportPdfImages(..)
+        | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)
         | Request::PlanPdfRaster { .. }
         | Request::OcrImage { .. }
@@ -1351,7 +1360,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ExportPdfJpeg(..)
+        Request::ExportPdfImages(..)
+        | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)
         | Request::PlanPdfRaster { .. }
         | Request::OcrImage { .. }

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-23",
+  "updated": "2026-10-01",
   "note": "Reference ledger statuses are historical, not proof of portable completion. Native implementation and Electron integration are distinct; see PARITY_STATUS.md. Commerce requirements remain cancelled and all remaining scope is retained.",
   "requirements": [
     {
@@ -266,8 +266,8 @@
       "reference_ledger_status": "verified",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Bounded single-page PNG rendering and static form appearances exist.",
-      "remaining": "Full-resolution DPI-based PNG/JPEG export and embedded-image extraction."
+      "evidence_notes": "DPI-based single and ordered-batch PNG/JPEG export, mixed image inputs and static form appearances exist with Mac fixture evidence.",
+      "remaining": "CLI selection/rename options, embedded-image extraction, current Windows acceptance and desktop integration."
     },
     {
       "id": "PDF05",

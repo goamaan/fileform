@@ -510,3 +510,34 @@ publication and mixed image sources remain needed for full original raster parit
 Windows run [35833734048](https://github.com/goamaan/fileform/actions/runs/35833734048)
 passed at afab174, covering streamed PNG output. The JPEG increment is newer and
 requires its own Windows result.
+
+### Ordered page-image folders — October 1, 2026
+
+`export-pdf-images FOLDER PDF_PACK RENDER_PACK png|jpeg DPI INPUT...` exports all
+source pages in input order. Worker `export_pdf_images` accepts optional explicit
+`pages` with the same zero-based source/page selection and extra clockwise rotation
+as PDF composition, plus DPI, format, JPEG quality and `allow_rasterization: true`.
+Selections preserve order and duplicates. Naming is `001.png`/`001.jpg`, etc.; the
+receipt records each image's source/page/rotation, dimensions, bytes and hash.
+This is page rendering; embedded image object extraction remains a different task.
+
+The operation shares verified source snapshots and prepared PNG/JPEG/TIFF image
+pages with composition. Every selected geometry/target is checked before rendering;
+all bound sources, including unused ones, are rechecked before final publication.
+Each output retains the independently verified single-page encoding path. Limits
+are 128 bound sources, 512 MiB combined input/prepared-image staging, 1000 selected
+outputs, 512 MiB combined final image output and bounded result metadata. Each
+encoder receives the remaining output byte budget. Images inherit the composition
+policy of one PDF point per oriented pixel, sRGB normalization and white-backed
+raster output. The final directory moves exclusively only after the full set
+succeeds. Cancel/failure cleans the owned tree without publishing partial results.
+
+Mac fixture evidence covers mixed PDF/image input, exact order, duplicates with
+independent rotations, pixel equality against the planned renderer, DPI/receipt
+provenance, default JPEG batch equality to standalone decoded JPEGs, invalid
+selection/fidelity/quality/DPI rejection, existing-folder protection, cancellation
+after the first staged image and a changed unused source. Shared single-page PNG/
+JPEG, composition and split regression tests pass after the refactor. Windows CI
+now includes the same folder fixture; its result is still required. CLI named
+selection/rotation options, collision rename policy and final UI integration remain
+open even though the worker can express ordered page selections.

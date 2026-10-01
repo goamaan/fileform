@@ -1,6 +1,6 @@
 # Release and parity status
 
-Reviewed September 23, 2026 against the active checkout. This is a work checklist,
+Reviewed October 1, 2026 against the active checkout. This is a work checklist,
 not release acceptance. Native capabilities below have bounded implementations
 and fixture evidence; they do not imply every original option or UI flow is done.
 The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
@@ -15,7 +15,7 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 | Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters | Not wired | VFR/track/extended-color gaps, playback proxies and editor integration |
 | PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, complete-folder split | Not wired | Marker/range/interval planning and editing UI; remaining original policies |
 | PDF compression | All-page lossless rewrite with graph/geometry/text/render checks | Not wired | Targeted lossy image optimization and its preservation proofs |
-| PDF images | DPI-based single-page PNG/JPEG export, bounded previews, static annotations/widgets | Not wired | Ordered/selected image-directory output, mixed image sources, embedded-image discovery/extraction |
+| PDF images | DPI-based single/batch PNG/JPEG export with ordered/rotated PDF/image selections, bounded previews, static annotations/widgets | Not wired | CLI selection/rename options, embedded-image discovery/extraction, final UI integration |
 | Text / OCR | Per-page and whole-document embedded text; explicit-English image/PDF OCR | Not wired | Automatic multilingual behavior, wider quality/orientation/form coverage and final UI |
 | Direct URLs | No portable request route | Not wired | Existing direct-media lookup/download/trim workflow |
 
