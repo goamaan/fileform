@@ -247,3 +247,30 @@ pack, Rust adapter and PDF/OCR interoperability; current runtime acceptance is
 pending. This adapter does not close wider grid/gain-map/high-depth/EXIF-only or
 conflicting-orientation fixtures, platform/library hardening, production bundling,
 Electron exposure or final HEIC parity. Those gates remain required.
+
+
+## Container and orientation acceptance — October 1, 2026
+
+Owned metadata fixtures assembled around the synthetic HEVC samples now exercise
+reused grid tiles, explicit P3 and BT.709 NCLX, ordinary depth auxiliaries, Apple/ISO
+gain-map declarations, PQ/HLG and tone-map items, EXIF-only orientation and conflicting
+EXIF versus HEIF rotation. The generator assembles bounded known fixture boxes;
+it is not a production parser or HEIC writer. ImageIO oracles come from a separate
+reader script. Current Mac tests pass grid/depth/P3 and gain/HDR/tmap rejection.
+These are metadata-policy fixtures; camera-specific gain metadata and real high-depth
+coded samples remain further acceptance cases.
+
+EXIF-only testing found that ImageIO ignores HEIC EXIF orientation even without
+HEIF transform properties. Rust now validates bounded EXIF metadata but leaves
+display orientation entirely to the helper's HEIF transforms. Both EXIF-only and
+conflicting cases match the original. This supersedes the earlier proposal to
+apply EXIF when rotation/mirror properties are absent.
+
+For explicit NCLX BT.709 transfer, ImageIO assigns sRGB while Rust/moxcms follows
+the declared transfer. The portable result matches an independent scalar inverse
+BT.709/sRGB calculation within two levels, but differs from ImageIO by up to 17.
+This is documented separately, not counted as pixel-equivalent baseline behavior.
+The remaining color-policy decision must stay visible in parity/release acceptance.
+All decode warnings still fail closed; no warning was suppressed to make these
+fixtures pass. Library `NCLX_colr_VUI_mismatch` warnings exposed an initial fixture
+range-tag mistake; corrected full-range fixtures are warning-free.

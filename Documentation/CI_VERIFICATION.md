@@ -80,3 +80,10 @@ and signed-packaged-app acceptance remain open.
 [Windows HEIC dependency build 36927492490](https://github.com/goamaan/fileform/actions/runs/36927492490)
 at `6ac9bed` passed the pinned libheif/libde265 shared-library source build. It proves
 dependencies only; the subsequent isolated helper and runtime fixtures have a new CI gate.
+
+Windows at `911fc26`: [HEIC run 36935031114](https://github.com/goamaan/fileform/actions/runs/36935031114)
+passed the helper, relocatable shared-library pack, Rust common-input pipeline and
+ImageIO/color fixtures after the LF checkout fix.
+[PDF run 36935031141](https://github.com/goamaan/fileform/actions/runs/36935031141)
+passed the complete PDF suite plus HEIC image assembly and image OCR. Subsequent
+container/orientation changes require their own current-head runtime acceptance.

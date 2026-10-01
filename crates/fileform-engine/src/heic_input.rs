@@ -204,7 +204,7 @@ fn read(mut reader: impl BufRead, cancel: &Cancellation) -> Result<DecodedImage>
     }
     let icc = bytes(&mut reader, *icc_size as usize, cancel)?;
     let exif = bytes(&mut reader, *exif_size as usize, cancel)?;
-    let exif_orientation = if !exif.is_empty() {
+    if !exif.is_empty() {
         let offset = u32::from_be_bytes(
             exif.get(..4)
                 .ok_or_else(invalid)?
@@ -212,15 +212,11 @@ fn read(mut reader: impl BufRead, cancel: &Cancellation) -> Result<DecodedImage>
                 .map_err(|_| invalid())?,
         ) as usize;
         let offset = offset.checked_add(4).ok_or_else(invalid)?;
-        image_orientation::parse_exif(exif.get(offset..).ok_or_else(invalid)?)?
-    } else {
-        1
-    };
-    let orientation = if *transformed == 1 {
-        1
-    } else {
-        exif_orientation
-    };
+        image_orientation::parse_exif(exif.get(offset..).ok_or_else(invalid)?)?;
+    }
+    // HEIF container transforms own display orientation. ImageIO ignores the
+    // embedded EXIF orientation, including EXIF-only and conflicting files.
+    let orientation = 1;
     let count = (*width as usize)
         .checked_mul(*height as usize)
         .and_then(|v| v.checked_mul(4))

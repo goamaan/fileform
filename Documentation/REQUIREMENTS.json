@@ -100,8 +100,8 @@
       "reference_ledger_status": "implementing",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "PNG/JPEG/TIFF native routes and current desktop wiring exist. Common SDR HEIC now uses an isolated source-built helper with Rust conversion/crop/resize/fit, ICC/alpha/orientation and Mac CLI/worker/PDF/OCR fixtures.",
-      "remaining": "Wider HEIC grid/gain-map/depth/EXIF and original-format acceptance; current Windows HEIC runtime; HEIC bundle/desktop integration and final UI checks."
+      "evidence_notes": "Common SDR HEIC has real Mac/Windows CLI/worker/PDF/OCR acceptance. Mac owned grid, NCLX, depth/gain-map and EXIF-only/conflicting orientation cases are tested; HEIF transforms own orientation like ImageIO.",
+      "remaining": "Current Windows container acceptance, camera/high-depth and other original-format fixtures, explicit BT.709 color-policy difference, HEIC desktop/bundling and final app acceptance."
     },
     {
       "id": "IMG02",

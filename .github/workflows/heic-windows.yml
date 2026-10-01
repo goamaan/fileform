@@ -41,6 +41,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python native/heic-decode/stage-evaluation.py Artifacts/heic-helper-evaluation/Release Artifacts/heic-dependency-evaluation Artifacts/HEICPack-Windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-heic-containers.py Artifacts/HEICPack-Windows | Tee-Object -FilePath Artifacts/heic-containers-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-heic.py Artifacts/HEICPack-Windows | Tee-Object -FilePath Artifacts/heic-engine-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain source build evidence
@@ -58,5 +60,6 @@ jobs:
             Artifacts/heic-helper-evaluation/Release/
             Artifacts/heic-helper-windows.txt
             Artifacts/heic-engine-windows.txt
+            Artifacts/heic-containers-windows.txt
             Artifacts/HEICPack-Windows/
           retention-days: 14

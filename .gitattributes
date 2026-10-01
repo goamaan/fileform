@@ -3,3 +3,6 @@ native/heic-decode/fixtures/*.json text eol=lf
 native/heic-decode/fixtures/*.rgba binary
 native/heic-decode/fixtures/*.heic binary
 crates/fileform-engine/tests/fixtures/*.heic binary
+native/heic-decode/container-fixtures/*.json text eol=lf
+native/heic-decode/container-fixtures/*.rgba binary
+native/heic-decode/container-fixtures/*.heic binary
