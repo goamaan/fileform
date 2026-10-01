@@ -610,3 +610,42 @@ Windows runtime acceptance is pending the new workflow; the preceding extraction
 run exposed Windows FlushFileBuffers on a read-only file, corrected to open the
 owned staged artifact for reading and writing before hashing/flushing. None of
 this establishes Electron integration or production release acceptance.
+
+Windows run [36921065308](https://github.com/goamaan/fileform/actions/runs/36921065308)
+at `36dd0b1` now passes the complete native PDF fixture set, including extraction,
+lossy optimization/fit, actual mask/profile preservation and cancellation/source
+change cleanup. This supersedes the pending Windows acceptance above.
+
+
+## Page planning and collision policies — October 1, 2026
+
+`split-pdf FOLDER PDF_PACK RENDER_PACK INPUT...` supports exactly one optional
+`--every COUNT`, `--ranges '1-3;4,2;5'` or `--after '3,7'`, plus `--dry-run`.
+Without a selector it still exports individual pages. Positions are one-based
+in the concatenated inputs; intervals include a final shorter group, ranges
+preserve order/duplicates, markers must be unique increasing positions before
+the last page. Worker `split_pdf.selection` is a tagged `{mode: ranges|every|after}`
+object. Explicit `groups` and selection are mutually exclusive. Dry-run returns
+validated groups and source hashes without creating an output directory.
+
+Merge, batch page export and embedded extraction now accept `--pages '3,1-2,3'`;
+worker `page_ranges` and explicit `pages` are mutually exclusive. Parse/resolve
+happens against the same private source snapshots used by execution. Selection
+is bounded to 16384 bytes and 1000 output pages. Batch JPEG also accepts
+`--quality 5-100`. Use `--` before literal input names starting with `--`.
+
+These routes and image optimization support `--collision fail|rename` (worker
+`collision`, default fail). Rename atomically publishes the **same verified staged
+candidate** as `name (1).ext`, `name (2).ext`, or `folder (1)`, with 1000 bounded
+name candidates. It does not rerun processing or take a new source snapshot on a
+late conflict. Actual destination is returned in the receipt. Complete-directory
+publication preserves every existing file/folder, including empty directories,
+symlinks and late arrivals. Plans do not reserve an output name.
+
+Mac CLI/worker fixtures cover mixed-source range order/duplicates, split interval
+remainder, markers, invalid/conflicting selectors, no-output plans, actual rename
+receipts for split/raster/extraction/optimization, source preservation and existing
+cancel/change cleanup. Workspace tests pass 99 tests with two supervised subprocess
+fixtures ignored in their standalone form; Clippy and Windows cross-check pass.
+Current Windows runtime acceptance for this planning/policy increment is pending.
+Desktop integration remains open.

@@ -10,9 +10,11 @@ use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ImageOptimization {
+    #[serde(default)]
+    pub collision: crate::OutputCollision,
     pub input: PathBuf,
     pub output: PathBuf,
     pub directory: PathBuf,
@@ -168,7 +170,7 @@ pub fn optimize(
             "Choose PDF output, quality/floor from 0.05 to 1, and valid pixel/byte limits.",
         ));
     }
-    if options.output.try_exists()? {
+    if options.collision == crate::OutputCollision::Fail && options.output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
     let deadline = Instant::now() + Duration::from_secs(600);
@@ -395,18 +397,14 @@ pub fn optimize(
         }
         temporary.as_file().sync_all()?;
         cancel.check()?;
-        temporary.persist_noclobber(&options.output).map_err(|e| {
-            fail(
-                if e.error.kind() == std::io::ErrorKind::AlreadyExists {
-                    "collision"
-                } else {
-                    "io"
-                },
-                e.error.to_string(),
-            )
-        })?;
+        let saved_output = crate::output_collision::publish_file(
+            temporary,
+            &options.output,
+            options.collision,
+            cancel,
+        )?;
         receipt.status = "saved";
-        receipt.output = Some(options.output.clone());
+        receipt.output = Some(saved_output);
         receipt.output_bytes = Some(bytes);
         receipt.output_sha256 = Some(sha256);
         return Ok(receipt);

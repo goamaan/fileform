@@ -47,3 +47,11 @@ GUI acceptance or signed public distribution.
 passed both macOS 26 and Windows 2025 jobs at 61f2caa. This includes the source-type
 smoke and native tests/builds plus preview packaging; it does not establish manual
 Windows GUI acceptance or final bundled-tool release readiness.
+
+
+October 1: [Windows PDF parity run 36921065308](https://github.com/goamaan/fileform/actions/runs/36921065308)
+at `36dd0b1f2ebfb9c409c5a68cfe0a416ce12a13f3` passed source-verified qpdf,
+PDFium evaluation attestation/helper, source-built OCR, and all real PDF runtime
+fixtures including intrinsic embedded-image extraction and targeted lossy image
+optimization/fit. The previous extraction flush failure is corrected. This is
+native Windows automated evidence, not Electron integration or manual GUI acceptance.

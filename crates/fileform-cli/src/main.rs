@@ -6,12 +6,14 @@ use fileform_engine::{
 };
 use std::path::PathBuf;
 fn main() {
-    let args: Vec<_> = std::env::args_os().skip(1).collect();
-    let request = match args.as_slice() {
+    let raw: Vec<_> = std::env::args_os().skip(1).collect();
+    let (args, collision) = collision_argument(raw);
+    let mut request = match args.as_slice() {
         [command, input, output, directory, renderer, tail @ ..]
             if command == "optimize-pdf-images" =>
         {
             let mut options = fileform_engine::PdfImageOptimization {
+                collision: fileform_engine::OutputCollision::Fail,
                 input: input.into(),
                 output: output.into(),
                 directory: directory.into(),
@@ -60,20 +62,26 @@ fn main() {
             Request::OptimizePdfImages(options)
         }
         [command, output, directory, inputs @ ..] if command == "extract-pdf-images" => {
+            let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ExtractPdfImages(fileform_engine::PdfImageExtraction {
-                inputs: inputs.iter().map(PathBuf::from).collect(),
+                collision: fileform_engine::OutputCollision::Fail,
+                inputs,
                 output: Some(output.into()),
                 directory: directory.into(),
                 pages: None,
+                page_ranges,
                 dry_run: false,
             })
         }
         [command, directory, inputs @ ..] if command == "plan-pdf-images" => {
+            let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ExtractPdfImages(fileform_engine::PdfImageExtraction {
-                inputs: inputs.iter().map(PathBuf::from).collect(),
+                collision: fileform_engine::OutputCollision::Fail,
+                inputs,
                 output: None,
                 directory: directory.into(),
                 pages: None,
+                page_ranges,
                 dry_run: true,
             })
         }
@@ -95,15 +103,18 @@ fn main() {
                     eprintln!("Choose 36–600 DPI.");
                     std::process::exit(2)
                 });
+            let (inputs, page_ranges, quality) = page_arguments(inputs, true);
             Request::ExportPdfImages(fileform_engine::PdfRasterBatch {
-                inputs: inputs.iter().map(PathBuf::from).collect(),
+                collision: fileform_engine::OutputCollision::Fail,
+                inputs,
                 output: output.into(),
                 directory: directory.into(),
                 renderer_directory: renderer.into(),
                 pages: None,
+                page_ranges,
                 dpi,
                 format,
-                quality: None,
+                quality,
                 allow_rasterization: true,
             })
         }
@@ -230,8 +241,12 @@ fn main() {
             })
         }
         [command, output, directory, renderer, inputs @ ..] if command == "split-pdf" => {
+            let (inputs, selection, dry_run) = split_arguments(inputs);
             Request::SplitPdf(PdfSplit {
-                inputs: inputs.iter().map(PathBuf::from).collect(),
+                collision: fileform_engine::OutputCollision::Fail,
+                inputs,
+                selection,
+                dry_run,
                 output: output.into(),
                 directory: directory.into(),
                 renderer_directory: renderer.into(),
@@ -240,12 +255,15 @@ fn main() {
             })
         }
         [command, output, directory, renderer, inputs @ ..] if command == "merge-pdf" => {
+            let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ComposePdf(PdfComposition {
-                inputs: inputs.iter().map(PathBuf::from).collect(),
+                collision: fileform_engine::OutputCollision::Fail,
+                inputs,
                 output: output.into(),
                 directory: directory.into(),
                 renderer_directory: renderer.into(),
                 pages: None,
+                page_ranges,
                 allow_document_changes: true,
             })
         }
@@ -600,11 +618,21 @@ fn main() {
         },
         _ => {
             eprintln!(
-                "Usage: fileform-native optimize-pdf-images INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--quality 0.8] [--minimum-quality 0.5] [--max-dimension PIXELS] [--max-bytes BYTES] [--dry-run] | extract-pdf-images FOLDER PDF_PACK INPUT... | plan-pdf-images PDF_PACK INPUT... | export-pdf-images FOLDER PDF_PACK RENDER_PACK png|jpeg DPI INPUT... | export-pdf-jpeg INPUT OUTPUT.jpg PDF_PACK RENDER_PACK PAGE DPI [QUALITY] | export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI | plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT.pdf... | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
+                "Usage: fileform-native optimize-pdf-images INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--quality 0.8] [--minimum-quality 0.5] [--max-dimension PIXELS] [--max-bytes BYTES] [--dry-run] | extract-pdf-images FOLDER PDF_PACK INPUT... [--pages RANGES] [--collision fail|rename] | plan-pdf-images PDF_PACK INPUT... [--pages RANGES] | export-pdf-images FOLDER PDF_PACK RENDER_PACK png|jpeg DPI INPUT... [--pages RANGES] [--quality 5-100] [--collision fail|rename] | export-pdf-jpeg INPUT OUTPUT.jpg PDF_PACK RENDER_PACK PAGE DPI [QUALITY] | export-pdf-png INPUT OUTPUT.png PDF_PACK RENDER_PACK PAGE DPI | plan-pdf-raster INPUT PDF_PACK DPI | ocr-image INPUT OUTPUT.txt OCR_PACK eng | verify-ocr-pack PACK | export-pdf-text INPUT OUTPUT.txt PDF_PACK RENDER_PACK [--allow-missing-text | --ocr OCR_PACK eng] | split-pdf OUTPUT_FOLDER PDF_PACK RENDER_PACK INPUT... [--every COUNT | --ranges GROUPS | --after POSITIONS] [--dry-run] | merge-pdf OUTPUT.pdf PDF_PACK RENDER_PACK INPUT... [--pages RANGES] [--collision fail|rename] | compress-pdf INPUT OUTPUT.pdf PDF_PACK RENDER_PACK [--max-bytes BYTES] | extract-pdf-text INPUT OUTPUT.txt RENDER_PACK PAGE_INDEX | render-pdf-page INPUT OUTPUT.png RENDER_PACK PAGE_INDEX [--media-box] | inspect-pdf-pages FILE PACK_DIRECTORY | inspect-pdf-graph FILE PACK_DIRECTORY | inspect-pdf FILE PACK_DIRECTORY | verify-pdf-pack PACK_DIRECTORY | poster INPUT OUTPUT.png PACK_DIRECTORY SECONDS | waveform FILE PACK_DIRECTORY | copy-video-trim INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | copy-audio-trim INPUT OUTPUT.m4a PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-media-packets FILE PACK_DIRECTORY STREAM_INDEX | trim-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY START_SECONDS END_SECONDS [--mute-audio] | inspect-video-timeline FILE PACK_DIRECTORY | trim-audio-time INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SECONDS END_SECONDS | inspect-audio-timeline FILE PACK_DIRECTORY | fit-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY BYTES | fit-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY BYTES | convert-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY [--max-dimension PIXELS] | remux-video INPUT OUTPUT.{{mp4,mov}} PACK_DIRECTORY | trim-audio INPUT OUTPUT.{{wav,flac}} PACK_DIRECTORY START_SAMPLE END_SAMPLE | convert-audio INPUT OUTPUT.{{wav,flac,m4a,mp3}} PACK_DIRECTORY | inspect-media FILE PACK_DIRECTORY | verify-media-pack DIRECTORY | inspect FILE | inspect-image FILE | convert-image INPUT OUTPUT.{{png,jpg,tiff}} [--background white|black] [--quality 1-100] [--crop x,y,width,height] [--max-dimension pixels] [--max-bytes bytes] [--minimum-quality 1-100] | convert-table INPUT OUTPUT.{{json,csv,tsv}}"
             );
             std::process::exit(2);
         }
     };
+    if let Some(policy) = collision {
+        match &mut request {
+            Request::OptimizePdfImages(options) => options.collision = policy,
+            Request::ExtractPdfImages(options) => options.collision = policy,
+            Request::ExportPdfImages(options) => options.collision = policy,
+            Request::SplitPdf(options) => options.collision = policy,
+            Request::ComposePdf(options) => options.collision = policy,
+            _ => argument_error("This route does not yet accept a collision policy."),
+        }
+    }
     match fileform_engine::execute(request) {
         Ok(result) => println!(
             "{}",
@@ -710,4 +738,144 @@ fn image_request(args: &[std::ffi::OsString]) -> Result<Request, &'static str> {
         minimum_quality,
         expected_source_sha256: None,
     })
+}
+
+fn split_arguments(
+    args: &[std::ffi::OsString],
+) -> (
+    Vec<PathBuf>,
+    Option<fileform_engine::PdfSplitSelection>,
+    bool,
+) {
+    let mut inputs = Vec::new();
+    let mut selection = None;
+    let mut dry_run = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].to_str() {
+            Some("--dry-run") if !dry_run => {
+                dry_run = true;
+                index += 1;
+            }
+            Some(flag @ ("--ranges" | "--every" | "--after")) if selection.is_none() => {
+                let value = args
+                    .get(index + 1)
+                    .and_then(|v| v.to_str())
+                    .unwrap_or_else(|| argument_error("Split option needs a value."));
+                selection = Some(match flag {
+                    "--ranges" => fileform_engine::PdfSplitSelection::Ranges {
+                        ranges: value.into(),
+                    },
+                    "--every" => fileform_engine::PdfSplitSelection::Every {
+                        count: value.parse().unwrap_or_else(|_| {
+                            argument_error("Choose a positive split interval.")
+                        }),
+                    },
+                    _ => fileform_engine::PdfSplitSelection::After {
+                        positions: value
+                            .split(',')
+                            .map(|v| {
+                                v.trim().parse().unwrap_or_else(|_| {
+                                    argument_error("Use comma-separated split positions.")
+                                })
+                            })
+                            .collect(),
+                    },
+                });
+                index += 2;
+            }
+            Some("--") => {
+                inputs.extend(args[index + 1..].iter().map(PathBuf::from));
+                break;
+            }
+            Some(flag) if flag.starts_with("--") => {
+                argument_error("Unknown, repeated or conflicting split option.")
+            }
+            _ => {
+                inputs.push(PathBuf::from(&args[index]));
+                index += 1;
+            }
+        }
+    }
+    (inputs, selection, dry_run)
+}
+fn argument_error(message: &str) -> ! {
+    eprintln!("{message}");
+    std::process::exit(2)
+}
+
+fn page_arguments(
+    args: &[std::ffi::OsString],
+    allow_quality: bool,
+) -> (Vec<PathBuf>, Option<String>, Option<u8>) {
+    let mut inputs = Vec::new();
+    let mut ranges = None;
+    let mut quality = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].to_str() {
+            Some("--pages") if ranges.is_none() => {
+                ranges = Some(
+                    args.get(index + 1)
+                        .and_then(|v| v.to_str())
+                        .unwrap_or_else(|| argument_error("Page selection needs a value."))
+                        .into(),
+                );
+                index += 2;
+            }
+            Some("--quality") if allow_quality && quality.is_none() => {
+                quality = Some(
+                    args.get(index + 1)
+                        .and_then(|v| v.to_str())
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or_else(|| argument_error("Choose JPEG quality from 5 to 100.")),
+                );
+                index += 2;
+            }
+            Some("--") => {
+                inputs.extend(args[index + 1..].iter().map(PathBuf::from));
+                break;
+            }
+            Some(flag) if flag.starts_with("--") => {
+                argument_error("Unknown or repeated page option.")
+            }
+            _ => {
+                inputs.push(PathBuf::from(&args[index]));
+                index += 1;
+            }
+        }
+    }
+    (inputs, ranges, quality)
+}
+
+fn collision_argument(
+    args: Vec<std::ffi::OsString>,
+) -> (
+    Vec<std::ffi::OsString>,
+    Option<fileform_engine::OutputCollision>,
+) {
+    let mut cleaned = Vec::new();
+    let mut collision = None;
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--" {
+            cleaned.extend_from_slice(&args[index..]);
+            break;
+        }
+        if args[index] == "--collision" {
+            if collision.is_some() {
+                argument_error("Repeated collision policy.");
+            }
+            collision = Some(match args.get(index + 1).and_then(|v| v.to_str()) {
+                Some("fail") => fileform_engine::OutputCollision::Fail,
+                Some("rename") => fileform_engine::OutputCollision::Rename,
+                _ => argument_error("Choose --collision fail or rename."),
+            });
+            index += 2;
+        } else {
+            cleaned.push(args[index].clone());
+            index += 1;
+        }
+    }
+    (cleaned, collision)
 }

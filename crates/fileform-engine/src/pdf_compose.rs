@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PdfPageSelection {
     pub source_index: usize,
@@ -18,14 +18,17 @@ pub struct PdfPageSelection {
     #[serde(default)]
     pub clockwise_rotation: i32,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Composition {
+    #[serde(default)]
+    pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
     pub pages: Option<Vec<PdfPageSelection>>,
+    pub page_ranges: Option<String>,
     pub allow_document_changes: bool,
 }
 #[derive(Debug, Serialize)]
@@ -38,6 +41,12 @@ pub struct CompositionReceipt {
     pub warnings: Vec<&'static str>,
 }
 pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<CompositionReceipt> {
+    if options.pages.is_some() && options.page_ranges.is_some() {
+        return Err(fail(
+            "invalid_request",
+            "Choose explicit pages or page ranges, not both.",
+        ));
+    }
     if !options.allow_document_changes {
         return Err(fail("unsupported", "PDF assembly creates a new document and cannot preserve document-level metadata, bookmarks, form behavior or signature certification."));
     }
@@ -60,7 +69,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
     {
         return Err(fail("limit", "PDF assembly supports 1–1000 output pages."));
     }
-    if options.output.try_exists()? {
+    if options.collision == crate::OutputCollision::Fail && options.output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
     }
     let mut state = prepare(&options.inputs, &options.directory, cancel)?;
@@ -164,8 +173,15 @@ pub(crate) fn compose_prepared(
         documents,
         ..
     } = state;
+    let ranged = options
+        .page_ranges
+        .as_ref()
+        .map(|v| {
+            crate::pdf_selection::pages(v, &geometries.iter().map(Vec::len).collect::<Vec<_>>())
+        })
+        .transpose()?;
     let all;
-    let selected = match &options.pages {
+    let selected = match options.pages.as_ref().or(ranged.as_ref()) {
         Some(pages) => pages,
         None => {
             all = geometries
@@ -295,22 +311,18 @@ pub(crate) fn compose_prepared(
     }
     temporary.as_file().sync_all()?;
     cancel.check()?;
-    temporary.persist_noclobber(&options.output).map_err(|e| {
-        fail(
-            if e.error.kind() == std::io::ErrorKind::AlreadyExists {
-                "collision"
-            } else {
-                "io"
-            },
-            e.error.to_string(),
-        )
-    })?;
+    let saved_output = crate::output_collision::publish_file(
+        temporary,
+        &options.output,
+        options.collision,
+        cancel,
+    )?;
     let mut warnings = vec!["A new PDF is created. Document-level metadata, bookmarks and form behavior may change; existing signatures do not certify it. Originals remain unchanged."];
     if !prepared.is_empty() {
         warnings.push("Each image becomes one sRGB page at one PDF point per oriented pixel. Descriptive metadata is omitted; transparency is retained as a soft mask.");
     }
     Ok(CompositionReceipt {
-        output: options.output.clone(),
+        output: saved_output,
         bytes,
         sha256,
         source_sha256: sources.iter().map(|v| v.hash.clone()).collect(),

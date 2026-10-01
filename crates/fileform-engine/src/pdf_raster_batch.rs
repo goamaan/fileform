@@ -7,14 +7,17 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RasterBatch {
+    #[serde(default)]
+    pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
     pub pages: Option<Vec<PdfPageSelection>>,
+    pub page_ranges: Option<String>,
     pub dpi: u16,
     pub format: Format,
     pub quality: Option<u8>,
@@ -42,6 +45,12 @@ pub struct BatchReceipt {
     pub warnings: Vec<&'static str>,
 }
 pub fn export(options: &RasterBatch, cancel: &Cancellation) -> Result<BatchReceipt> {
+    if options.pages.is_some() && options.page_ranges.is_some() {
+        return Err(fail(
+            "invalid_request",
+            "Choose explicit pages or page ranges, not both.",
+        ));
+    }
     if !options.allow_rasterization {
         return Err(fail("unsupported", "Page image export rasterizes text and vectors and does not retain document metadata or interactive behavior."));
     }
@@ -63,10 +72,20 @@ pub fn export(options: &RasterBatch, cancel: &Cancellation) -> Result<BatchRecei
     {
         return Err(fail("limit", "Choose 1–1000 page images."));
     }
-    let transaction = DirectoryTransaction::new(&options.output)?;
+    let transaction = DirectoryTransaction::with_collision(&options.output, options.collision)?;
     let mut prepared = pdf_compose::prepare(&options.inputs, &options.directory, cancel)?;
+    let ranged = options
+        .page_ranges
+        .as_ref()
+        .map(|v| {
+            crate::pdf_selection::pages(
+                v,
+                &prepared.geometries.iter().map(Vec::len).collect::<Vec<_>>(),
+            )
+        })
+        .transpose()?;
     let all;
-    let selected = match &options.pages {
+    let selected = match options.pages.as_ref().or(ranged.as_ref()) {
         Some(pages) => pages,
         None => {
             all = pdf_compose::individual_pages(&prepared)
@@ -154,7 +173,7 @@ pub fn export(options: &RasterBatch, cancel: &Cancellation) -> Result<BatchRecei
         });
     }
     pdf_compose::check_sources(&mut prepared, &options.inputs)?;
-    let receipt = BatchReceipt {
+    let mut receipt = BatchReceipt {
         output: options.output.clone(),
         parts,
         source_sha256: prepared.sources.iter().map(|v| v.hash.clone()).collect(),
@@ -172,6 +191,6 @@ pub fn export(options: &RasterBatch, cancel: &Cancellation) -> Result<BatchRecei
             "Page-image receipt exceeds the response limit. No folder was saved.",
         ));
     }
-    transaction.commit(cancel)?;
+    receipt.output = transaction.commit(cancel)?;
     Ok(receipt)
 }

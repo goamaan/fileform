@@ -8,13 +8,16 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::PathBuf};
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Extraction {
+    #[serde(default)]
+    pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
     pub output: Option<PathBuf>,
     pub directory: PathBuf,
     pub pages: Option<Vec<PdfPageSelection>>,
+    pub page_ranges: Option<String>,
     #[serde(default)]
     pub dry_run: bool,
 }
@@ -29,6 +32,12 @@ pub struct ExtractionReceipt {
     pub warnings: Vec<&'static str>,
 }
 pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<ExtractionReceipt> {
+    if options.pages.is_some() && options.page_ranges.is_some() {
+        return Err(fail(
+            "invalid_request",
+            "Choose explicit pages or page ranges, not both.",
+        ));
+    }
     if !(1..=128).contains(&options.inputs.len())
         || options
             .pages
@@ -56,8 +65,15 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
         counts.push(info.pages);
         sources.push(source);
     }
+    let ranged = options
+        .page_ranges
+        .as_ref()
+        .map(|v| {
+            crate::pdf_selection::pages(v, &counts.iter().map(|v| *v as usize).collect::<Vec<_>>())
+        })
+        .transpose()?;
     let all;
-    let pages = match &options.pages {
+    let pages = match options.pages.as_ref().or(ranged.as_ref()) {
         Some(pages) => pages,
         None => {
             if counts.iter().map(|v| *v as usize).sum::<usize>() > 1000 {
@@ -143,8 +159,9 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
     let transaction = if options.dry_run {
         None
     } else {
-        Some(DirectoryTransaction::new(
+        Some(DirectoryTransaction::with_collision(
             options.output.as_ref().expect("validated output"),
+            options.collision,
         )?)
     };
     let mut bytes = 0u64;
@@ -200,7 +217,7 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
     } else if supported == 0 {
         warnings.push("None of the discovered image objects can be exported with the supported encoding policy.");
     }
-    let receipt = ExtractionReceipt {
+    let mut receipt = ExtractionReceipt {
         output: if options.dry_run {
             None
         } else {
@@ -220,7 +237,7 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
         ));
     }
     if let Some(transaction) = transaction {
-        transaction.commit(cancel)?;
+        receipt.output = Some(transaction.commit(cancel)?);
     }
     Ok(receipt)
 }

@@ -7,13 +7,23 @@ pub(crate) struct DirectoryTransaction {
     destination: PathBuf,
     parent: PathBuf,
     parent_identity: same_file::Handle,
+    collision: crate::OutputCollision,
 }
 impl DirectoryTransaction {
+    #[cfg(test)]
     pub(crate) fn new(destination: &Path) -> Result<Self> {
+        Self::with_collision(destination, crate::OutputCollision::Fail)
+    }
+    pub(crate) fn with_collision(
+        destination: &Path,
+        collision: crate::OutputCollision,
+    ) -> Result<Self> {
         if destination.file_name().is_none() {
             return Err(fail("invalid_request", "Choose a new output folder."));
         }
-        if std::fs::symlink_metadata(destination).is_ok() {
+        if collision == crate::OutputCollision::Fail
+            && std::fs::symlink_metadata(destination).is_ok()
+        {
             return Err(fail("collision", "The output already exists."));
         }
         let parent = destination
@@ -40,13 +50,14 @@ impl DirectoryTransaction {
             destination: destination.into(),
             parent,
             parent_identity,
+            collision,
         })
     }
     pub(crate) fn path(&self) -> &Path {
         &self.payload
     }
     /// Caller has already verified/synced every part and rechecked every source.
-    pub(crate) fn commit(self, cancel: &Cancellation) -> Result<()> {
+    pub(crate) fn commit(self, cancel: &Cancellation) -> Result<PathBuf> {
         if self.parent_identity != same_file::Handle::from_path(&self.parent)? {
             return Err(fail("output_changed", "Output folder changed."));
         }
@@ -56,19 +67,25 @@ impl DirectoryTransaction {
         // The enclosing TempDir owns recursive cleanup on error, not TempPath.
         let mut payload = tempfile::TempPath::try_from_path(&self.payload)?;
         payload.disable_cleanup(true);
-        payload.persist_noclobber(&self.destination).map_err(|e| {
-            fail(
-                if e.error.kind() == std::io::ErrorKind::AlreadyExists
-                    || std::fs::symlink_metadata(&self.destination).is_ok()
-                {
-                    "collision"
-                } else {
-                    "io"
-                },
-                e.error.to_string(),
-            )
-        })?;
-        Ok(())
+        for candidate in
+            crate::output_collision::candidates(&self.destination, true, self.collision)
+        {
+            cancel.check()?;
+            let candidate = candidate?;
+            match payload.persist_noclobber(&candidate) {
+                Ok(()) => return Ok(candidate),
+                Err(error) => {
+                    if !crate::output_collision::collision(&error.error, &candidate) {
+                        return Err(error.error.into());
+                    }
+                    payload = error.path;
+                }
+            }
+        }
+        Err(fail(
+            "collision",
+            "No free output folder within the collision policy.",
+        ))
     }
 }
 #[cfg(test)]
@@ -104,6 +121,23 @@ mod tests {
         transaction.commit(&Cancellation::default()).unwrap();
         assert_eq!(
             std::fs::read(destination.join("part.pdf")).unwrap(),
+            b"verified"
+        );
+        let destination = root.path().join("renamed.v2");
+        let transaction =
+            DirectoryTransaction::with_collision(&destination, crate::OutputCollision::Rename)
+                .unwrap();
+        std::fs::write(transaction.path().join("part.pdf"), b"verified").unwrap();
+        std::fs::create_dir(&destination).unwrap();
+        std::fs::write(destination.join("original"), b"keep").unwrap();
+        let renamed = transaction.commit(&Cancellation::default()).unwrap();
+        assert_eq!(renamed, root.path().join("renamed.v2 (1)"));
+        assert_eq!(
+            std::fs::read(destination.join("original")).unwrap(),
+            b"keep"
+        );
+        assert_eq!(
+            std::fs::read(renamed.join("part.pdf")).unwrap(),
             b"verified"
         );
         let destination = root.path().join("cancelled");

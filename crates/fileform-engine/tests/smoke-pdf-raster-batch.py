@@ -59,6 +59,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-page-images-') as folder:
     assert (receipt['parts'][0]['width'],receipt['parts'][0]['height'])==(400,600)
     assert (receipt['parts'][2]['width'],receipt['parts'][2]['height'])==(600,400)
     assert not execute(request)['ok']
+    renamed=execute({**request,'collision':'rename'})
+    assert renamed['ok'] and Path(renamed['result']['output'])==base/'ordered (1)',renamed
+    assert sorted(p.name for p in output.iterdir())==['001.png','002.png','003.png','004.png']
+
     empty=base/'existing';empty.mkdir()
     assert not execute({**request,'output':str(empty)})['ok'] and not list(empty.iterdir())
     jpeg=base/'jpeg'
@@ -71,6 +75,17 @@ with tempfile.TemporaryDirectory(prefix='fileform-page-images-') as folder:
         assert run(cli,'convert-image',path,base/f'batch-{page}.png').returncode==0
         assert run(cli,'convert-image',plain,base/f'plain-{page}.png').returncode==0
         assert decode(base/f'batch-{page}.png')[3]==decode(base/f'plain-{page}.png')[3]
+    chosen=base/'cli-selection'
+    result=run(cli,'export-pdf-images',chosen,pdf,renderer,'jpeg',72,*inputs,'--pages','3,1-2,3','--quality',91)
+    assert result.returncode==0,result.stderr
+    cli_receipt=json.loads(result.stdout)
+    assert cli_receipt['quality']==91
+    assert [(p['source_index'],p['page_index']) for p in cli_receipt['parts']]==[(1,0),(0,0),(0,1),(1,0)]
+    for invalid in [('1;2',),('5',),('1,,2',)]:
+        rejected=base/'bad-selection'
+        result=run(cli,'export-pdf-images',rejected,pdf,renderer,'png',72,*inputs,'--pages',*invalid)
+        assert result.returncode!=0 and not rejected.exists()
+    assert not execute({**request,'page_ranges':'1','output':str(base/'conflicting-selection')})['ok']
     before=set(base.iterdir());rejected=base/'rejected'
     for change in [{'pages':[]},{'pages':[{'source_index':0,'page_index':99}]},
                    {'allow_rasterization':False},{'quality':90},{'dpi':601},

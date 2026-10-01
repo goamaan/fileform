@@ -80,6 +80,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-lossy-pdf-') as folder:
     assert error['pdf_optimization']['attempted_quality'][-1]==.505 and error['pdf_optimization']['selected_quality'] is None
     assert source.read_bytes()==original
     preserved=output.read_bytes();assert optimize(source,output).returncode!=0 and output.read_bytes()==preserved
+    renamed=optimize(source,output,'--max-dimension',160,'--collision','rename')
+    assert renamed.returncode==0 and Path(json.loads(renamed.stdout)['output'])==base/'optimized (1).pdf',renamed.stderr
+    assert output.read_bytes()==preserved
+
     request={'operation':'optimize_pdf_images','input':str(source),'output':str(base/'worker.pdf'),
              'directory':str(pdf),'renderer_directory':str(renderer),'max_dimension':160,'allow_lossy':True}
     response=subprocess.run([str(worker)],input=json.dumps(request)+'\n',text=True,capture_output=True,check=True,timeout=240)

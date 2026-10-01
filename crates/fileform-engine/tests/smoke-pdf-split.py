@@ -34,6 +34,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-split-') as folder:
         assert path.parent==output and part['pages']==1
         assert hashlib.sha256(path.read_bytes()).hexdigest()==part['sha256']
     assert run(cli,'split-pdf',output,pdf,renderer,*inputs).returncode!=0
+    renamed=run(cli,'split-pdf',output,pdf,renderer,*inputs,'--collision','rename','--every','2')
+    assert renamed.returncode==0,renamed.stderr
+    renamed_receipt=json.loads(renamed.stdout)
+    assert Path(renamed_receipt['output'])==base/'parts (1)' and [p['pages'] for p in renamed_receipt['parts']]==[2,1]
     empty=base/'existing-empty';empty.mkdir()
     assert run(cli,'split-pdf',empty,pdf,renderer,*inputs).returncode!=0
     assert not list(empty.iterdir())
@@ -44,6 +48,32 @@ with tempfile.TemporaryDirectory(prefix='fileform-pdf-split-') as folder:
     result=split(request)
     assert result['ok'],result
     assert [p['pages'] for p in result['result']['parts']]==[2,1]
+    # Ranges address the concatenated PDF/image inputs, preserve order and
+    # duplicates, and separate output groups with semicolons.
+    for flag,value,expected in [('--ranges','3,1;2,2',[[[1,0],[0,0]],[[0,1],[0,1]]]),
+                                ('--every','2',[[[0,0],[0,1]],[[1,0]]]),
+                                ('--after','1,2',[[[0,0]],[[0,1]],[[1,0]]])]:
+        planned=base/(flag[2:]+'-plan')
+        result=run(cli,'split-pdf',planned,pdf,renderer,*inputs,flag,value,'--dry-run')
+        assert result.returncode==0,result.stderr
+        plan=json.loads(result.stdout)
+        assert plan['status']=='planned' and not planned.exists() and plan['parts']==[]
+        actual=[[[p['source_index'],p['page_index']] for p in group] for group in plan['groups']]
+        assert actual==expected and plan['source_sha256']==hashes,(flag,actual)
+        destination=base/(flag[2:]+'-saved')
+        result=run(cli,'split-pdf',destination,pdf,renderer,*inputs,flag,value)
+        assert result.returncode==0,result.stderr
+        saved=json.loads(result.stdout)
+        assert [part['pages'] for part in saved['parts']]==[len(group) for group in expected]
+    for args in [('--every','0'),('--ranges','4'),('--ranges','1;'),('--after','3'),
+                 ('--after','2,1'),('--every','2','--ranges','1'),('--dry-run','--dry-run')]:
+        destination=base/'invalid-plan'
+        assert run(cli,'split-pdf',destination,pdf,renderer,*inputs,*args).returncode!=0 and not destination.exists()
+    worker_plan={**request,'output':str(base/'worker-plan'),'groups':None,
+                 'selection':{'mode':'ranges','ranges':'2;1,3'},'dry_run':True}
+    reply=split(worker_plan);assert reply['ok'] and reply['result']['status']=='planned' and not (base/'worker-plan').exists(),reply
+    assert not split({**worker_plan,'groups':request['groups']})['ok']
+    assert not split({**worker_plan,'selection':None,'groups':[[{'source_index':0,'page_index':99}]]})['ok']
     before=set(base.iterdir())
     rejected=base/'rejected'
     invalid={**request,'output':str(rejected),'groups':[[{'source_index':0,'page_index':0}],[{'source_index':0,'page_index':99}]]}

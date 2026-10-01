@@ -68,6 +68,13 @@ with tempfile.TemporaryDirectory(prefix='fileform-extract-images-') as folder:
     assert by[10]['skip_reason'] and by[10]['color_space']=='/DeviceCMYK'
     selected=execute(request([source],dry_run=True,pages=[{'source_index':0,'page_index':1}]*2))
     assert selected['ok'] and all(v['resource_pages']==[1] for v in selected['result']['candidates'])
+    cli_selected=run(cli,'plan-pdf-images',pack,source,'--pages','2,2')
+    assert cli_selected.returncode==0,cli_selected.stderr
+    assert all(v['resource_pages']==[1] for v in json.loads(cli_selected.stdout)['candidates'])
+    assert not execute(request([source],dry_run=True,pages=[{'source_index':0,'page_index':0}],page_ranges='1'))['ok']
+    for value in ['3','1;2','1,,2']:
+        assert run(cli,'plan-pdf-images',pack,source,'--pages',value).returncode!=0
+
     output=base/'images'
     result=run(cli,'extract-pdf-images',output,pack,source);assert result.returncode==0,result.stderr
     receipt=json.loads(result.stdout)
@@ -84,6 +91,10 @@ with tempfile.TemporaryDirectory(prefix='fileform-extract-images-') as folder:
             else:expected=bytes([255,0,0,255,0,128,255,255])
             assert bytes(pixels)==expected,(candidate,pixels)
     assert not execute(request([source],output))['ok']
+    renamed=run(cli,'extract-pdf-images',output,pack,source,'--pages','2','--collision','rename')
+    assert renamed.returncode==0,renamed.stderr
+    assert Path(json.loads(renamed.stdout)['output'])==output.with_name(output.name+' (1)')
+
     alias=base/'alias.pdf';os.link(source,alias)
     assert not execute(request([source,alias],dry_run=True))['ok']
     empty=base/'empty.pdf';fixture(empty)

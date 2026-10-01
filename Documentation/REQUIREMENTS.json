@@ -257,8 +257,8 @@
       "reference_ledger_status": "verified",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Native explicit groups and per-page split use complete-folder publication.",
-      "remaining": "Marker/range/interval planning and desktop workflow."
+      "evidence_notes": "Native explicit groups, ordered ranges with duplicates, intervals and split-after markers use source-bound planning and complete-folder publication; CLI/worker and Mac fixtures pass.",
+      "remaining": "Current Windows planning/policy acceptance, desktop split editing and integration."
     },
     {
       "id": "PDF04",
@@ -266,8 +266,8 @@
       "reference_ledger_status": "verified",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Single/batch DPI-based PNG/JPEG page export and intrinsic JPEG/PNG image extraction with resource provenance have native implementations and Mac fixture evidence.",
-      "remaining": "CLI selection/rename options, full original extraction fixture coverage, current Windows acceptance and desktop integration."
+      "evidence_notes": "DPI-based single/batch PNG/JPEG export and intrinsic JPEG/PNG extraction have native Mac/Windows runtime evidence. CLI page ranges/quality and file/folder rename policies have Mac fixtures.",
+      "remaining": "Current Windows selection/rename acceptance, full original extraction fixture coverage and desktop integration."
     },
     {
       "id": "PDF05",
@@ -276,7 +276,7 @@
       "portable_status": "partial",
       "priority": "release-and-parity",
       "evidence_notes": "Lossless compression preserves graph/geometry/text/pixels. Targeted lossy image optimization, intrinsic resize and bounded byte fitting prove the entire expected document graph, retain unsupported/masked/profiled objects and validate every page render/text; Mac CLI/worker fixtures pass.",
-      "remaining": "Current Windows optimization acceptance, wider original policy coverage and desktop integration."
+      "remaining": "Desktop integration and wider original policy coverage; current native Mac/Windows runtime tests pass."
     },
     {
       "id": "PDF06",
