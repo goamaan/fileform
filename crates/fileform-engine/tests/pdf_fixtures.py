@@ -16,12 +16,13 @@ def fixture(path, annotated=False, inherited=False, text=False):
     if text: objects.append(b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
     write_pdf(path, objects)
 
-def write_pdf(path, objects):
+def write_pdf(path, objects, generations=None):
+    generations=generations or {}
     data=bytearray(b'%PDF-1.7\n');offsets=[0]
     for index,obj in enumerate(objects,1):
-        offsets.append(len(data));data.extend(str(index).encode()+b' 0 obj\n'+obj+b'\nendobj\n')
+        offsets.append(len(data));data.extend(f'{index} {generations.get(index,0)} obj\n'.encode()+obj+b'\nendobj\n')
     xref=len(data);data.extend(f'xref\n0 {len(objects)+1}\n0000000000 65535 f \n'.encode())
-    for offset in offsets[1:]:data.extend(f'{offset:010} 00000 n \n'.encode())
+    for index,offset in enumerate(offsets[1:],1):data.extend(f'{offset:010} {generations.get(index,0):05} n \n'.encode())
     data.extend(f'trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode());path.write_bytes(data)
 
 

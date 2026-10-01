@@ -46,7 +46,11 @@ pub use ocr_image::OcrLanguage;
 mod pdf_compose;
 mod pdf_split;
 pub use pdf_split::Split as PdfSplit;
+mod pdf_embedded_encode;
 mod pdf_graph;
+mod pdf_image_extraction;
+mod pdf_image_graph;
+pub use pdf_image_extraction::Extraction as PdfImageExtraction;
 mod pdf_images;
 mod pdf_inspect;
 mod pdf_optimize;
@@ -124,6 +128,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    ExtractPdfImages(PdfImageExtraction),
     ExportPdfImages(PdfRasterBatch),
     ExportPdfPng(PdfPngExport),
     ExportPdfJpeg(PdfJpegExport),
@@ -348,6 +353,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    PdfExtractedImages(pdf_image_extraction::ExtractionReceipt),
     PdfImages(pdf_raster_batch::BatchReceipt),
     PdfPng(pdf_raster_export::RasterReceipt),
     PdfJpeg(pdf_raster_export::RasterReceipt),
@@ -947,6 +953,10 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::ExtractPdfImages(options) = &request {
+        return pdf_image_extraction::extract(options, cancellation)
+            .map(Response::PdfExtractedImages);
+    }
     if let Request::ExportPdfImages(options) = &request {
         return pdf_raster_batch::export(options, cancellation).map(Response::PdfImages);
     }
@@ -1317,7 +1327,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ExportPdfImages(..)
+        Request::ExtractPdfImages(..)
+        | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)
         | Request::PlanPdfRaster { .. }
@@ -1360,7 +1371,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ExportPdfImages(..)
+        Request::ExtractPdfImages(..)
+        | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)
         | Request::PlanPdfRaster { .. }

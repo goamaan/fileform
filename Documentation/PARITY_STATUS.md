@@ -15,7 +15,7 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 | Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters | Not wired | VFR/track/extended-color gaps, playback proxies and editor integration |
 | PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, complete-folder split | Not wired | Marker/range/interval planning and editing UI; remaining original policies |
 | PDF compression | All-page lossless rewrite with graph/geometry/text/render checks | Not wired | Targeted lossy image optimization and its preservation proofs |
-| PDF images | DPI-based single/batch PNG/JPEG export with ordered/rotated PDF/image selections, bounded previews, static annotations/widgets | Not wired | CLI selection/rename options, embedded-image discovery/extraction, final UI integration |
+| PDF images | DPI-based single/batch PNG/JPEG page export and intrinsic embedded JPEG/PNG extraction with provenance | Not wired | CLI selection/rename options, broader embedded-image acceptance and final UI integration |
 | Text / OCR | Per-page and whole-document embedded text; explicit-English image/PDF OCR | Not wired | Automatic multilingual behavior, wider quality/orientation/form coverage and final UI |
 | Direct URLs | No portable request route | Not wired | Existing direct-media lookup/download/trim workflow |
 

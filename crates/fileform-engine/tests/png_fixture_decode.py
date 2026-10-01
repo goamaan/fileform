@@ -1,7 +1,7 @@
 """Independent PNG decoder for generated test outputs, including all five filters."""
 import struct
 import zlib
-def decode(path):
+def decode(path, rgba=False):
     data=path.read_bytes();assert data[:8]==b'\x89PNG\r\n\x1a\n'
     offset=8;chunks={};compressed=bytearray()
     while offset<len(data):
@@ -33,8 +33,9 @@ def decode(path):
                     prediction=left if a<=b and a<=c else (up if b<=c else corner)
                 row[x]=(row[x]+prediction)&255
         pixels.extend(row);previous=row
-    if channels==4:
+    if channels==4 and not rgba:
         assert all(alpha==255 for alpha in pixels[3::4])
         pixels=bytearray(value for i,value in enumerate(pixels) if i%4!=3)
     assert b'sRGB' in chunks or b'iCCP' in chunks
+    if b'sRGB' in chunks: assert chunks[b'sRGB']==b'\0'
     return w,h,struct.unpack('>IIB',chunks[b'pHYs']) if b'pHYs' in chunks else None,pixels

@@ -264,6 +264,23 @@ pub(crate) fn decode<R: BufRead + Seek>(mut input: R) -> Result<DecodedImage> {
     })
 }
 
+pub(crate) fn decode_pdf_image<R: BufRead + Seek>(
+    mut input: R,
+    width: u32,
+    height: u32,
+    gray: bool,
+) -> Result<DecodedImage> {
+    let info = metadata(&mut input)?;
+    if info.width != width || info.height != height || info.gray != gray || info.orientation != 1 {
+        return Err(fail(
+            "verification",
+            "JPEG samples, dimensions or orientation differ from the PDF image dictionary.",
+        ));
+    }
+    input.seek(SeekFrom::Start(0))?;
+    decode(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

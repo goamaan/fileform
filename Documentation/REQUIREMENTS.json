@@ -266,8 +266,8 @@
       "reference_ledger_status": "verified",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "DPI-based single and ordered-batch PNG/JPEG export, mixed image inputs and static form appearances exist with Mac fixture evidence.",
-      "remaining": "CLI selection/rename options, embedded-image extraction, current Windows acceptance and desktop integration."
+      "evidence_notes": "Single/batch DPI-based PNG/JPEG page export and intrinsic JPEG/PNG image extraction with resource provenance have native implementations and Mac fixture evidence.",
+      "remaining": "CLI selection/rename options, full original extraction fixture coverage, current Windows acceptance and desktop integration."
     },
     {
       "id": "PDF05",

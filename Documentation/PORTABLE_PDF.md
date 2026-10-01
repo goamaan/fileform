@@ -541,3 +541,39 @@ JPEG, composition and split regression tests pass after the refactor. Windows CI
 now includes the same folder fixture; its result is still required. CLI named
 selection/rotation options, collision rename policy and final UI integration remain
 open even though the worker can express ordered page selections.
+
+### Embedded image extraction — October 1, 2026
+
+`plan-pdf-images PDF_PACK INPUT...` and `extract-pdf-images FOLDER PDF_PACK INPUT...`
+now inspect/export embedded image XObjects. Worker `extract_pdf_images` accepts
+explicit source/page selections and a dry-run flag. Selection uses intrinsic image
+pixels; rotation is rejected. The resource traversal follows inherited/indirect
+resources and nested Forms, terminates cycles, and deduplicates by source/object/
+generation. Every retained resource page/path is reported. Resource references
+may include unused images; inline images, annotation appearances and patterns are
+not enumerated, matching the original documented extraction policy.
+
+Eligible standalone RGB/gray DCT JPEG bytes are copied exactly after strict
+preallocation geometry/component/orientation checks and full decoding. Other
+eligible 8-bit RGB/gray streams are decoded by qpdf from plain/Flate/ASCII85/
+ASCIIHex/RunLength data and reconstructed into exact straight RGBA PNG, including
+same-size gray soft-mask alpha and RGB under alpha zero. Candidate skip reasons
+cover the original unsupported colors, bit depths, masks, predictor parameters,
+filter chains and alternate semantics; runtime corruption fails the entire job.
+
+Metadata JSON and extracted streams use bounded file-backed process capture.
+Source/output bounds are 512 MiB, encoded JPEG streams 256 MiB, individual images
+16384 pixels per edge/64 million pixels, total decoded RGBA-equivalent samples
+512 MiB, metadata 32 MiB per source, objects 100000, resources 100000 visits,
+Form/indirect depth 32 and ancestry 64. Provenance is bounded to 4096 bytes per
+path/4 MiB total; the existing worker receipt cap can reject an otherwise larger
+metadata result explicitly before folder publication. Nothing is silently dropped.
+Physical source aliases are rejected. All outputs are staged and verified before
+one exclusive folder publication; cancellation/failure removes the owned tree.
+
+Mac real fixtures pass original JPEG bytes with nonzero object generation,
+RGB/gray/soft-mask samples, hidden RGB, all supported sample filters, inherited/
+indirect/nested/cyclic resources, reuse/dedup/provenance, selections/skips, aliases,
+no-image plans, malformed sample rollback and cancellation after staging begins.
+Windows CI now runs this same suite. The final UI, CLI selection/rename options,
+portable setups and broader original fixture coverage still need acceptance.
