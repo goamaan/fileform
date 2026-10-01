@@ -48,5 +48,15 @@ for (name, space, alpha, orientation, count) in [
     }
     guard drawn else { fatalError("Could not render ImageIO oracle") }
     try Data(pixels).write(to: output.appendingPathComponent(name + ".rgba"))
+    var srgb = [UInt8](repeating: 0, count: decoded.width * decoded.height * 4)
+    let normalized = srgb.withUnsafeMutableBytes { buffer -> Bool in
+        guard let context = CGContext(data: buffer.baseAddress, width: decoded.width, height: decoded.height,
+            bitsPerComponent: 8, bytesPerRow: decoded.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+        context.draw(decoded, in: CGRect(x: 0, y: 0, width: decoded.width, height: decoded.height)); return true
+    }
+    guard normalized else { fatalError("Could not normalize ImageIO oracle") }
+    try Data(srgb).write(to: output.appendingPathComponent(name + ".srgb.rgba"))
+
 }
 print(output.path)

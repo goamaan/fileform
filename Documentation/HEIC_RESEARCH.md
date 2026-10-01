@@ -204,3 +204,46 @@ closed by this prototype. Remaining gates include ICC/NCLX-to-sRGB ownership and
 broader transfer profiles, EXIF-only/conflicting orientation, grids, real gain-map
 and high-depth fixtures, resource/cancellation supervision, relocatable library
 packaging and LGPL replacement/rebuild paths. Keep HEIC advertised as pending.
+
+
+## Rust adapter and common HEIC routes — October 1, 2026
+
+`heic_input.rs` now verifies an `app.fileform.heic` pack (helper + both shared
+libraries), supervises one decode per private snapshot outside the UI, captures
+binary stdout to a bounded owned file, and validates the FH1 header, metadata,
+exact sample length, flags, alpha, EXIF offset and trailing EOF before accepting
+pixels. It avoids applying EXIF orientation again when HEIF rotation/mirror
+properties were used. Premultiplied samples are unassociated once. Actual ICC
+profiles and supported explicit SDR NCLX matrix/TRC descriptions pass through the
+existing safe Rust CMS exactly once; ambiguous partial NCLX, PQ/HLG (including ICC
+CICP), mismatched gray profiles and unsupported descriptions fail closed. Fully
+unspecified color metadata follows the existing explicit assumed-sRGB policy.
+The image pipeline remains bounded at 80 million pixels, 512 MiB source and 1 MiB
+CMS profiles. Native library limits do not establish complete process containment.
+
+`FILEFORM_HEIC_PACK` selects the verified pack for standalone CLI/worker use;
+otherwise `HEICPack` beside/one level above the executable is checked. Desktop
+must supply its reviewed bundled pack explicitly; no renderer-controlled path is
+introduced. `verify-heic-pack PACK` returns verification metadata.
+`stage-evaluation.py` assembles a local relocatable shared-library pack, retains
+source/recipe/license evidence and uses Mac ad-hoc signatures before hashing; this
+is not a Developer ID signed/notarized release or a completed LGPL delivery audit.
+
+Mac real-tool tests pass common HEIC through inspection, PNG/JPEG/TIFF export,
+crop/resize, exact TIFF roundtrip, explicit JPEG mattes, byte fit, source/output
+hashes, stale/collision/cancel/missing-pack rejection and cleanup. All eight
+orientations and alpha agree with ImageIO. P3 conversion agrees with an independent
+D65 P3-to-sRGB calculation within two levels (observed maximum one); ImageIO
+end-to-end differences up to six levels near clipping boundaries are quantified
+because a one-level decoder difference can grow during that transform. Mean error
+stays below half a level. The same HEIC pipeline passes image-to-PDF composition
+and real image OCR using an owned text fixture. Previous PDF image/PNG/JPEG/TIFF
+OCR regressions, 101 active Rust tests, Clippy and Windows cross-check pass.
+
+Windows helper run `36929157043` compiled successfully but rejected golden fixture
+hashes after Git converted JSON LF to CRLF. `.gitattributes` now pins exact fixture
+line endings and binary payloads. New workflows exercise the helper, relocatable
+pack, Rust adapter and PDF/OCR interoperability; current runtime acceptance is
+pending. This adapter does not close wider grid/gain-map/high-depth/EXIF-only or
+conflicting-orientation fixtures, platform/library hardening, production bundling,
+Electron exposure or final HEIC parity. Those gates remain required.

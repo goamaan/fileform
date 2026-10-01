@@ -2,9 +2,9 @@ name: Windows PDF parity
 on:
   push:
     branches: [main]
-    paths: ['crates/**', 'native/pdf-render/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
+    paths: ['crates/**', 'native/pdf-render/**', 'native/heic-decode/**', 'Tools/build-heic-evaluation.py', '.gitattributes', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
   pull_request:
-    paths: ['crates/**', 'native/pdf-render/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
+    paths: ['crates/**', 'native/pdf-render/**', 'native/heic-decode/**', 'Tools/build-heic-evaluation.py', '.gitattributes', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/pdf-windows.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -116,6 +116,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-ocr.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows Artifacts/pdf-ocr-evaluation/OCRPack | Tee-Object -FilePath Artifacts/pdf-ocr-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify HEIC inputs in PDF and OCR routes
+        shell: pwsh
+        run: |
+          python Tools/build-heic-evaluation.py --work Artifacts/pdf-heic-evaluation --jobs 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $prefix = (Resolve-Path Artifacts/pdf-heic-evaluation/install).Path
+          cmake -S native/heic-decode -B Artifacts/pdf-heic-helper -A x64 "-DHEIC_ROOT=$prefix" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build Artifacts/pdf-heic-helper --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python native/heic-decode/stage-evaluation.py Artifacts/pdf-heic-helper/Release Artifacts/pdf-heic-evaluation Artifacts/HEICPack-PDF-Windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-heic.py Artifacts/HEICPack-PDF-Windows Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows Artifacts/pdf-ocr-evaluation/OCRPack | Tee-Object -FilePath Artifacts/heic-pdf-ocr-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain pack and diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -123,6 +137,10 @@ jobs:
           name: fileform-pdf-windows-x64
           path: |
             Artifacts/PDFPack-Windows/
+            Artifacts/heic-pdf-ocr-windows.txt
+            Artifacts/pdf-heic-evaluation/*.log
+            Artifacts/pdf-heic-evaluation/*.json
+            Artifacts/HEICPack-PDF-Windows/
             Artifacts/pdf-build-windows/*.log
             Artifacts/pdf-smoke-windows.json
             Artifacts/pdf-extract-images-windows.txt

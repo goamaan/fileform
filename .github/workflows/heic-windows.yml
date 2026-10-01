@@ -2,9 +2,9 @@ name: Windows HEIC dependency evaluation
 on:
   push:
     branches: [main]
-    paths: ['Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', 'Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
   pull_request:
-    paths: ['Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', 'Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +32,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python native/heic-decode/smoke.py Artifacts/heic-helper-evaluation/Release/fileform-heic-decode.exe native/heic-decode/fixtures | Tee-Object -FilePath Artifacts/heic-helper-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and exercise Rust HEIC adapter
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          $env:RUSTFLAGS='-C target-feature=+crt-static'
+          cargo build --release --workspace --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python native/heic-decode/stage-evaluation.py Artifacts/heic-helper-evaluation/Release Artifacts/heic-dependency-evaluation Artifacts/HEICPack-Windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-heic.py Artifacts/HEICPack-Windows | Tee-Object -FilePath Artifacts/heic-engine-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain source build evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -46,4 +57,6 @@ jobs:
             Artifacts/heic-dependency-evaluation/install/
             Artifacts/heic-helper-evaluation/Release/
             Artifacts/heic-helper-windows.txt
+            Artifacts/heic-engine-windows.txt
+            Artifacts/HEICPack-Windows/
           retention-days: 14

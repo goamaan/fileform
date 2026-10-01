@@ -107,7 +107,8 @@ pub(crate) fn prepare(
             && (signature[..2] == [0xff, 0xd8]
                 || signature[..2] == *b"II"
                 || signature[..2] == *b"MM"
-                || signature.starts_with(b"\x89PNG"));
+                || signature.starts_with(b"\x89PNG")
+                || (read >= 8 && signature[4..8] == *b"ftyp"));
         let document = if is_image {
             let page = crate::pdf_images::prepare(
                 source.snapshot.path(),

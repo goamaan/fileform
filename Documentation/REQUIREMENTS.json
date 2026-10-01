@@ -100,8 +100,8 @@
       "reference_ledger_status": "implementing",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "PNG/JPEG/TIFF native routes and desktop wiring exist.",
-      "remaining": "Existing HEIC input and remaining original format cases; final UI acceptance."
+      "evidence_notes": "PNG/JPEG/TIFF native routes and current desktop wiring exist. Common SDR HEIC now uses an isolated source-built helper with Rust conversion/crop/resize/fit, ICC/alpha/orientation and Mac CLI/worker/PDF/OCR fixtures.",
+      "remaining": "Wider HEIC grid/gain-map/depth/EXIF and original-format acceptance; current Windows HEIC runtime; HEIC bundle/desktop integration and final UI checks."
     },
     {
       "id": "IMG02",

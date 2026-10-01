@@ -10,6 +10,9 @@ fn main() {
     let (args, collision) = collision_argument(raw);
     let (args, audio_stream) = audio_stream_argument(args);
     let mut request = match args.as_slice() {
+        [command, directory] if command == "verify-heic-pack" => Request::VerifyHeicPack {
+            directory: directory.into(),
+        },
         [command, input, output, directory, tail @ ..] if command == "playback-preview" => {
             let mut options = fileform_engine::MediaPlayback {
                 input: input.into(),

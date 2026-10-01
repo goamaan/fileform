@@ -10,7 +10,7 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 | Area | Native engine / CLI / worker | Electron app | Still required |
 | --- | --- | --- | --- |
 | Tables | CSV, TSV, flat JSON conversion and verification | Picker, conversion, save/reveal | Unified intake, mixed batches, persistence and final UX checks |
-| Images | PNG/JPEG/TIFF conversion, crop, resize, quality/byte fit, orientation/color checks | These limited routes are wired | Existing HEIC input parity; remaining original format/color cases; final preview/UX acceptance |
+| Images | PNG/JPEG/TIFF and common SDR HEIC conversion, crop, resize, quality/byte fit, orientation/color checks | These limited routes are wired | Wider HEIC grid/gain-map/depth/EXIF and original format/color acceptance; HEIC desktop/bundle integration; final preview/UX acceptance |
 | Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, selected audio tracks, exact WAV/FLAC/M4A trims and fast AAC trim | Not wired | Wider original-policy acceptance, desktop playback leases/cache and editor integration |
 | Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters and complete normalized playback exports | Not wired | Original-policy acceptance, desktop playback leases/cache and editor integration; VFR trim remains an explicit original limitation |
 | PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, range/interval/marker split and complete-folder publication | Not wired | Editing UI and remaining original policies |

@@ -154,3 +154,15 @@ its earlier successful result remained available. Minimum quality above maximum
 blocked saving. Cancelling the save dialog preserved the result. Evidence:
 Artifacts/Verification/electron-image/fit-ui-verified.json. These controls do not
 add hidden dimension changes or claim a globally optimal quality search.
+
+
+## Common HEIC input — October 1, 2026
+
+Common single-image SDR HEIC now enters the same Rust image pipeline using the
+verified isolated libheif/libde265 helper. Conversion, crop/resize, fit, previews,
+PDF composition and OCR reuse its normalized pixels. Mac fixtures cover sRGB,
+Display-P3 ICC, alpha and all eight orientations with independent ImageIO/color
+references. See [HEIC implementation and remaining gates](HEIC_RESEARCH.md).
+Wider metadata/container cases and current Windows runtime, bundling and desktop
+acceptance remain open; do not advertise complete HEIC parity yet. HEIC writing
+remains deferred. `Tools/encode-heic-fixture.swift` is only an owned-fixture generator.

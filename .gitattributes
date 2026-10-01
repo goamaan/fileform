@@ -1,0 +1,5 @@
+# Exact generated fixture inventories must survive Windows checkouts.
+native/heic-decode/fixtures/*.json text eol=lf
+native/heic-decode/fixtures/*.rgba binary
+native/heic-decode/fixtures/*.heic binary
+crates/fileform-engine/tests/fixtures/*.heic binary

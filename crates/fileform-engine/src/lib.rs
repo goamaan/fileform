@@ -12,6 +12,7 @@ use std::{
 use tempfile::NamedTempFile;
 
 mod exif_color;
+mod heic_input;
 mod image_color;
 mod image_crop;
 mod image_fit;
@@ -137,6 +138,9 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    VerifyHeicPack {
+        directory: PathBuf,
+    },
     MediaPlaybackPreview(MediaPlayback),
     OptimizePdfImages(PdfImageOptimization),
     ExtractPdfImages(PdfImageExtraction),
@@ -376,6 +380,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    HeicPackVerification(heic_input::HeicPackVerification),
     MediaPlaybackPreview(media_playback::PlaybackReceipt),
     OptimizedPdfImages(pdf_lossy_optimize::ImageOptimizationReceipt),
     PdfExtractedImages(pdf_image_extraction::ExtractionReceipt),
@@ -459,12 +464,14 @@ fn prepare_image(
     cancellation: &Cancellation,
 ) -> Result<(Source, ImageInspection, image::RgbaImage)> {
     let mut source = Source::open_with_limit(input, cancellation.clone(), 512 * 1024 * 1024)?;
-    let mut signature = [0u8; 2];
-    source.snapshot_reader()?.read_exact(&mut signature)?;
-    let decoded = if signature == [0xff, 0xd8] {
+    let mut signature = [0u8; 12];
+    let read = source.snapshot_reader()?.read(&mut signature)?;
+    let decoded = if read >= 2 && signature[..2] == [0xff, 0xd8] {
         jpeg_input::decode(io::BufReader::new(source.snapshot_reader()?))?
-    } else if signature == *b"II" || signature == *b"MM" {
+    } else if read >= 2 && (signature[..2] == *b"II" || signature[..2] == *b"MM") {
         tiff_input::decode(io::BufReader::new(source.snapshot_reader()?), cancellation)?
+    } else if read >= 8 && signature[4..8] == *b"ftyp" {
+        heic_input::decode(source.snapshot.path(), cancellation)?
     } else {
         png_pipeline::decode(io::BufReader::new(source.snapshot_reader()?))?
     };
@@ -520,7 +527,10 @@ fn prepare_image(
                 "gamma_chromaticities",
             )
         } else {
-            (Some(oriented_hash.clone()), "assumed_srgb")
+            (
+                Some(oriented_hash.clone()),
+                decoded.color_override.unwrap_or("assumed_srgb"),
+            )
         };
     let icc_srgb_rgba_sha256 = if decoded.has_icc {
         icc_srgb_rgba_sha256
@@ -978,6 +988,9 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::VerifyHeicPack { directory } = &request {
+        return heic_input::verify(directory, cancellation).map(Response::HeicPackVerification);
+    }
     if let Request::MediaPlaybackPreview(options) = &request {
         return media_playback::export(options, cancellation).map(Response::MediaPlaybackPreview);
     }
@@ -1393,7 +1406,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::MediaPlaybackPreview(..)
+        Request::VerifyHeicPack { .. }
+        | Request::MediaPlaybackPreview(..)
         | Request::OptimizePdfImages(..)
         | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
@@ -1439,7 +1453,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::MediaPlaybackPreview(..)
+        Request::VerifyHeicPack { .. }
+        | Request::MediaPlaybackPreview(..)
         | Request::OptimizePdfImages(..)
         | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
