@@ -12,16 +12,17 @@ use std::{
 };
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PngExport {
+pub struct PageExport {
     pub input: PathBuf,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
     pub page_index: u32,
     pub dpi: u16,
+    pub quality: Option<u8>,
 }
 #[derive(Debug, Serialize)]
-pub struct PngReceipt {
+pub struct RasterReceipt {
     pub output: PathBuf,
     pub bytes: u64,
     pub sha256: String,
@@ -30,7 +31,9 @@ pub struct PngReceipt {
     pub width: u32,
     pub height: u32,
     pub dpi: u16,
-    pub pixels_per_meter: u32,
+    pub pixels_per_meter: Option<u32>,
+    pub format: &'static str,
+    pub quality: Option<u8>,
     pub warnings: Vec<&'static str>,
 }
 fn invalid() -> crate::Failure {
@@ -47,15 +50,33 @@ fn line(reader: &mut impl BufRead, expected: &[u8]) -> Result<()> {
     }
     Ok(())
 }
-pub fn export(options: &PngExport, cancel: &Cancellation) -> Result<PngReceipt> {
-    if !(36..=600).contains(&options.dpi)
-        || !options
-            .output
-            .extension()
-            .and_then(|v| v.to_str())
-            .is_some_and(|v| v.eq_ignore_ascii_case("png"))
-    {
-        return Err(fail("invalid_request", "Choose PNG output and 36–600 DPI."));
+#[derive(Clone, Copy)]
+pub(crate) enum Format {
+    Png,
+    Jpeg,
+}
+pub(crate) fn export(
+    options: &PageExport,
+    format: Format,
+    cancel: &Cancellation,
+) -> Result<RasterReceipt> {
+    let extension = options
+        .output
+        .extension()
+        .and_then(|v| v.to_str())
+        .unwrap_or("");
+    let valid = match format {
+        Format::Png => extension.eq_ignore_ascii_case("png") && options.quality.is_none(),
+        Format::Jpeg => {
+            (extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg"))
+                && options.quality.is_none_or(|v| (5..=100).contains(&v))
+        }
+    };
+    if !(36..=600).contains(&options.dpi) || !valid {
+        return Err(fail(
+            "invalid_request",
+            "Choose the matching image format, 36–600 DPI, and JPEG quality from 5 to 100.",
+        ));
     }
     if options.output.try_exists()? {
         return Err(fail("collision", "The output already exists."));
@@ -110,7 +131,78 @@ pub fn export(options: &PngExport, cancel: &Cancellation) -> Result<PngReceipt> 
         .unwrap_or(Path::new("."));
     let identity = same_file::Handle::from_path(parent)?;
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-    let ppm = (f64::from(options.dpi) / 0.0254).round() as u32;
+    let quality = match format {
+        Format::Png => None,
+        Format::Jpeg => Some(options.quality.unwrap_or(85)),
+    };
+    let ppm = match format {
+        Format::Png => Some(encode_png(
+            &mut reader,
+            &mut temporary,
+            &plan,
+            options.dpi,
+            cancel,
+        )?),
+        Format::Jpeg => {
+            encode_jpeg(
+                &mut reader,
+                &mut temporary,
+                &plan,
+                options.dpi,
+                quality.expect("JPEG quality"),
+                cancel,
+            )?;
+            None
+        }
+    };
+    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, 512 * 1024 * 1024)?;
+    source.check(&options.input)?;
+    if identity != same_file::Handle::from_path(parent)? {
+        return Err(fail("output_changed", "Output folder changed."));
+    }
+    temporary.as_file().sync_all()?;
+    cancel.check()?;
+    temporary.persist_noclobber(&options.output).map_err(|e| {
+        fail(
+            if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+                "collision"
+            } else {
+                "io"
+            },
+            e.error.to_string(),
+        )
+    })?;
+    let mut warnings=vec!["Rendered as an image. Searchable text, vectors, interactive behavior and document metadata are not retained."];
+    if quality.is_some() {
+        warnings.push("JPEG adds lossy encoding at the requested quality.");
+    }
+    Ok(RasterReceipt {
+        output: options.output.clone(),
+        bytes,
+        sha256,
+        source_sha256: source.hash,
+        page_index: options.page_index,
+        width: plan.width,
+        height: plan.height,
+        dpi: options.dpi,
+        pixels_per_meter: ppm,
+        format: match format {
+            Format::Png => "png",
+            Format::Jpeg => "jpeg",
+        },
+        quality,
+        warnings,
+    })
+}
+
+fn encode_png(
+    reader: &mut impl Read,
+    temporary: &mut tempfile::NamedTempFile,
+    plan: &pdf_raster_plan::RasterPagePlan,
+    dpi: u16,
+    cancel: &Cancellation,
+) -> Result<u32> {
+    let ppm = (f64::from(dpi) / 0.0254).round() as u32;
     let mut expected = Sha256::new();
     {
         let limited = LimitedWriter {
@@ -190,23 +282,71 @@ pub fn export(options: &PngExport, cancel: &Cancellation) -> Result<PngReceipt> 
     if rows != plan.height || actual.finalize() != expected.finalize() {
         return Err(invalid());
     }
-    let (bytes, sha256) = digest(temporary.as_file_mut(), cancel, 512 * 1024 * 1024)?;
-    source.check(&options.input)?;
-    if identity != same_file::Handle::from_path(parent)? {
-        return Err(fail("output_changed", "Output folder changed."));
+    Ok(ppm)
+}
+fn encode_jpeg(
+    reader: &mut impl Read,
+    temporary: &mut tempfile::NamedTempFile,
+    plan: &pdf_raster_plan::RasterPagePlan,
+    dpi: u16,
+    quality: u8,
+    cancel: &Cancellation,
+) -> Result<()> {
+    use image::ImageEncoder;
+    let mut rgb = Vec::new();
+    let length = usize::try_from(plan.decoded_rgb_bytes)
+        .map_err(|_| fail("limit", "Raster buffer size overflow."))?;
+    rgb.try_reserve_exact(length)
+        .map_err(|_| fail("limit", "Not enough memory to encode the requested JPEG."))?;
+    rgb.resize(length, 0);
+    for chunk in rgb.chunks_mut(64 * 1024) {
+        cancel.check()?;
+        reader.read_exact(chunk)?;
     }
-    temporary.as_file().sync_all()?;
+    let profile = moxcms::ColorProfile::new_srgb()
+        .encode()
+        .map_err(|e| fail("encoding", e.to_string()))?;
+    {
+        let limited = LimitedWriter {
+            inner: temporary.as_file_mut(),
+            cancellation: cancel.clone(),
+            bytes: 0,
+            maximum_bytes: 512 * 1024 * 1024,
+        };
+        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(limited, quality);
+        encoder.set_pixel_density(image::codecs::jpeg::PixelDensity::dpi(dpi));
+        encoder
+            .set_icc_profile(profile.clone())
+            .map_err(|_| invalid())?;
+        encoder
+            .encode(
+                &rgb,
+                plan.width,
+                plan.height,
+                image::ExtendedColorType::Rgb8,
+            )
+            .map_err(|e| fail("encoding", e.to_string()))?;
+    }
+    drop(rgb); // Do not retain the raw RGB allocation while independently decoding.
     cancel.check()?;
-    temporary.persist_noclobber(&options.output).map_err(|e| {
-        fail(
-            if e.error.kind() == std::io::ErrorKind::AlreadyExists {
-                "collision"
-            } else {
-                "io"
-            },
-            e.error.to_string(),
-        )
-    })?;
-    Ok(PngReceipt{output:options.output.clone(),bytes,sha256,source_sha256:source.hash,page_index:options.page_index,width:plan.width,height:plan.height,dpi:options.dpi,pixels_per_meter:ppm,
-        warnings:vec!["Rendered as an image. Searchable text, vectors, interactive behavior and document metadata are not retained."]})
+    let mut file = temporary.reopen()?;
+    let mut header = [0u8; 20];
+    file.read_exact(&mut header)?;
+    let mut expected = vec![
+        0xff, 0xd8, 0xff, 0xe0, 0, 16, b'J', b'F', b'I', b'F', 0, 1, 2, 1,
+    ];
+    expected.extend_from_slice(&dpi.to_be_bytes());
+    expected.extend_from_slice(&dpi.to_be_bytes());
+    expected.extend_from_slice(&[0, 0]);
+    if header.as_slice() != expected {
+        return Err(invalid());
+    }
+    file.seek(SeekFrom::Start(0))?;
+    crate::jpeg_output::verify(
+        BufReader::new(file),
+        plan.width,
+        plan.height,
+        &profile,
+        cancel,
+    )
 }

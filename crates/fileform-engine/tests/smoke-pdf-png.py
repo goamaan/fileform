@@ -17,39 +17,7 @@ worker=root/'target/release'/('fileform-worker'+suffix)
 helper=renderer/'bin'/('fileform-pdf-render'+suffix)
 def run(*args):
     return subprocess.run([str(v) for v in args],capture_output=True,timeout=120)
-def decode(path):
-    data=path.read_bytes();assert data[:8]==b'\x89PNG\r\n\x1a\n'
-    offset=8;chunks={};compressed=bytearray()
-    while offset<len(data):
-        length,=struct.unpack('>I',data[offset:offset+4]);kind=data[offset+4:offset+8]
-        value=data[offset+8:offset+8+length]
-        crc,=struct.unpack('>I',data[offset+8+length:offset+12+length])
-        assert zlib.crc32(kind+value)==crc
-        offset+=12+length
-        if kind==b'IDAT':compressed.extend(value)
-        else:chunks[kind]=value
-        if kind==b'IEND':assert offset==len(data);break
-    w,h,depth,color,compression,filtering,interlaced=struct.unpack('>IIBBBBB',chunks[b'IHDR'])
-    assert (depth,color,compression,filtering,interlaced)==(8,2,0,0,0)
-    scan=zlib.decompress(compressed);stride=w*3
-    assert len(scan)==h*(stride+1)
-    previous=bytearray(stride);pixels=bytearray()
-    for y in range(h):
-        start=y*(stride+1);kind=scan[start];row=bytearray(scan[start+1:start+1+stride])
-        assert kind<=4
-        if kind==2:row=bytearray((a+b)&255 for a,b in zip(row,previous))
-        elif kind:
-            for x in range(stride):
-                left=row[x-3] if x>=3 else 0;up=previous[x];corner=previous[x-3] if x>=3 else 0
-                if kind==1:prediction=left
-                elif kind==3:prediction=(left+up)//2
-                else:
-                    p=left+up-corner;a=abs(p-left);b=abs(p-up);c=abs(p-corner)
-                    prediction=left if a<=b and a<=c else (up if b<=c else corner)
-                row[x]=(row[x]+prediction)&255
-        pixels.extend(row);previous=row
-    assert chunks[b'sRGB']==b'\0'
-    return w,h,struct.unpack('>IIB',chunks[b'pHYs']),pixels
+from png_fixture_decode import decode
 with tempfile.TemporaryDirectory(prefix='fileform-pdf-png-') as folder:
     base=Path(folder)
     cases=[('large',lambda p:fixture(p,text=True),0,600),

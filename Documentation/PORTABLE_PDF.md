@@ -481,3 +481,32 @@ mixed image sources and final desktop wiring still remain for full page-image pa
 Windows run [35832062083](https://github.com/goamaan/fileform/actions/runs/35832062083)
 passed at ea9e1f9, proving the earlier exact-target helper and DPI planner. The
 streamed PNG exporter is newer and needs its own Windows acceptance.
+
+### Single-page JPEG export — October 1, 2026
+
+`export-pdf-jpeg INPUT OUTPUT.jpg PDF_PACK RENDER_PACK PAGE DPI [QUALITY]` and
+worker `export_pdf_jpeg` share the exact-size rendering, snapshot and no-clobber
+publication path with PNG. JPEG accepts 36–600 DPI and integer quality 5–100
+(default 85), writes JFIF density in inches and an sRGB ICC profile, and reports
+the lossy encoding policy. The complete JPEG is independently decoded to verify
+dimensions, RGB samples, ICC/orientation and its end marker; the JFIF header must
+match the requested DPI. Quality is explicit and never silently adjusted.
+
+The helper raster stays file-backed. The current safe Rust JPEG encoder requires
+a bounded RGB buffer (at most 192 MB under the 64-million-pixel limit); that buffer
+is released before full output decode. PNG retains row streaming. This does not
+establish final process-memory budgets or cancellation latency at maximum size.
+The shared source/size checks and owned staging cleanup remain enforced.
+
+Mac real fixtures pass PNG regressions plus JPEG at qualities 5/85/100, independent
+zune-JPEG decode and stdlib PNG pixel checks, measured quality/size/error tradeoffs,
+JFIF/ICC metadata, 600-DPI output beyond preview limits, forms/rotation/UserUnit,
+CLI/worker decoded parity, collisions and unchanged sources. The ICC encoder uses
+a creation timestamp: byte-identical repeated JPEG output is not promised. Each
+receipt hash is checked against its own actual file; decoded pixels are compared
+for repeated-operation parity. Windows CI runs the same suite. Batch/selected
+publication and mixed image sources remain needed for full original raster parity.
+
+Windows run [35833734048](https://github.com/goamaan/fileform/actions/runs/35833734048)
+passed at afab174, covering streamed PNG output. The JPEG increment is newer and
+requires its own Windows result.
