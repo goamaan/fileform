@@ -150,8 +150,8 @@
       "reference_ledger_status": "planned",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Native audio/video conversion and extraction routes exist with explicit limits.",
-      "remaining": "Track/format/color gaps and all Electron integration."
+      "evidence_notes": "Native audio/video conversion, extraction and fitting exist; selected audio streams are supported with explicit indices and real distinct-track Mac fixtures.",
+      "remaining": "Current Windows track-selection acceptance, wider original policy/format tests and Electron integration."
     },
     {
       "id": "MED02",
@@ -168,8 +168,8 @@
       "reference_ledger_status": "implementing",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Native exact/fast trim routes have bounded clock/content checks.",
-      "remaining": "VFR, track selection, remaining lossy trim policies and editors."
+      "evidence_notes": "Native exact WAV/FLAC/M4A and CFR H.264 trims, AAC/keyframe-copy trims and explicit audio-stream selection have real Mac fixtures. CFR-only trimming matches the original Swift reference.",
+      "remaining": "Current Windows selected-track acceptance, remaining original-policy fixtures, playback proxies and desktop editor integration. VFR trimming is not original parity and remains future breadth."
     },
     {
       "id": "MED04",

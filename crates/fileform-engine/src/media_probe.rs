@@ -83,6 +83,25 @@ pub(crate) fn audio(info: &MediaInspection, selected: Option<u32>) -> Result<&St
         .find(|s| s.codec_type == "audio")
         .ok_or_else(|| fail("unsupported", "No audio track was found."))
 }
+pub(crate) fn retained_audio(
+    info: &MediaInspection,
+    selected: Option<u32>,
+    mute: bool,
+) -> Result<Option<&Stream>> {
+    if mute {
+        if selected.is_some() {
+            return Err(fail(
+                "invalid_request",
+                "Choose an audio track or mute audio, not both.",
+            ));
+        }
+        return Ok(None);
+    }
+    if info.audio_tracks == 0 && selected.is_none() {
+        return Ok(None);
+    }
+    audio(info, selected).map(Some)
+}
 fn parse(bytes: &[u8]) -> Result<(Probe, f64, usize, usize)> {
     let probe: Probe = serde_json::from_slice(bytes)
         .map_err(|_| fail("unsupported", "Invalid media inspection response."))?;

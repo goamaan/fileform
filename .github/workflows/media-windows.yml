@@ -117,6 +117,13 @@ jobs:
         run: |
           python crates/fileform-engine/tests/smoke-video-encoder.py Artifacts/MediaPack-Windows h264_mf | Tee-Object -FilePath Artifacts/video-encoder-windows.jsonl
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify selected Windows video audio
+        env:
+          FILEFORM_NATIVE_DIAGNOSTICS: '1'
+        shell: pwsh
+        run: |
+          python crates/fileform-engine/tests/smoke-video-selection.py Artifacts/MediaPack-Windows | Tee-Object -FilePath Artifacts/video-selection-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain pack, sources and build diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -128,6 +135,7 @@ jobs:
             Artifacts/media-foundation-probe.jsonl
             Artifacts/media-smoke-windows.json
             Artifacts/audio-selection-windows.txt
+            Artifacts/video-selection-windows.txt
             Artifacts/video-encoder-windows.jsonl
             Artifacts/engine-build-windows/*.log
             Artifacts/engine-build-windows/verification.txt

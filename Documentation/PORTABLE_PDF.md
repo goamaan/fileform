@@ -649,3 +649,7 @@ cancel/change cleanup. Workspace tests pass 99 tests with two supervised subproc
 fixtures ignored in their standalone form; Clippy and Windows cross-check pass.
 Current Windows runtime acceptance for this planning/policy increment is pending.
 Desktop integration remains open.
+
+Windows [36924240580](https://github.com/goamaan/fileform/actions/runs/36924240580)
+at `9c8c075` now passes planning/selection/rename fixtures and the complete prior
+PDF suite. This supersedes the pending native planning/policy statement above.

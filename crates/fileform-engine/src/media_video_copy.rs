@@ -18,6 +18,7 @@ pub struct CopyReceipt {
     pub duration_seconds: f64,
     pub duration_tolerance_seconds: f64,
     pub audio_tracks: usize,
+    pub source_audio_stream_index: Option<u32>,
     pub muted_audio: bool,
 }
 fn seconds(ticks: i64, base: TimeBase) -> f64 {
@@ -114,10 +115,8 @@ pub fn trim(
     };
     let begin = seconds(i64::from(start) * clock.frame_ticks, base);
     let finish = seconds(i64::from(end) * clock.frame_ticks, base);
-    let retained_audio = info
-        .streams
-        .iter()
-        .find(|s| s.codec_type == "audio" && !options.mute_audio);
+    let retained_audio =
+        media_probe::retained_audio(&info, options.audio_stream, options.mute_audio)?;
     let mut tolerance = 0.001;
     let mut retained_packets = None;
     if let Some(audio) = retained_audio {
@@ -348,6 +347,7 @@ pub fn trim(
         duration_seconds: after.duration_seconds,
         duration_tolerance_seconds: tolerance,
         audio_tracks: after.audio_tracks,
+        source_audio_stream_index: retained_audio.map(|s| s.index),
         muted_audio: options.mute_audio,
     })
 }

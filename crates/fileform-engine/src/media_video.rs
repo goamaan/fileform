@@ -12,6 +12,7 @@ pub struct VideoEncoding {
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VideoFit {
+    pub audio_stream: Option<u32>,
     pub max_bytes: u64,
     pub minimum_bitrate: Option<u32>,
     pub max_dimension: Option<u32>,
@@ -39,6 +40,7 @@ pub(crate) struct VideoSelection {
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct VideoOperation {
+    pub audio_stream: Option<u32>,
     pub encoding: Option<VideoEncoding>,
     pub encode_audio: bool,
     pub mute_audio: bool,
@@ -92,6 +94,7 @@ pub struct VideoReceipt {
     pub width: u32,
     pub height: u32,
     pub audio_tracks: usize,
+    pub source_audio_stream_index: Option<u32>,
     pub stream_copy: bool,
     pub requested_bitrate: Option<u32>,
     pub attempts: u32,
@@ -127,13 +130,10 @@ pub(crate) fn video(
     info: &media_probe::MediaInspection,
     stream_copy: bool,
 ) -> Result<&media_probe::Stream> {
-    if info.video_tracks != 1
-        || info.audio_tracks > 1
-        || info.streams.len() != 1 + info.audio_tracks
-    {
+    if info.video_tracks != 1 || info.streams.len() != 1 + info.audio_tracks {
         return Err(fail(
             "unsupported",
-            "Choose one video track with at most one audio track and no extra streams.",
+            "Choose one video track with audio tracks and no extra streams.",
         ));
     }
     let video = info
@@ -165,17 +165,6 @@ pub(crate) fn video(
         return Err(fail(
             "unsupported",
             "This video route requires supported 8-bit SDR video without transparency.",
-        ));
-    }
-    if stream_copy
-        && info
-            .streams
-            .iter()
-            .any(|s| s.codec_type == "audio" && s.codec_name.as_deref() != Some("aac"))
-    {
-        return Err(fail(
-            "unsupported",
-            "Stream-copy conversion requires AAC audio.",
         ));
     }
     Ok(video)
@@ -250,6 +239,15 @@ pub fn transform(
     }
     let before = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
     let original = video(&before, encoding.is_none())?;
+    let selected_audio =
+        media_probe::retained_audio(&before, operation.audio_stream, operation.mute_audio)?;
+    if encoding.is_none() && selected_audio.is_some_and(|s| s.codec_name.as_deref() != Some("aac"))
+    {
+        return Err(fail(
+            "unsupported",
+            "Stream-copy conversion requires selected AAC audio.",
+        ));
+    }
     let expected_dimensions = if let Some(options) = encoding {
         if original
             .sample_aspect_ratio
@@ -284,20 +282,12 @@ pub fn transform(
     } else {
         None
     };
-    let expected_audio_tracks = if operation.mute_audio {
-        0
-    } else {
-        before.audio_tracks
-    };
+    let expected_audio_tracks = usize::from(selected_audio.is_some());
     let expected_duration = operation
         .selection
         .map_or(before.duration_seconds, |s| s.duration_seconds);
-    let copy_audio = !encode_audio
-        && before
-            .streams
-            .iter()
-            .filter(|s| s.codec_type == "audio")
-            .all(|s| s.codec_name.as_deref() == Some("aac"));
+    let copy_audio =
+        !encode_audio && selected_audio.is_none_or(|s| s.codec_name.as_deref() == Some("aac"));
     let parent = output
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -321,10 +311,10 @@ pub fn transform(
         "-map_chapters",
         "-1",
     ]);
-    if operation.mute_audio {
-        copy.arg("-an");
+    if let Some(audio) = selected_audio {
+        copy.args(["-map", &format!("0:{}", audio.index)]);
     } else {
-        copy.args(["-map", "0:a:0?"]);
+        copy.arg("-an");
     }
     if let Some(samples) = operation.selection.and_then(|s| s.audio_samples) {
         copy.args([
@@ -469,17 +459,14 @@ pub fn transform(
             }
         }
     }
-    if let Some(audio) = before
-        .streams
-        .iter()
-        .find(|s| s.codec_type == "audio" && !operation.mute_audio)
-    {
+    if let Some(audio) = selected_audio {
         let result = after
             .streams
             .iter()
             .find(|s| s.codec_type == "audio")
             .ok_or_else(|| fail("verification", "Output audio is missing."))?;
-        if audio.channels != result.channels
+        if result.codec_name.as_deref() != Some("aac")
+            || audio.channels != result.channels
             || audio.sample_rate != result.sample_rate
             || ((start(audio)? - start(original)?) - (start(result)? - start(copied)?)).abs()
                 > 0.001
@@ -495,13 +482,20 @@ pub fn transform(
     } else {
         vec!["0:v:0"]
     } {
-        let hash = |path: &Path| -> Result<Vec<u8>> {
+        let hash = |path: &Path, source: bool| -> Result<Vec<u8>> {
             let mut decode = command(&executable);
             decode
                 .args(["-err_detect", "explode", "-noautorotate"])
                 .arg("-i")
                 .arg(path)
-                .args(["-map", track]);
+                .args([
+                    "-map",
+                    &if source && track == "0:a:0" {
+                        format!("0:{}", selected_audio.expect("retained audio").index)
+                    } else {
+                        track.into()
+                    },
+                ]);
             if track == "0:v:0" {
                 decode.args([
                     "-c:v",
@@ -517,10 +511,10 @@ pub fn transform(
             decode.args(["-threads", "2", "-f", "hash", "-hash", "sha256", "-"]);
             native_process::run(decode, cancellation, deadline, 4096)
         };
-        let output_hash = hash(temporary.path())?;
+        let output_hash = hash(temporary.path(), false)?;
         let preserve = encoding.is_none() || (track == "0:a:0" && copy_audio);
         if !output_hash.starts_with(b"SHA256=")
-            || (preserve && output_hash != hash(source.snapshot.path())?)
+            || (preserve && output_hash != hash(source.snapshot.path(), true)?)
         {
             return Err(fail(
                 "verification",
@@ -553,6 +547,7 @@ pub fn transform(
         width: copied.width.unwrap(),
         height: copied.height.unwrap(),
         audio_tracks: after.audio_tracks,
+        source_audio_stream_index: selected_audio.map(|s| s.index),
         stream_copy: encoding.is_none(),
         requested_bitrate: encoding.map(|options| options.bitrate.unwrap_or(2000000)),
         attempts: 1,
@@ -606,6 +601,7 @@ pub fn fit(
             directory,
             Some(&source.hash),
             VideoOperation {
+                audio_stream: options.audio_stream,
                 encoding: Some(VideoEncoding {
                     max_dimension: options.max_dimension,
                     bitrate: Some(rate),

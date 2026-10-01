@@ -8,6 +8,7 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VideoTrimOptions {
+    pub audio_stream: Option<u32>,
     pub interval: MediaInterval,
     #[serde(default)]
     pub mute_audio: bool,
@@ -93,16 +94,18 @@ pub fn trim(
     }
     let info = media_probe::inspect(source.snapshot.path(), directory, cancellation)?;
     media_video::trim_picture(&info)?;
+    let selected_audio =
+        media_probe::retained_audio(&info, options.audio_stream, options.mute_audio)?;
     let timeline = media_video_timeline::inspect(source.snapshot.path(), directory, cancellation)?;
     let (start, end, realized) = frame_range(options.interval, &timeline)?;
-    let audio_samples = if info.audio_tracks > 0 && !options.mute_audio {
-        let track = info
-            .streams
-            .iter()
-            .find(|s| s.codec_type == "audio")
-            .expect("counted audio");
+    let audio_samples = if let Some(track) = selected_audio {
         crate::media_audio::validate_trim_source(track, false)?;
-        let audio = media_timeline::inspect(source.snapshot.path(), directory, None, cancellation)?;
+        let audio = media_timeline::inspect(
+            source.snapshot.path(),
+            directory,
+            Some(track.index),
+            cancellation,
+        )?;
         let video_clock = timeline.origin_ticks as u128
             * u128::from(timeline.time_base.numerator)
             * u128::from(audio.time_base.denominator);
@@ -133,6 +136,7 @@ pub fn trim(
     let duration_seconds =
         (realized.end.ticks - realized.start.ticks) as f64 / f64::from(realized.end.timescale);
     let operation = media_video::VideoOperation {
+        audio_stream: options.audio_stream,
         encoding: Some(VideoEncoding::default()),
         encode_audio: true,
         mute_audio: options.mute_audio,

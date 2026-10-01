@@ -426,6 +426,7 @@ fn main() {
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
                 options: VideoTrimOptions {
+                    audio_stream: None,
                     interval: MediaInterval {
                         start: time(start),
                         end: time(end),
@@ -455,6 +456,7 @@ fn main() {
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
                 options: VideoTrimOptions {
+                    audio_stream: None,
                     interval: MediaInterval {
                         start: time(start),
                         end: time(end),
@@ -509,6 +511,7 @@ fn main() {
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
                 options: VideoFit {
+                    audio_stream: None,
                     max_bytes,
                     minimum_bitrate: None,
                     max_dimension: None,
@@ -552,6 +555,7 @@ fn main() {
                 }
             };
             Request::ConvertVideo {
+                audio_stream: None,
                 input: PathBuf::from(input),
                 output: PathBuf::from(output),
                 directory: PathBuf::from(directory),
@@ -563,6 +567,7 @@ fn main() {
             }
         }
         [command, input, output, directory] if command == "remux-video" => Request::RemuxVideo {
+            audio_stream: None,
             input: PathBuf::from(input),
             output: PathBuf::from(output),
             directory: PathBuf::from(directory),
@@ -639,7 +644,13 @@ fn main() {
             | Request::InspectAudioTimeline { audio_stream, .. }
             | Request::FitAudio { audio_stream, .. }
             | Request::TrimAudio { audio_stream, .. }
-            | Request::ConvertAudio { audio_stream, .. } => *audio_stream = Some(index),
+            | Request::ConvertAudio { audio_stream, .. }
+            | Request::ConvertVideo { audio_stream, .. }
+            | Request::RemuxVideo { audio_stream, .. } => *audio_stream = Some(index),
+            Request::CopyVideoTrim { options, .. } | Request::TrimVideo { options, .. } => {
+                options.audio_stream = Some(index)
+            }
+            Request::FitVideo { options, .. } => options.audio_stream = Some(index),
             _ => argument_error("This route does not yet accept audio track selection."),
         }
     }

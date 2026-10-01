@@ -4,7 +4,7 @@ Status: verified native packs, bounded media inspection, WAV/FLAC/M4A/MP3
 conversion/extraction and size fitting, WAV/FLAC/M4A exact trims, AAC packet-copy
 trims, MP4/MOV remuxing and SDR H.264 conversion/resize/fit, exact/keyframe video
 trims, measured waveforms and posters exist. Audio-only routes now expose explicit
-stream selection. VFR video trim, video track selection, wider original policies,
+stream selection. Wider original policies,
 playback proxies, Electron integration and release packaging remain open.
 Preserve the original Swift implementations as parity references.
 
@@ -678,5 +678,36 @@ indices in a picture+two-audio file, selected AAC packet-copy proofs, invalid,
 missing, repeated, nonaudio and stale selections, cancellation and staging cleanup.
 The complete prior audio/video regression suite also passes. Workspace 99 active
 Rust tests, Clippy, release build and Windows target check pass. Windows runtime
-acceptance is pending the new `smoke-audio-selection.py` workflow step. Video
-operations do not yet accept this audio selection and desktop integration is open.
+acceptance is pending the new `smoke-audio-selection.py` workflow step. This audio-only increment does not establish video selection or desktop integration.
+
+
+## Selected audio in video operations — October 1, 2026
+
+Video remux/conversion accept root `audio_stream`; fit and exact/fast trim accept
+`options.audio_stream`. Their CLI routes use `--audio-stream INDEX`. Multiple
+audio tracks require selection unless explicitly muted. Selecting a track and
+muting simultaneously is rejected. Receipts report `source_audio_stream_index`
+or null for silence. Eligibility, encoder mapping, timeline/sample mapping,
+layout/clock checks, source/output PCM and packet proofs use that selected track.
+Unselected codecs do not reject an otherwise eligible selected AAC remux. Sources
+with extra nonaudio streams or multiple picture tracks keep their existing limits.
+
+Mac real-tool tests use a video with independent 440 Hz and 880 Hz tracks. They
+verify each selection through remux, H.264 conversion, fit, exact trim and keyframe
+copy; compare decoded picture/audio and packet sequences where preservation is
+promised; measure the chosen tone after lossy encoding; verify explicit muting,
+AAC selection with an unselected PCM track, ambiguous/nonaudio/conflicting rejection
+and source/staging safety. Prior media regression, workspace tests, Clippy and
+Windows cross-check pass. Windows runtime selection acceptance is pending.
+
+The original `Sources/FileformCore/MediaTrimBackend.swift` validates constant-rate
+packet timestamps and rejects VFR trims. Portable CFR-only exact/fast trimming
+preserves that limit. VFR posters already have separate measured-frame tests;
+VFR trimming is future breadth, not an omitted original supported trim route.
+HDR/high-depth/alpha/non-square-pixel video workflows likewise remain explicit
+unsupported policies unless the original source provides a supported route.
+
+Windows [36925202391](https://github.com/goamaan/fileform/actions/runs/36925202391)
+at `10975e7` now passes all native audio selection/M4A trim tests and previous
+media/Media Foundation regressions. This supersedes the pending audio-only runtime
+statement above; selected-video-audio acceptance remains pending its new CI run.

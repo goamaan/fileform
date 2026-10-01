@@ -267,6 +267,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     ConvertVideo {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -274,6 +275,7 @@ pub enum Request {
         expected_source_sha256: Option<String>,
     },
     RemuxVideo {
+        audio_stream: Option<u32>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -1259,6 +1261,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::SavedAudio);
     }
     if let Request::ConvertVideo {
+        audio_stream,
         input,
         output,
         directory,
@@ -1272,6 +1275,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             directory,
             expected_source_sha256.as_deref(),
             media_video::VideoOperation {
+                audio_stream: *audio_stream,
                 encoding: Some(*options),
                 ..Default::default()
             },
@@ -1280,6 +1284,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         .map(Response::SavedVideo);
     }
     if let Request::RemuxVideo {
+        audio_stream,
         input,
         output,
         directory,
@@ -1291,7 +1296,10 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             directory,
             expected_source_sha256.as_deref(),
-            media_video::VideoOperation::default(),
+            media_video::VideoOperation {
+                audio_stream: *audio_stream,
+                ..Default::default()
+            },
             cancellation,
         )
         .map(Response::SavedVideo);

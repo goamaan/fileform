@@ -55,3 +55,13 @@ PDFium evaluation attestation/helper, source-built OCR, and all real PDF runtime
 fixtures including intrinsic embedded-image extraction and targeted lossy image
 optimization/fit. The previous extraction flush failure is corrected. This is
 native Windows automated evidence, not Electron integration or manual GUI acceptance.
+
+October 1: [Windows PDF planning/policy run 36924240580](https://github.com/goamaan/fileform/actions/runs/36924240580)
+at `9c8c075` passed all PDF fixtures, including native range/interval/marker
+planning and actual rename receipts. Media run `36924240639` and desktop preview
+run `36924240663` at the same commit passed their existing suites.
+
+[Windows audio selection run 36925202391](https://github.com/goamaan/fileform/actions/runs/36925202391)
+at `10975e7` passed real distinct-track selection, exact M4A trimming, existing
+media smoke and Media Foundation encoding/decoding. This covers audio-only routes;
+the subsequent selected-video-audio increment requires its own runtime evidence.
