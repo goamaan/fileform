@@ -1,0 +1,37 @@
+name: Windows HEIC dependency evaluation
+on:
+  push:
+    branches: [main]
+    paths: ['Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
+  pull_request:
+    paths: ['Tools/build-heic-evaluation.py', 'native/heic-decode/**', '.github/workflows/heic-windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: heic-windows-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  dependencies:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build pinned HEIC decoder dependencies
+        shell: pwsh
+        run: |
+          python Tools/build-heic-evaluation.py --work Artifacts/heic-dependency-evaluation --jobs 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain source build evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fileform-heic-dependency-evaluation-windows-x64
+          path: |
+            Artifacts/heic-dependency-evaluation/*.log
+            Artifacts/heic-dependency-evaluation/*.json
+            Artifacts/heic-dependency-evaluation/*-cache.txt
+            Artifacts/heic-dependency-evaluation/*.tar.gz
+            Artifacts/heic-dependency-evaluation/licenses/
+            Artifacts/heic-dependency-evaluation/install/
+          retention-days: 14

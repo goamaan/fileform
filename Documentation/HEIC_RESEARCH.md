@@ -155,3 +155,23 @@ source preservation, cancellation, cleanup, and no-clobber output. Reuse origina
 ImageIO as a behavior/color oracle on Mac, with tolerances appropriate to decoder
 rounding rather than unsupported byte-exact equality. Keep missing cases visible
 until verified; a restricted prototype does not close the HEIC parity requirement.
+
+
+## Dependency source build — October 1, 2026
+
+`Tools/build-heic-evaluation.py --work NEW_DIRECTORY --jobs 4` now verifies the
+actual downloaded archive bytes against both pins above, safely extracts bounded
+regular files/directories, builds shared libraries with explicit codec paths and
+optional codecs/examples/plugins disabled, and retains commands, caches, source
+archives and licenses. A fresh Mac arm64 build passed. `otool` reports libheif and
+libde265 plus system C++/System dependencies, with no host codec library linked.
+The Windows workflow builds the same pinned source and retains its evidence;
+Windows source-build acceptance is pending. This is dependency evaluation only,
+not HEIC support in the app, engine adapter, helper acceptance or distribution.
+
+Next implementation gates remain the isolated bounded decode helper and protocol,
+original single-image SDR/ICC/NCLX/alpha/orientation parity fixtures against ImageIO,
+HDR/gain-map rejection (including tone-map/compact-container representations),
+Rust image/OCR/PDF integration, native runtime tests on both systems, library
+replacement/rebuild packaging and Electron end-to-end integration. Do not replace
+these gates with a basic dependency build or advertise restored HEIC input yet.
