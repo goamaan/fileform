@@ -25,6 +25,25 @@ pub(crate) fn limit(
             .max(1) as u32
     };
     let (out_width, out_height) = (scaled(width), scaled(height));
+    exact(image, out_width, out_height, cancellation)
+}
+pub(crate) fn exact(
+    image: image::RgbaImage,
+    out_width: u32,
+    out_height: u32,
+    cancellation: &Cancellation,
+) -> Result<image::RgbaImage> {
+    cancellation.check()?;
+    let (width, height) = image.dimensions();
+    if out_width == 0 || out_height == 0 || out_width > width || out_height > height {
+        return Err(fail(
+            "invalid_request",
+            "Resize dimensions must be positive and cannot enlarge the image.",
+        ));
+    }
+    if (out_width, out_height) == (width, height) {
+        return Ok(image);
+    }
     let bytes = u64::from(out_width)
         .checked_mul(u64::from(out_height))
         .and_then(|n| n.checked_mul(4))

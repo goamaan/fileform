@@ -253,6 +253,20 @@ pub struct GraphInspection {
 pub fn inspect(input: &Path, directory: &Path, cancel: &Cancellation) -> Result<GraphInspection> {
     pdf_inspect::verify_pack(directory, cancel)?;
     let mut source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024)?;
+    let graph = document_snapshot(source.snapshot.path(), directory, cancel)?;
+    let graph = fingerprint(&graph, cancel)?;
+    source.check(input)?;
+    Ok(GraphInspection {
+        source_sha256: source.hash,
+        graph,
+    })
+}
+pub(crate) fn document_snapshot(
+    input: &Path,
+    directory: &Path,
+    cancel: &Cancellation,
+) -> Result<Value> {
+    pdf_inspect::verify_pack(directory, cancel)?;
     let mut command = pdf_inspect::command(directory)?;
     command
         .args([
@@ -261,16 +275,20 @@ pub fn inspect(input: &Path, directory: &Path, cancel: &Cancellation) -> Result<
             "--json-stream-data=inline",
             "--decode-level=generalized",
         ])
-        .arg(source.snapshot.path());
-    let bytes = native_process::run(command, cancel, Duration::from_secs(120), 128 * 1024 * 1024)?;
-    let graph: Value = serde_json::from_slice(&bytes)?;
-    let graph = fingerprint(&graph, cancel)?;
-    source.check(input)?;
-    Ok(GraphInspection {
-        source_sha256: source.hash,
-        graph,
-    })
+        .arg(input);
+    let mut temporary = tempfile::NamedTempFile::new()?;
+    native_process::run_to_file(
+        command,
+        cancel,
+        Duration::from_secs(120),
+        &mut temporary,
+        128 * 1024 * 1024,
+    )?;
+    Ok(serde_json::from_reader(std::io::BufReader::new(
+        temporary.as_file_mut(),
+    ))?)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -49,6 +49,9 @@ pub use pdf_split::Split as PdfSplit;
 mod pdf_embedded_encode;
 mod pdf_graph;
 mod pdf_image_extraction;
+mod pdf_lossy_images;
+mod pdf_lossy_optimize;
+pub use pdf_lossy_optimize::ImageOptimization as PdfImageOptimization;
 mod pdf_image_graph;
 pub use pdf_image_extraction::Extraction as PdfImageExtraction;
 mod pdf_images;
@@ -128,6 +131,7 @@ impl<R: Seek> Seek for CancellableReader<R> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    OptimizePdfImages(PdfImageOptimization),
     ExtractPdfImages(PdfImageExtraction),
     ExportPdfImages(PdfRasterBatch),
     ExportPdfPng(PdfPngExport),
@@ -315,12 +319,15 @@ pub enum Request {
 pub struct Failure {
     pub code: &'static str,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pdf_optimization: Option<serde_json::Value>,
 }
 type Result<T> = std::result::Result<T, Failure>;
 fn fail(code: &'static str, message: impl Into<String>) -> Failure {
     Failure {
         code,
         message: message.into(),
+        pdf_optimization: None,
     }
 }
 impl From<io::Error> for Failure {
@@ -353,6 +360,7 @@ pub struct Receipt {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
+    OptimizedPdfImages(pdf_lossy_optimize::ImageOptimizationReceipt),
     PdfExtractedImages(pdf_image_extraction::ExtractionReceipt),
     PdfImages(pdf_raster_batch::BatchReceipt),
     PdfPng(pdf_raster_export::RasterReceipt),
@@ -953,6 +961,10 @@ pub fn execute_with_cancellation(request: Request, cancellation: Cancellation) -
 }
 fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Response> {
     cancellation.check()?;
+    if let Request::OptimizePdfImages(options) = &request {
+        return pdf_lossy_optimize::optimize(options, cancellation)
+            .map(Response::OptimizedPdfImages);
+    }
     if let Request::ExtractPdfImages(options) = &request {
         return pdf_image_extraction::extract(options, cancellation)
             .map(Response::PdfExtractedImages);
@@ -1327,7 +1339,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return inspect_image(input, cancellation, preview.unwrap_or(false));
     }
     let input = match &request {
-        Request::ExtractPdfImages(..)
+        Request::OptimizePdfImages(..)
+        | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)
@@ -1371,7 +1384,8 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
     let separator = delimiter(input)?;
     let mut source = Source::open_cancellable(input, cancellation.clone())?;
     match request {
-        Request::ExtractPdfImages(..)
+        Request::OptimizePdfImages(..)
+        | Request::ExtractPdfImages(..)
         | Request::ExportPdfImages(..)
         | Request::ExportPdfJpeg(..)
         | Request::ExportPdfPng(..)

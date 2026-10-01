@@ -173,7 +173,10 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
                     512 * 1024 * 1024 - bytes,
                     cancel,
                 )?;
-                let mut file = std::fs::File::open(&destination)?;
+                let mut file = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&destination)?;
                 let (count, hash) = digest(&mut file, cancel, 512 * 1024 * 1024 - bytes)?;
                 file.sync_all()?;
                 bytes += count;

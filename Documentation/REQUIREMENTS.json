@@ -275,8 +275,8 @@
       "reference_ledger_status": "verified",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Lossless compression checks all pages, graph, geometry, text and pixels.",
-      "remaining": "Targeted lossy image optimization, fit policies and desktop integration."
+      "evidence_notes": "Lossless compression preserves graph/geometry/text/pixels. Targeted lossy image optimization, intrinsic resize and bounded byte fitting prove the entire expected document graph, retain unsupported/masked/profiled objects and validate every page render/text; Mac CLI/worker fixtures pass.",
+      "remaining": "Current Windows optimization acceptance, wider original policy coverage and desktop integration."
     },
     {
       "id": "PDF06",

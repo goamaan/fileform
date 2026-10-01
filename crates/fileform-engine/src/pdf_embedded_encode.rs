@@ -16,7 +16,7 @@ fn invalid() -> crate::Failure {
         "The embedded image samples or encoded output failed verification.",
     )
 }
-fn stream(
+pub(crate) fn stream(
     input: &Path,
     pack: &Path,
     reference: &str,

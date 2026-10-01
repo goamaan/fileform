@@ -353,6 +353,30 @@ impl ImageGraph {
             soft_mask,
         })
     }
+    pub(crate) fn optimization_masks(&self) -> Result<BTreeSet<String>> {
+        let mut masks = BTreeSet::new();
+        for object in self.objects()?.values() {
+            if let Some(dict) = object
+                .get("stream")
+                .and_then(|v| v.get("dict"))
+                .and_then(Value::as_object)
+            {
+                for key in ["/Mask", "/SMask"] {
+                    if let Some(reference) = dict
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .filter(|v| pdf_graph::reference(v))
+                    {
+                        masks.insert(reference.to_owned());
+                    }
+                }
+            }
+        }
+        Ok(masks)
+    }
+    pub(crate) fn optimization_dict(&self, reference: &str) -> Result<Map<String, Value>> {
+        Ok(self.reference_dict(reference)?.clone())
+    }
     pub(crate) fn discover(
         &self,
         source_index: usize,

@@ -577,3 +577,36 @@ indirect/nested/cyclic resources, reuse/dedup/provenance, selections/skips, alia
 no-image plans, malformed sample rollback and cancellation after staging begins.
 Windows CI now runs this same suite. The final UI, CLI selection/rename options,
 portable setups and broader original fixture coverage still need acceptance.
+
+
+## Targeted image optimization — October 1, 2026
+
+`optimize-pdf-images INPUT OUTPUT.pdf PDF_PACK RENDER_PACK` now accepts
+`--quality`, `--minimum-quality`, `--max-dimension`, `--max-bytes` and
+`--dry-run`. The worker route is `optimize_pdf_images`; it requires explicit
+`allow_lossy: true`. It recompresses eligible 8-bit DeviceRGB/DeviceGray images
+as JPEG, optionally reducing their longest intrinsic edge with integer-floor
+aspect dimensions. It retains masked images, images reused as masks, profiled
+JPEGs and unsupported sample interpretations with explicit candidate reasons.
+JPEG integer quality rounds upward so it never undercuts the requested floor.
+
+Byte fitting makes at most six descending attempts, including the exact quality
+floor, each decoded afresh from original samples. Every attempt must preserve the
+entire expected graph: only planned image dictionaries/streams can differ. All
+page geometry and extracted text must match, and every page must successfully
+render. Rendering/text verification share a ten-minute budget. Candidate files
+are privately staged, bounded, source-rechecked and published without clobbering;
+non-smaller results keep the original without writing a redundant output. Target
+misses include attempted qualities and candidate reasons in the structured error.
+
+Mac fixture evidence: real three-page photographic/gray optimization, independent
+complete expected-graph comparison (vectors/fonts/text/metadata/unsupported CMYK),
+resize floor rounding, byte fit, noninteger floors, actual retained masks and ICC
+JPEG streams, CLI/worker equivalence, collisions, non-smaller retention, cancellation
+after a candidate exists, changed-source cleanup and unsupported document rejection.
+Workspace tests (97 passed, two subprocess fixtures intentionally ignored then
+invoked by their supervising tests), Clippy and Windows cross-check passed.
+Windows runtime acceptance is pending the new workflow; the preceding extraction
+run exposed Windows FlushFileBuffers on a read-only file, corrected to open the
+owned staged artifact for reading and writing before hashing/flushing. None of
+this establishes Electron integration or production release acceptance.

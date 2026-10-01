@@ -104,6 +104,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-optimize.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-optimize-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python crates/fileform-engine/tests/smoke-pdf-lossy.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-lossy-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-compose.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-compose-windows.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python crates/fileform-engine/tests/smoke-pdf-images.py Artifacts/PDFPack-Windows Artifacts/PDFRenderPack-Windows | Tee-Object -FilePath Artifacts/pdf-images-windows.txt
@@ -132,6 +134,7 @@ jobs:
             Artifacts/pdf-raster-batch-windows.txt
             Artifacts/pdf-render-engine-windows.txt
             Artifacts/pdf-optimize-windows.txt
+            Artifacts/pdf-lossy-windows.txt
             Artifacts/pdf-compose-windows.txt
             Artifacts/pdf-images-windows.txt
             Artifacts/pdf-split-windows.txt

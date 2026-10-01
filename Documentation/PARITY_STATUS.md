@@ -14,7 +14,7 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 | Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, exact lossless trims and fast AAC trim | Not wired | Track selection, remaining trim/format policies, playback and editor integration |
 | Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters | Not wired | VFR/track/extended-color gaps, playback proxies and editor integration |
 | PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, complete-folder split | Not wired | Marker/range/interval planning and editing UI; remaining original policies |
-| PDF compression | All-page lossless rewrite with graph/geometry/text/render checks | Not wired | Targeted lossy image optimization and its preservation proofs |
+| PDF compression | All-page lossless rewrite and targeted image recompression/resize/byte fit with exact expected-graph checks | Not wired | Wider original-policy acceptance, current Windows optimization acceptance and desktop integration |
 | PDF images | DPI-based single/batch PNG/JPEG page export and intrinsic embedded JPEG/PNG extraction with provenance | Not wired | CLI selection/rename options, broader embedded-image acceptance and final UI integration |
 | Text / OCR | Per-page and whole-document embedded text; explicit-English image/PDF OCR | Not wired | Automatic multilingual behavior, wider quality/orientation/form coverage and final UI |
 | Direct URLs | No portable request route | Not wired | Existing direct-media lookup/download/trim workflow |
@@ -28,8 +28,8 @@ Open File and appearance settings; it does not expose the media/PDF/OCR APIs yet
 
 ## Work order
 
-1. Finish original advertised native behavior. The next PDF work is full-resolution
-   page images and embedded-image extraction, followed by targeted image compression.
+1. Finish original advertised native behavior. The next PDF work is CLI page selection,
+   marker/range/interval planning and collision policies.
    Automatic OCR language handling remains required. Retain the media/image/URL
    gaps above; do not quietly reduce them to the tested subset.
 2. Connect restored capabilities to a coherent desktop workflow. Final entry is
