@@ -28,11 +28,15 @@ export interface TaskOptions {
   format:string;maxDimension?:number;maxBytes?:number;quality?:number;minimumQuality?:number;
   background?:'white'|'black';crop?:PixelCrop;pages?:string;splitEvery?:number;splitAfter?:number[];
   start?:string;end?:string;audioStream?:number;muteAudio?:boolean;fast?:boolean;dpi?:number;lossy?:boolean;
+  pageOrder?:PageChoice[];
 }
+export interface PageChoice {sourceID:string;pageIndex:number;rotation:number}
+export interface PageThumbnail {sourceID:string;pageIndex:number;dataURL:string;width:number;height:number}
 export interface TaskResult {id:string;name:string;bytes:number;summary:string;warnings:string[];folder:boolean}
 export interface FileformAPI {
   chooseFiles(task?:import('./tasks.js').TaskID):Promise<AssetSource[]>;
   importFiles(files:File[]):Promise<AssetSource[]>;
   runTask(ids:string[],task:import('./tasks.js').TaskID,options:TaskOptions):Promise<TaskResult|null>;
   openResult(id:string):Promise<void>;
+  previewPages(pages:{sourceID:string;pageIndex:number}[]):Promise<PageThumbnail[]>;
 }

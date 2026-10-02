@@ -5,6 +5,7 @@ const api:FileformAPI = {
   importFiles:(files)=>ipcRenderer.invoke('fileform:import-files',files.map(file=>webUtils.getPathForFile(file))),
   runTask:(ids,task,options)=>ipcRenderer.invoke('fileform:run-task',ids,task,options),
   openResult:(id)=>ipcRenderer.invoke('fileform:open-result',id),
+  previewPages:(pages)=>ipcRenderer.invoke('fileform:preview-pages',pages),
   onOpenFile:(callback)=>{
     const listener=()=>callback();
     ipcRenderer.on('fileform:open-request',listener);

@@ -8,6 +8,7 @@ import {validateImageExport,outputDimensions} from '../src/image-export.js';
 import { pathToFileURL } from 'node:url';
 import {inspectAsset,type AssetRecord} from './assets.cjs';
 import {planTask} from './task-request.cjs';
+import {previewPages} from './page-preview.cjs';
 import {tasks,type TaskID} from '../src/tasks.js';
 import type {AssetSource,TaskResult} from '../src/contracts.js';
 import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
@@ -106,6 +107,11 @@ ipcMain.handle('fileform:choose-files',async(event,task:unknown)=>{
   });
 });
 ipcMain.handle('fileform:import-files',async(event,paths:unknown)=>{authorize(event);return exclusive(()=>importPaths(paths));});
+ipcMain.handle('fileform:preview-pages',async(event,pages:unknown)=>{
+  authorize(event);
+  if(!Array.isArray(pages)||!pages.length||pages.length>12||!pages.every(v=>v&&typeof v.sourceID==='string'&&assets.has(v.sourceID)&&Number.isSafeInteger(v.pageIndex)))throw new Error('Choose existing PDF pages.');
+  return exclusive(async()=>previewPages(pages.map(v=>({record:assets.get(v.sourceID)!,pageIndex:v.pageIndex})),worker,await nativeRuntime(),app.getPath('temp')));
+});
 ipcMain.handle('fileform:run-task',async(event,ids:unknown,task:unknown,options:unknown)=>{
   authorize(event);
   if(!Array.isArray(ids)||!ids.length||ids.length>128||!ids.every(v=>typeof v==='string'&&assets.has(v))||typeof task!=='string')throw new Error('Choose the files again.');

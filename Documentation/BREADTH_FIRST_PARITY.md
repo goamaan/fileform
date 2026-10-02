@@ -11,14 +11,22 @@ checks passing. `916cc59` then added a complete packaged native runtime and pass
 Mac packaging; its Windows packaging exposed an architecture-name mismatch, fixed
 in the shared-intake increment below. Do not expand domain fixture corpora now.
 
-The next stable increment connects 13 main actions through one file-first intake
+`ebfc216` connects 13 main actions through one file-first intake
 and action-first chooser, with a shared inspector/task planner, source binding,
 cancellation, native save dialogs and open/reveal results. Real native integration
 covers every action across tables/images/PDF/audio/video/text; representative
 packaged Mac GUI checks cover action-first PDF text extraction, PDF splitting,
-table conversion, media intake/audio extraction and both themes. This is broad exposure, not complete
-parity: no claim is made for untested drop handling, all GUI variants, automatic
-languages, playback/editing, batches, URL downloads, setups or persistence.
+table conversion, media intake/audio extraction and both themes. Its complete
+Mac/Windows runtime tests and packages pass CI (run 36947127261). This is broad
+exposure, not complete parity: no claim is made for untested drop handling, all GUI variants, automatic
+languages, media playback/editing, batches, URL downloads, setups or persistence.
+
+The PDF editing increment adds bounded native thumbnails, page selection/movement/
+rotation/removal/duplication, source insertion, toolbar undo/redo, visual split
+markers and preserving arrangements when changing PDF/image outputs. Packaged Mac
+GUI checks reopen edited PDFs, split parts and page images. Remaining PDF policy/
+history/large-document acceptance stays recorded; move to media playback/editor
+integration next rather than expanding PDF graph/format corner cases.
 
 ## Execution order
 
@@ -53,7 +61,7 @@ languages, playback/editing, batches, URL downloads, setups or persistence.
 | --- | --- | --- |
 | Tables | CSV/TSV/flat JSON conversion | Native and shared table intake/conversion exist; batches/persistence still missing |
 | Images | PNG/JPEG/TIFF/HEIC input, conversion, crop, resize, compress/fit, preview | Native common routes and shared app route exist; required tools are bundled |
-| PDFs | Combine PDF/images; reorder/rotate/remove/insert; split; page images; embedded images; compress/fit | Native routes and basic shared app routes exist; page editing still missing |
+| PDFs | Combine PDF/images; reorder/rotate/remove/insert; split; page images; embedded images; compress/fit | Native routes and basic shared app routes exist; basic page editing/visual markers are now connected; wider original policies remain |
 | Audio | Convert/extract, MP3, size fit, exact/fast trim, track selection, waveform/playback | Native and shared conversion/trim routes exist; waveform/playback/editor still missing |
 | Video | Convert/remux, resize/fit, exact/fast trim, audio selection/mute, poster/playback | Native routes and basic shared app routes exist; poster/playback/editor still missing; preserve original CFR/SDR limits |
 | Text/OCR | Embedded PDF text, image/scanned-PDF recognition | Native explicit-English routes exist; explicit-English app route exists; automatic multilingual behavior remains required |

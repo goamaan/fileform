@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+import type {AssetSource} from './contracts.js';
 export type FileFamily='table'|'image'|'pdf'|'audio'|'video';
 export type TaskID='table.convert'|'image.convert'|'pdf.combine'|'pdf.split'|'pdf.images'|'pdf.extract-images'|'pdf.compress'|'text.extract'|'text.ocr'|'audio.convert'|'audio.trim'|'video.convert'|'video.trim';
 export interface TaskDefinition {id:TaskID;label:string;families:FileFamily[];multiple?:boolean;outputFormats:string[]}
@@ -18,4 +20,11 @@ export const tasks:TaskDefinition[]=[
 ];
 export function availableTasks(families:FileFamily[]):TaskDefinition[]{
  return tasks.filter(task=>families.length>0&&(families.length===1||task.multiple)&&families.every(family=>task.families.includes(family)));
+}
+export function availableTasksForAssets(assets:AssetSource[]):TaskDefinition[]{
+ return availableTasks(assets.map(v=>v.family)).filter(task=>{
+  if(task.id.startsWith('audio.')&&!assets[0]?.audioTracks?.length)return false;
+  if(['image.convert','pdf.combine','pdf.images','text.ocr'].includes(task.id)&&assets.some(v=>v.image&&!v.image.canConvert))return false;
+  return true;
+ });
 }

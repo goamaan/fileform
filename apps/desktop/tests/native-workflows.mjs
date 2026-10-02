@@ -10,6 +10,8 @@ const require=createRequire(import.meta.url);
 const {inspectAsset}=require('../dist-main/electron/assets.cjs');
 const {planTask}=require('../dist-main/electron/task-request.cjs');
 const {loadRuntime}=require('../dist-main/electron/runtime.cjs');
+const {previewPages}=require('../dist-main/electron/page-preview.cjs');
+const {availableTasksForAssets}=require('../dist-main/src/tasks.js');
 const root=resolve(import.meta.dirname,'../../..');
 const runtime=await loadRuntime(resolve(process.env.FILEFORM_RUNTIME_ROOT??join(root,'Artifacts/DesktopRuntime')));
 const executable=resolve(process.env.FILEFORM_WORKER??runtime.worker);
@@ -45,8 +47,22 @@ try{
   ['video.trim',['video'],{format:'mp4',start:'1.3',end:'1.7',fast:true},'trim.mp4'],
  ];
  for(const [task,ids,options,name] of cases){const output=join(folder,name);const plan=planTask(ids.map(id=>records[id]),task,options,output,runtime);const result=await worker(plan.request);assert.equal(result.output,output);const stat=await fs.stat(output);assert.equal(stat.isDirectory(),plan.folder);console.log(task,'real desktop module flow passed');}
+ const silentPath=join(folder,'silent.mp4');await worker(planTask([records.video],'video.trim',{format:'mp4',start:'0',end:'1',fast:true,muteAudio:true},silentPath,runtime).request);
+ const silent=await inspectAsset(silentPath,worker,runtime);assert.equal(silent.asset.audioTracks.length,0);assert(!availableTasksForAssets([silent.asset]).some(v=>v.id.startsWith('audio.')));assert.throws(()=>planTask([silent],'audio.convert',{format:'wav'},'',runtime));
+ console.log('Contextual actions reject silent-video audio extraction before saving');
 
  const combined=await inspectAsset(join(folder,'combined.pdf'),worker,runtime);
+ const thumbs=await previewPages([{record:records.pdf,pageIndex:0}],worker,runtime,folder);
+ assert.equal(thumbs[0].sourceID,records.pdf.asset.id);assert(thumbs[0].dataURL.startsWith('data:image/png;base64,'));assert(thumbs[0].width<=240&&thumbs[0].height<=240);
+ await assert.rejects(previewPages([{record:{...records.pdf,sha256:'0'.repeat(64)},pageIndex:0}],worker,runtime,folder),/changed/);
+ assert(!(await fs.readdir(folder)).some(v=>v.startsWith('fileform-pages-')));console.log('PDF thumbnail identity and cleanup passed');
+ const pageOrder=[{sourceID:records.image.asset.id,pageIndex:0,rotation:270},{sourceID:records.pdf.asset.id,pageIndex:0,rotation:90},{sourceID:records.pdf.asset.id,pageIndex:0,rotation:180}];
+ const organized=join(folder,'organized.pdf');await worker(planTask([records.pdf,records.image],'pdf.combine',{format:'pdf',pageOrder},organized,runtime).request);
+ const geometry=await worker({operation:'inspect_pdf_pages',input:organized,directory:runtime.pack('pdf')});assert.equal(geometry.pages.length,3);assert.deepEqual(geometry.pages.map(v=>v.rotation),[270,90,180]);
+ const rastered=await worker(planTask([records.pdf,records.image],'pdf.images',{format:'png',pageOrder,dpi:72},join(folder,'organized-pages'),runtime).request);assert.equal(rastered.parts.length,3);assert.deepEqual(rastered.parts.map(v=>v.clockwise_rotation),[270,90,180]);
+ const marked=await worker(planTask([combined],'pdf.split',{format:'pdf',splitAfter:[1]},join(folder,'marked-split'),runtime).request);assert.deepEqual(marked.parts.map(v=>v.pages),[1,1]);
+ assert.throws(()=>planTask([records.pdf],'pdf.combine',{format:'pdf',pageOrder:[{sourceID:records.image.asset.id,pageIndex:0,rotation:0}]},'',runtime));
+ console.log('PDF page order, duplication, rotation, selected raster export and visual marker planning passed');
  const embedded=planTask([records.pdf],'pdf.extract-images',{format:'images'},join(folder,'embedded'),runtime);
  const extracted=await worker(embedded.request);assert(extracted.supported>0);console.log('pdf.extract-images real desktop module flow passed');
  const embeddedText=join(folder,'embedded.txt');await worker(planTask([records.pdf],'text.extract',{format:'txt'},embeddedText,runtime).request);assert((await fs.readFile(embeddedText,'utf8')).includes('Fileform document'));console.log('text.extract real desktop module flow passed');

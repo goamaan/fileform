@@ -7,7 +7,9 @@ The native macOS reference remains in `apps/macos` with the broader capabilities
 The app has one file picker/drop surface, contextual actions and an action-first
 chooser. Thirteen main actions connect table/image conversion, PDF assembly/split/
 compression/image export, audio/video conversion/trim and embedded/English OCR
-text export. Existing image crop/resize/fit controls remain contextual. All five
+text export. Image crop/resize/fit controls remain contextual. PDF thumbnails and page
+order/rotate/remove/duplicate/insert controls, toolbar undo/redo and visual split
+markers are connected; arrangements survive switching PDF/page-image output. All five
 reviewed tool packs are bundled. Main processing stays native and file IDs are
 opaque to the renderer. Follow Documentation/BREADTH_FIRST_PARITY.md.
 Light/dark/system appearance and normal display-filling launch are implemented.

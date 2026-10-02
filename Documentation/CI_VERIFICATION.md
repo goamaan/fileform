@@ -111,3 +111,44 @@ passed Mac staging/packaging but failed Windows packaging because Node's `x64`
 name was compared with the runtime's `x86_64`. Both loader and builder now normalize
 that alias. The corrected shared-intake increment still requires current-head CI;
 the older run must not be cited as a complete two-platform pass.
+
+
+`ebfc2164fcdf87112c584095cfd9e96efe968438` passes the complete bundled desktop
+[run 36947127261](https://github.com/goamaan/fileform/actions/runs/36947127261) on
+macOS 26 and Windows 2025: native tests/checks, all 13 shared workflow module routes,
+complete processing runtime, notices, Mac archive and Windows NSIS packaging.
+The dedicated Windows HEIC (36947127247), media (36947127238), OCR (36947127235)
+and PDF (36947127243) runs also pass. This closes the observed Windows architecture
+alias failure, not signing/public-release or manual Windows GUI acceptance.
+
+## PDF desktop page editing — October 1
+
+Local shared workflow integration now also verifies native page thumbnails bound
+to the inspected identity, stale-content rejection/temporary cleanup, source-ID
+validation, explicit page order/duplicates/rotations, rotated page-image exports
+and marker split plans. The same test runs in the desktop CI matrix.
+
+Packaged Mac GUI: owned two-page PDF thumbnails loaded; moving/rotating/duplicating,
+toolbar undo/redo, removing and undoing removal worked. Inserting an owned HEIC
+kept the existing edits. The saved four-page PDF reopened with rotations 90/90/0/0,
+text page 2 twice, then page 1 and the inserted image. Visual split-after-page-1
+saved two complete one-page documents. A separate edit switched from PDF to PNG
+without losing page order/rotation; its two 144-DPI outputs reopened as 400x600
+images with the independently checked blue-page-2 then red-page-1 content.
+Both theme layouts were inspected. Preview data is capped to 12 pages per request,
+240-pixel bounds, 512 KB per encoded PNG, and 96 retained thumbnails; temporary
+preview folders are removed after success/failure. Renderer paths are not exposed.
+
+Current PDF editor limitations: selecting/deselecting source files resets the
+per-editor undo/redo stack (existing page edits for retained sources are preserved),
+history is not persisted across other task families/restarts, and native menu/
+keyboard history plus large-document/drag/Windows GUI acceptance require the final
+whole-app pass. Native metadata/interactive/protected-file limits remain explicit.
+This is a broad app route increment, not a full original-policy or release claim.
+
+The shared action catalog also checks inspected capabilities: silent video has no
+audio conversion/trim actions, and non-convertible images do not offer processing
+that requires decoded SDR pixels. Native integration creates and inspects a muted
+video to verify the audio-action rejection before any save. Packaged Mac action-
+first QA selected that owned silent video for audio extraction; the app explained
+the unavailable action and offered only video conversion/trim.
