@@ -152,3 +152,10 @@ that requires decoded SDR pixels. Native integration creates and inspects a mute
 video to verify the audio-action rejection before any save. Packaged Mac action-
 first QA selected that owned silent video for audio extraction; the app explained
 the unavailable action and offered only video conversion/trim.
+
+`bf471aebe80c86cffe7e8817b3aca4005a28b92b` passes the complete desktop
+[run 36952131974](https://github.com/goamaan/fileform/actions/runs/36952131974) on
+macOS 26 and Windows 2025, including the expanded real PDF editing/thumbnail/marker
+module workflows, contextual silent-video checks, complete runtimes, notices and
+Mac/NSIS packaging. Manual Windows GUI and production signing/release gates remain
+open. The next breadth-first implementation is media playback/waveform/trim UI.
