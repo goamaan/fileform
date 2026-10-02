@@ -20,14 +20,19 @@ pub struct OptimizationReceipt {
     pub graph_sha256: String,
     pub warnings: Vec<&'static str>,
 }
+pub(crate) struct Options<'a> {
+    pub maximum: Option<u64>,
+    pub expected: Option<&'a str>,
+}
 pub fn optimize(
     input: &Path,
     output: &Path,
     directory: &Path,
     renderer: &Path,
-    maximum: Option<u64>,
+    options: Options<'_>,
     cancel: &Cancellation,
 ) -> Result<OptimizationReceipt> {
+    let maximum = options.maximum;
     if !output
         .extension()
         .and_then(|v| v.to_str())
@@ -43,6 +48,7 @@ pub fn optimize(
         return Err(fail("collision", "The output already exists."));
     }
     let mut source = Source::open_with_limit(input, cancel.clone(), 512 * 1024 * 1024)?;
+    crate::source_binding::single(&source, options.expected)?;
     let input_bytes = source.snapshot.as_file().metadata()?.len();
     let before = pdf_inspect::inspect(source.snapshot.path(), directory, cancel)?;
     let graph = pdf_graph::inspect(source.snapshot.path(), directory, cancel)?.graph;

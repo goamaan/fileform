@@ -19,6 +19,7 @@ pub struct PdfOcrOptions {
 #[serde(deny_unknown_fields)]
 pub struct TextExport {
     pub input: PathBuf,
+    pub expected_source_sha256: Option<String>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
@@ -53,6 +54,7 @@ pub fn export(options: &TextExport, cancel: &Cancellation) -> Result<DocumentTex
         return Err(fail("collision", "The output already exists."));
     }
     let mut source = Source::open_with_limit(&options.input, cancel.clone(), 512 * 1024 * 1024)?;
+    crate::source_binding::single(&source, options.expected_source_sha256.as_deref())?;
     let info = pdf_inspect::inspect(source.snapshot.path(), &options.directory, cancel)?;
     let parent = options
         .output

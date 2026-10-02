@@ -16,18 +16,29 @@ pub struct ImageOptimization {
     #[serde(default)]
     pub collision: crate::OutputCollision,
     pub input: PathBuf,
+    pub expected_source_sha256: Option<String>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
-    #[serde(default = "initial_quality")]
+    #[serde(default = "initial_quality", deserialize_with = "json_quality")]
     pub quality: f64,
-    #[serde(default = "floor_quality")]
+    #[serde(default = "floor_quality", deserialize_with = "json_quality")]
     pub minimum_quality: f64,
     pub max_dimension: Option<u32>,
     pub max_bytes: Option<u64>,
     #[serde(default)]
     pub dry_run: bool,
     pub allow_lossy: bool,
+}
+// The tagged request buffers JSON numbers with arbitrary precision, also needed
+// for exact table cells. Deserialize through Number to retain decimal controls.
+fn json_quality<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<f64, D::Error> {
+    let value = serde_json::Number::deserialize(deserializer)?;
+    value
+        .as_f64()
+        .ok_or_else(|| serde::de::Error::custom("Quality must be a finite number."))
 }
 fn initial_quality() -> f64 {
     0.8
@@ -175,6 +186,7 @@ pub fn optimize(
     }
     let deadline = Instant::now() + Duration::from_secs(600);
     let mut source = Source::open_with_limit(&options.input, cancel.clone(), 512 * 1024 * 1024)?;
+    crate::source_binding::single(&source, options.expected_source_sha256.as_deref())?;
     let input_bytes = source.snapshot.as_file().metadata()?.len();
     let info = pdf_inspect::inspect(source.snapshot.path(), &options.directory, cancel)?;
     let original =
@@ -434,5 +446,18 @@ mod tests {
         assert!(qualities.windows(2).all(|v| v[0] > v[1]));
         assert_eq!(schedule(0.8, 0.5, false, true), vec![0.8]);
         assert_eq!(schedule(0.8, 0.5, true, false), vec![0.8]);
+    }
+}
+
+#[cfg(test)]
+mod request_tests {
+    #[test]
+    fn decimal_quality_survives_tagged_request() {
+        let request: crate::Request = serde_json::from_str(r#"{"operation":"optimize_pdf_images","input":"source.pdf","output":"result.pdf","directory":"pdf","renderer_directory":"renderer","quality":0.85,"minimum_quality":0.5,"allow_lossy":true}"#).unwrap();
+        let crate::Request::OptimizePdfImages(options) = request else {
+            panic!("wrong request")
+        };
+        assert_eq!(options.quality, 0.85);
+        assert_eq!(options.minimum_quality, 0.5);
     }
 }

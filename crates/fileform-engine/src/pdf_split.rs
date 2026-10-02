@@ -14,6 +14,7 @@ pub struct Split {
     #[serde(default)]
     pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
+    pub expected_source_sha256: Option<Vec<String>>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
@@ -61,6 +62,7 @@ pub fn split(options: &Split, cancel: &Cancellation) -> Result<SplitReceipt> {
         )?)
     };
     let mut prepared = pdf_compose::prepare(&options.inputs, &options.directory, cancel)?;
+    crate::source_binding::multiple(&prepared.sources, options.expected_source_sha256.as_deref())?;
     let all;
     let groups = match &options.groups {
         Some(groups) => groups,
@@ -107,6 +109,7 @@ pub fn split(options: &Split, cancel: &Cancellation) -> Result<SplitReceipt> {
         let group = Composition {
             collision: crate::OutputCollision::Fail,
             inputs: options.inputs.clone(),
+            expected_source_sha256: None,
             output: transaction.path().join(&name),
             directory: options.directory.clone(),
             renderer_directory: options.renderer_directory.clone(),

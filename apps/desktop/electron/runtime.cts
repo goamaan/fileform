@@ -8,7 +8,7 @@ export async function loadRuntime(root:string):Promise<NativeRuntime> {
   const manifestPath=join(canonical,'runtime.json');
   if((await fs.stat(manifestPath)).size>1_048_576)throw new Error('The processing tools are incomplete. Reinstall Fileform.');
   const manifest=JSON.parse(await fs.readFile(manifestPath,'utf8'));
-  if(manifest.schemaVersion!==1||manifest.platform!==process.platform||manifest.architecture!==(process.arch==='arm64'?'aarch64':process.arch))throw new Error('The processing tools do not match this system.');
+  if(manifest.schemaVersion!==1||manifest.platform!==process.platform||manifest.architecture!==(process.arch==='arm64'?'aarch64':process.arch==='x64'?'x86_64':process.arch))throw new Error('The processing tools do not match this system.');
   const suffix=process.platform==='win32'?'.exe':'';
   async function file(relativePath:string){
     const path=await fs.realpath(join(canonical,relativePath));const part=relative(canonical,path);

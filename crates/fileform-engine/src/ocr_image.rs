@@ -75,6 +75,7 @@ pub fn recognize(
     output: &Path,
     directory: &Path,
     language: &OcrLanguage,
+    expected: Option<&str>,
     cancel: &Cancellation,
 ) -> Result<OcrReceipt> {
     if !output
@@ -89,6 +90,7 @@ pub fn recognize(
     }
     let session = OcrSession::new(directory, language, cancel)?;
     let (mut source, inspection, pixels) = prepare_image(input, cancel)?;
+    crate::source_binding::single(&source, expected)?;
     if !inspection.conversion_available {
         return Err(fail(
             "unsupported",

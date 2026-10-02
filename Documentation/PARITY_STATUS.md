@@ -9,22 +9,25 @@ The complete requirement IDs remain in [REQUIREMENTS.json](REQUIREMENTS.json).
 
 | Area | Native engine / CLI / worker | Electron app | Still required |
 | --- | --- | --- | --- |
-| Tables | CSV, TSV, flat JSON conversion and verification | Picker, conversion, save/reveal | Unified intake, mixed batches, persistence and final UX checks |
-| Images | PNG/JPEG/TIFF and common SDR HEIC conversion, crop, resize, quality/byte fit, orientation/color checks | These limited routes are wired | Camera-specific/high-depth and remaining original format/color acceptance, explicit BT.709 policy difference; HEIC desktop/bundle integration; final preview/UX acceptance |
-| Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, selected audio tracks, exact WAV/FLAC/M4A trims and fast AAC trim | Not wired | Wider original-policy acceptance, desktop playback leases/cache and editor integration |
-| Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters and complete normalized playback exports | Not wired | Original-policy acceptance, desktop playback leases/cache and editor integration; VFR trim remains an explicit original limitation |
-| PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, range/interval/marker split and complete-folder publication | Not wired | Editing UI and remaining original policies |
-| PDF compression | All-page lossless rewrite and targeted image recompression/resize/byte fit with exact expected-graph checks | Not wired | Wider original-policy acceptance and desktop integration |
-| PDF images | DPI-based single/batch PNG/JPEG page export and intrinsic embedded JPEG/PNG extraction with provenance | Not wired | Broader embedded-image acceptance and final UI integration |
-| Text / OCR | Per-page and whole-document embedded text; explicit-English image/PDF OCR | Not wired | Automatic multilingual behavior, wider quality/orientation/form coverage and final UI |
+| Tables | CSV, TSV, flat JSON conversion and verification | Shared intake, conversion, save/open/reveal | Mixed batches, persistence and final UX checks |
+| Images | PNG/JPEG/TIFF and common SDR HEIC conversion, crop, resize, quality/byte fit, orientation/color checks | Shared intake and contextual image editor are wired | Camera-specific/high-depth and remaining original format/color acceptance, explicit BT.709 policy difference; Final unified preview/UX acceptance |
+| Audio | WAV/FLAC/AAC/MP3 conversion/extraction, size fit, selected audio tracks, exact WAV/FLAC/M4A trims and fast AAC trim | Conversion/fit/trim/track controls wired | Wider original-policy acceptance, desktop playback leases/cache and editor integration |
+| Video | Remux, SDR H.264 conversion/resize/fit, exact and keyframe-copy trim, posters and complete normalized playback exports | Conversion/fit/trim/track/mute controls wired | Original-policy acceptance, desktop playback leases/cache and editor integration; VFR trim remains an explicit original limitation |
+| PDF assembly | Merge PDF/images, selection/order/duplicate/rotation, range/interval/marker split and complete-folder publication | Combine/range selection/split wired | Page editing UI and remaining original policies |
+| PDF compression | All-page lossless rewrite and targeted image recompression/resize/byte fit with exact expected-graph checks | Lossless/lossy compression and byte limit wired | Wider original-policy acceptance and GUI acceptance |
+| PDF images | DPI-based single/batch PNG/JPEG page export and intrinsic embedded JPEG/PNG extraction with provenance | Page/embedded exports wired | Broader embedded-image acceptance and GUI acceptance |
+| Text / OCR | Per-page and whole-document embedded text; explicit-English image/PDF OCR | Embedded text and explicit-English image/PDF OCR wired | Automatic multilingual behavior, wider quality/orientation/form coverage and final UI |
 | Direct URLs | No portable request route | Not wired | Existing direct-media lookup/download/trim workflow |
 
 Native implementation and limits: [images](PORTABLE_IMAGES.md),
 [media](PORTABLE_MEDIA.md), [PDF](PORTABLE_PDF.md), [OCR](OCR_RESEARCH.md).
 Request inventory: `crates/fileform-engine/src/lib.rs`. Desktop exposure:
 `apps/desktop/src/contracts.ts` and `apps/desktop/electron/main.cts`.
-The current desktop bridge exposes table/image operations, cancellation, reveal,
-Open File and appearance settings; it does not expose the media/PDF/OCR APIs yet.
+The shared bridge now exposes 13 contextual actions across these families, plus
+native picker/drop intake, cancellation, save/open/reveal and appearance settings.
+All action planners pass real native integration tests. Representative packaged
+Mac GUI checks pass for PDF text/split and media-to-audio extraction. This does not
+mean every option, drop path, original editor or Windows GUI flow is accepted.
 
 ## Work order — breadth first
 

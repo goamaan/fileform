@@ -1,6 +1,10 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { FileformAPI, Appearance } from '../src/contracts.js';
 const api:FileformAPI = {
+  chooseFiles:(task)=>ipcRenderer.invoke('fileform:choose-files',task),
+  importFiles:(files)=>ipcRenderer.invoke('fileform:import-files',files.map(file=>webUtils.getPathForFile(file))),
+  runTask:(ids,task,options)=>ipcRenderer.invoke('fileform:run-task',ids,task,options),
+  openResult:(id)=>ipcRenderer.invoke('fileform:open-result',id),
   onOpenFile:(callback)=>{
     const listener=()=>callback();
     ipcRenderer.on('fileform:open-request',listener);

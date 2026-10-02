@@ -18,3 +18,21 @@ export interface FileformAPI {
   appearance(mode?:Appearance):Promise<{mode:Appearance;dark:boolean}>;
 }
 declare global { interface Window { fileform:FileformAPI } }
+
+export interface AudioTrack {index:number;codec:string;channels:number;sampleRate:number;language?:string}
+export interface AssetSource {
+  id:string;name:string;bytes:number;family:import('./tasks.js').FileFamily;
+  table?:SourceFile;image?:ImageSource;pages?:number;duration?:number;audioTracks?:AudioTrack[];
+}
+export interface TaskOptions {
+  format:string;maxDimension?:number;maxBytes?:number;quality?:number;minimumQuality?:number;
+  background?:'white'|'black';crop?:PixelCrop;pages?:string;splitEvery?:number;splitAfter?:number[];
+  start?:string;end?:string;audioStream?:number;muteAudio?:boolean;fast?:boolean;dpi?:number;lossy?:boolean;
+}
+export interface TaskResult {id:string;name:string;bytes:number;summary:string;warnings:string[];folder:boolean}
+export interface FileformAPI {
+  chooseFiles(task?:import('./tasks.js').TaskID):Promise<AssetSource[]>;
+  importFiles(files:File[]):Promise<AssetSource[]>;
+  runTask(ids:string[],task:import('./tasks.js').TaskID,options:TaskOptions):Promise<TaskResult|null>;
+  openResult(id:string):Promise<void>;
+}

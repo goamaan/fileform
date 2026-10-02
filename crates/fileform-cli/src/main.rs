@@ -50,6 +50,7 @@ fn main() {
             if command == "optimize-pdf-images" =>
         {
             let mut options = fileform_engine::PdfImageOptimization {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 input: input.into(),
                 output: output.into(),
@@ -101,6 +102,7 @@ fn main() {
         [command, output, directory, inputs @ ..] if command == "extract-pdf-images" => {
             let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ExtractPdfImages(fileform_engine::PdfImageExtraction {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 inputs,
                 output: Some(output.into()),
@@ -113,6 +115,7 @@ fn main() {
         [command, directory, inputs @ ..] if command == "plan-pdf-images" => {
             let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ExtractPdfImages(fileform_engine::PdfImageExtraction {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 inputs,
                 output: None,
@@ -142,6 +145,7 @@ fn main() {
                 });
             let (inputs, page_ranges, quality) = page_arguments(inputs, true);
             Request::ExportPdfImages(fileform_engine::PdfRasterBatch {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 inputs,
                 output: output.into(),
@@ -241,6 +245,7 @@ fn main() {
             if command == "ocr-image" && language == "eng" =>
         {
             Request::OcrImage {
+                expected_source_sha256: None,
                 input: input.into(),
                 output: output.into(),
                 directory: directory.into(),
@@ -269,6 +274,7 @@ fn main() {
                 }
             };
             Request::ExportPdfText(PdfTextExport {
+                expected_source_sha256: None,
                 input: input.into(),
                 output: output.into(),
                 directory: directory.into(),
@@ -280,6 +286,7 @@ fn main() {
         [command, output, directory, renderer, inputs @ ..] if command == "split-pdf" => {
             let (inputs, selection, dry_run) = split_arguments(inputs);
             Request::SplitPdf(PdfSplit {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 inputs,
                 selection,
@@ -294,6 +301,7 @@ fn main() {
         [command, output, directory, renderer, inputs @ ..] if command == "merge-pdf" => {
             let (inputs, page_ranges, _) = page_arguments(inputs, false);
             Request::ComposePdf(PdfComposition {
+                expected_source_sha256: None,
                 collision: fileform_engine::OutputCollision::Fail,
                 inputs,
                 output: output.into(),
@@ -324,6 +332,7 @@ fn main() {
                 }
             };
             Request::OptimizePdf {
+                expected_source_sha256: None,
                 input: input.into(),
                 output: output.into(),
                 directory: directory.into(),

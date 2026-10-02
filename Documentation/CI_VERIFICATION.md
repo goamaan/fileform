@@ -87,3 +87,27 @@ ImageIO/color fixtures after the LF checkout fix.
 [PDF run 36935031141](https://github.com/goamaan/fileform/actions/runs/36935031141)
 passed the complete PDF suite plus HEIC image assembly and image OCR. Subsequent
 container/orientation changes require their own current-head runtime acceptance.
+
+## Shared desktop intake checkpoint — October 1
+
+The shared inspector/task planner integration runs 13 main action routes with the
+real bundled runtime, including embedded PDF images/text, English HEIC/scanned-PDF
+OCR, table/image/media conversion and PDF/audio/video trimming or splitting. It
+checks unchanged source hashes and rejects stale PDF bindings before output.
+The desktop workflow runs this after compilation on both platforms.
+
+Local checks: 103 Rust tests passed (2 explicit subprocess fixtures ignored by the
+ordinary runner), Clippy passed, Windows MSVC cross-target compile passed, four
+desktop crop/export tests passed, routing passed, and all 13 integration routes
+passed with the complete staged runtime. Decimal PDF quality requests now have a
+regression check: arbitrary-precision JSON numbers previously failed when buffered
+inside the tagged request. Packaged Mac GUI native-dialog checks saved PDF text,
+split two PDF pages, converted a table and extracted audio from video; PDF/audio outputs reopened in
+the native inspector, text content was verified, and both themes were inspected.
+Exhaustive GUI, real Finder drop and manual Windows GUI remain unverified.
+
+The earlier full-runtime [run 36941390949](https://github.com/goamaan/fileform/actions/runs/36941390949)
+passed Mac staging/packaging but failed Windows packaging because Node's `x64`
+name was compared with the runtime's `x86_64`. Both loader and builder now normalize
+that alias. The corrected shared-intake increment still requires current-head CI;
+the older run must not be cited as a complete two-platform pass.

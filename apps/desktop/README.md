@@ -4,10 +4,12 @@ Electron + React UI with an isolated, optimized Rust worker. This is the first
 working migration slice, not the full Fileform replacement or a public release.
 The native macOS reference remains in `apps/macos` with the broader capabilities.
 
-Current app flow covers tables and PNG/JPEG/TIFF/HEIC images, including crop,
-resize and fitting. The complete reviewed media/PDF/render/OCR/HEIC tool runtime
-is now bundled for the next broad integration pass. Media/PDF/OCR desktop actions
-are still being connected. Follow Documentation/BREADTH_FIRST_PARITY.md.
+The app has one file picker/drop surface, contextual actions and an action-first
+chooser. Thirteen main actions connect table/image conversion, PDF assembly/split/
+compression/image export, audio/video conversion/trim and embedded/English OCR
+text export. Existing image crop/resize/fit controls remain contextual. All five
+reviewed tool packs are bundled. Main processing stays native and file IDs are
+opaque to the renderer. Follow Documentation/BREADTH_FIRST_PARITY.md.
 Light/dark/system appearance and normal display-filling launch are implemented.
 No accounts, activation or payments are part of Fileform.
 
@@ -25,7 +27,7 @@ npm ci --prefix apps/desktop
 npm run build --prefix apps/desktop
 npm run notices --prefix apps/desktop
 cd apps/desktop
-npx electron-builder --dir --config electron-builder.cjs
+npx electron-builder --dir --config electron-builder.cjs --publish never
 ```
 
 `FILEFORM_RUNTIME_ROOT` can select a separately staged development runtime.
@@ -70,7 +72,24 @@ in Documentation/CI_VERIFICATION.md. Full-runtime package evidence is recorded i
 Documentation/ELECTRON_RELEASE.md. Native success does not establish desktop
 exposure or signed-release acceptance.
 
-Remaining: shared file-first intake, all main actions, batches/setups/persistence,
+Remaining: complete original editing/playback, automatic multilingual OCR, URLs,
+batches/setups/persistence, exhaustive shared-intake/GUI acceptance,
 Windows packaged-app checks, native isolation/crash cleanup, final performance,
 complete licensing/rebuild delivery, full-runtime signing/notarization, secure
 updates and final website/copy acceptance.
+
+## Shared workflow verification
+
+After a desktop build and complete runtime stage:
+
+```sh
+node apps/desktop/tests/native-workflows.mjs
+```
+
+This runs the actual inspector/task planner against real bundled tools, generated
+owned documents and owned image/media fixtures. It verifies all 13 native action
+routes, image/scanned-PDF OCR, unchanged source hashes and stale-source rejection.
+It is module/process integration, not renderer or native-dialog automation.
+Packaged Mac UI checks separately exercised table conversion, PDF text/split and audio extraction
+with native dialogs, resulting files, and theme switching. Windows CI runs the
+same integration script before packaging; manual Windows GUI remains unavailable.

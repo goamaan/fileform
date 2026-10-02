@@ -2,7 +2,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const runtimeRoot = path.resolve(process.env.FILEFORM_RUNTIME_ROOT || path.join(__dirname,'../../Artifacts/DesktopRuntime'));
 const runtime = JSON.parse(fs.readFileSync(path.join(runtimeRoot,'runtime.json'),'utf8'));
-if(runtime.schemaVersion !== 1 || runtime.platform !== process.platform || runtime.architecture !== (process.arch==='arm64'?'aarch64':process.arch)) throw new Error('Stage the complete native runtime for this platform before packaging.');
+if(runtime.schemaVersion !== 1 || runtime.platform !== process.platform || runtime.architecture !== (process.arch==='arm64'?'aarch64':process.arch==='x64'?'x86_64':process.arch)) throw new Error('Stage the complete native runtime for this platform before packaging.');
 module.exports = {
   appId:'app.fileform.DesktopPreview',productName:'Fileform Preview',
   directories:{output:'artifacts'},

@@ -6,6 +6,10 @@ import { basename, dirname, join, parse, resolve, relative, isAbsolute, sep } fr
 import {loadRuntime,runtimeRoot,type NativeRuntime} from './runtime.cjs';
 import {validateImageExport,outputDimensions} from '../src/image-export.js';
 import { pathToFileURL } from 'node:url';
+import {inspectAsset,type AssetRecord} from './assets.cjs';
+import {planTask} from './task-request.cjs';
+import {tasks,type TaskID} from '../src/tasks.js';
+import type {AssetSource,TaskResult} from '../src/contracts.js';
 import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
 
 app.setName('Fileform Preview');
@@ -23,6 +27,7 @@ const children=new Set<ChildProcess>();
 const sources=new Map<string,SourceFile & {path:string;sha256:string}>();
 const saved=new Map<string,string>();
 const images=new Map<string,ImageSource & {path:string;sha256:string}>();
+const assets=new Map<string,AssetRecord>();
 const rendererRoot=resolve(__dirname,'../../dist');
 const page='fileform://app/index.html';
 protocol.registerSchemesAsPrivileged([{scheme:'fileform',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
@@ -73,6 +78,63 @@ function worker(request:unknown):Promise<any> {
   });
   });
 }
+
+async function importPaths(paths:unknown):Promise<AssetSource[]> {
+  if(!Array.isArray(paths)||paths.length<1||paths.length>128||!paths.every(v=>typeof v==='string'&&isAbsolute(v)&&v.length<=32768))throw new Error('Choose up to 128 local files.');
+  if(assets.size+paths.length>512)throw new Error('This session has reached 512 files. Restart Fileform to begin a new session.');
+  const runtime=await nativeRuntime();const imported:AssetRecord[]=[];
+  for(const path of paths){
+    const record=await inspectAsset(path,worker,runtime);
+    const existing=[...assets.values()].find(v=>v.path===record.path&&v.sha256===record.sha256);
+    imported.push(existing??record);
+  }
+  for(const record of imported){
+    assets.set(record.asset.id,record);
+    if(record.asset.table)sources.set(record.asset.id,{...record.asset.table,path:record.path,sha256:record.sha256});
+    if(record.asset.image)images.set(record.asset.id,{...record.asset.image,path:record.path,sha256:record.sha256});
+  }
+  return imported.map(v=>v.asset);
+}
+ipcMain.handle('fileform:choose-files',async(event,task:unknown)=>{
+  authorize(event);return exclusive(async()=>{
+    const action=task===undefined?undefined:tasks.find(v=>v.id===task);
+    if(task!==undefined&&!action)throw new Error('Choose an available action.');
+    const extensions={table:['csv','tsv','json'],image:['png','jpg','jpeg','tiff','tif','heic','heif'],pdf:['pdf'],audio:['wav','flac','m4a','mp3','aac','ogg','mov','mp4','mkv','webm'],video:['mp4','mov','mkv','webm','avi']};
+    const filters=action?[{name:action.label,extensions:[...new Set(action.families.flatMap(family=>extensions[family]))]}]:undefined;
+    const selected=await dialog.showOpenDialog(window!,{properties:action&&!action.multiple?['openFile']:['openFile','multiSelections'],filters});
+    return selected.canceled?[]:importPaths(selected.filePaths);
+  });
+});
+ipcMain.handle('fileform:import-files',async(event,paths:unknown)=>{authorize(event);return exclusive(()=>importPaths(paths));});
+ipcMain.handle('fileform:run-task',async(event,ids:unknown,task:unknown,options:unknown)=>{
+  authorize(event);
+  if(!Array.isArray(ids)||!ids.length||ids.length>128||!ids.every(v=>typeof v==='string'&&assets.has(v))||typeof task!=='string')throw new Error('Choose the files again.');
+  const records=ids.map(id=>assets.get(id)!);
+  return exclusive(async()=>{
+    const runtime=await nativeRuntime();const probe=planTask(records,task as TaskID,options,'',runtime);
+    const stem=parse(records[0].asset.name).name;
+    const choice=await dialog.showSaveDialog(window!,{defaultPath:join(dirname(records[0].path),stem+'-'+task.split('.').at(-1)+(probe.folder?'':'.'+probe.extension)),filters:probe.folder?undefined:[{name:probe.extension.toUpperCase(),extensions:[probe.extension]}],properties:['createDirectory']});
+    if(choice.canceled||!choice.filePath)return null;
+    if(!probe.folder&&parse(choice.filePath).ext.toLowerCase()!=='.'+probe.extension)throw new Error('Use the selected output extension.');
+    const plan=planTask(records,task as TaskID,options,choice.filePath,runtime);
+    const receipt=await worker(plan.request);
+    if(receipt.status==='not_smaller'&&receipt.output===null)return {id:'',name:records[0].asset.name,bytes:records[0].asset.bytes,summary:'The original is already smaller.',warnings:[],folder:false} satisfies TaskResult;
+    if(receipt.output!==choice.filePath)throw new Error('The result location could not be verified. Check the output folder.');
+    const metadata=await fs.stat(choice.filePath);
+    if(probe.folder?!metadata.isDirectory():!metadata.isFile())throw new Error('The output could not be reopened.');
+    let bytes=metadata.isFile()?metadata.size:0;
+    if(metadata.isDirectory()){
+      const names=await fs.readdir(choice.filePath);if(names.length>1000)throw new Error('Too many result files.');
+      for(const name of names){const stat=await fs.stat(join(choice.filePath,name));if(!stat.isFile())throw new Error('Invalid result folder.');bytes+=stat.size;}
+    }
+    const result:TaskResult={id:randomUUID(),name:basename(choice.filePath),bytes,folder:probe.folder,summary:probe.folder?'Saved '+(await fs.readdir(choice.filePath)).length+' files':'Saved '+probe.extension.toUpperCase(),warnings:Array.isArray(receipt.warnings)?receipt.warnings.filter((v:unknown)=>typeof v==='string').map((v:string)=>v.slice(0,1000)):[]};
+    if(saved.size>=100)saved.delete(saved.keys().next().value!);saved.set(result.id,choice.filePath);return result;
+  });
+});
+ipcMain.handle('fileform:open-result',async(event,id:unknown)=>{
+  authorize(event);if(typeof id!=='string'||!saved.has(id))throw new Error('Choose a saved result.');
+  const error=await shell.openPath(saved.get(id)!);if(error)throw new Error('This result could not be opened.');
+});
 ipcMain.handle('fileform:cancel',(event)=>{authorize(event);cancelCurrent?.();});
 const count=(x:unknown):x is number=>Number.isSafeInteger(x) && Number(x)>=0;
 ipcMain.handle('fileform:choose',async(event)=>{

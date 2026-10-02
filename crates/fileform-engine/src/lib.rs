@@ -45,6 +45,7 @@ mod native_process;
 mod ocr_image;
 mod ocr_pack;
 mod regular_file;
+mod source_binding;
 pub use ocr_image::OcrLanguage;
 mod output_collision;
 mod pdf_compose;
@@ -153,6 +154,7 @@ pub enum Request {
         dpi: u16,
     },
     OcrImage {
+        expected_source_sha256: Option<String>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -165,6 +167,7 @@ pub enum Request {
     SplitPdf(PdfSplit),
     ComposePdf(PdfComposition),
     OptimizePdf {
+        expected_source_sha256: Option<String>,
         input: PathBuf,
         output: PathBuf,
         directory: PathBuf,
@@ -1023,14 +1026,22 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             .map(Response::PdfRasterPlan);
     }
     if let Request::OcrImage {
+        expected_source_sha256,
         input,
         output,
         directory,
         language,
     } = &request
     {
-        return ocr_image::recognize(input, output, directory, language, cancellation)
-            .map(Response::RecognizedImage);
+        return ocr_image::recognize(
+            input,
+            output,
+            directory,
+            language,
+            expected_source_sha256.as_deref(),
+            cancellation,
+        )
+        .map(Response::RecognizedImage);
     }
     if let Request::VerifyOcrPack { directory } = &request {
         return ocr_pack::verify(directory, cancellation).map(Response::OcrPackVerification);
@@ -1045,6 +1056,7 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
         return pdf_compose::compose(options, cancellation).map(Response::ComposedPdf);
     }
     if let Request::OptimizePdf {
+        expected_source_sha256,
         input,
         output,
         directory,
@@ -1057,7 +1069,10 @@ fn execute_inner(request: Request, cancellation: &Cancellation) -> Result<Respon
             output,
             directory,
             renderer_directory,
-            *max_bytes,
+            pdf_optimize::Options {
+                maximum: *max_bytes,
+                expected: expected_source_sha256.as_deref(),
+            },
             cancellation,
         )
         .map(Response::OptimizedPdf);

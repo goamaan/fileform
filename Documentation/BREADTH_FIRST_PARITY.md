@@ -6,15 +6,19 @@ a verified downloadable macOS/Windows release; nothing is removed from the ledge
 
 ## Stable checkpoint
 
-Implementation checkpoint: `073d44d` on main. The worktree is clean. PDF, media,
-playback and common HEIC increments have real Mac/Windows evidence; the latest
-HEIF container/orientation increment passes locally and has current CI running.
-Keep fixing any observed failure in that increment before treating it as accepted.
-Do not expand its fixture corpus or add more specialized options now.
+The PDF/HEIC detail work is closed at `073d44d`, with its relevant Windows native
+checks passing. `916cc59` then added a complete packaged native runtime and passed
+Mac packaging; its Windows packaging exposed an architecture-name mismatch, fixed
+in the shared-intake increment below. Do not expand domain fixture corpora now.
 
-The key bottleneck is desktop exposure: its current contract only offers table
-and image operations. Much of the PDF/media/OCR engine already exists. Further
-backend detail does not make those workflows usable in the app.
+The next stable increment connects 13 main actions through one file-first intake
+and action-first chooser, with a shared inspector/task planner, source binding,
+cancellation, native save dialogs and open/reveal results. Real native integration
+covers every action across tables/images/PDF/audio/video/text; representative
+packaged Mac GUI checks cover action-first PDF text extraction, PDF splitting,
+table conversion, media intake/audio extraction and both themes. This is broad exposure, not complete
+parity: no claim is made for untested drop handling, all GUI variants, automatic
+languages, playback/editing, batches, URL downloads, setups or persistence.
 
 ## Execution order
 
@@ -47,12 +51,12 @@ backend detail does not make those workflows usable in the app.
 
 | Family | Main actions to connect | Current foundation / broad gap |
 | --- | --- | --- |
-| Tables | CSV/TSV/flat JSON conversion | Native + temporary desktop route exist; move into shared intake/batches |
-| Images | PNG/JPEG/TIFF/HEIC input, conversion, crop, resize, compress/fit, preview | Native common routes exist; table/image bridge exists, HEIC tools are not bundled/exposed |
-| PDFs | Combine PDF/images; reorder/rotate/remove/insert; split; page images; embedded images; compress/fit | Native routes exist; desktop workflows are absent |
-| Audio | Convert/extract, MP3, size fit, exact/fast trim, track selection, waveform/playback | Native routes exist; desktop workflows are absent |
-| Video | Convert/remux, resize/fit, exact/fast trim, audio selection/mute, poster/playback | Native routes exist; desktop workflows are absent; preserve original CFR/SDR limits |
-| Text/OCR | Embedded PDF text, image/scanned-PDF recognition | Native explicit-English routes exist; desktop exposure and automatic multilingual behavior are required |
+| Tables | CSV/TSV/flat JSON conversion | Native and shared table intake/conversion exist; batches/persistence still missing |
+| Images | PNG/JPEG/TIFF/HEIC input, conversion, crop, resize, compress/fit, preview | Native common routes and shared app route exist; required tools are bundled |
+| PDFs | Combine PDF/images; reorder/rotate/remove/insert; split; page images; embedded images; compress/fit | Native routes and basic shared app routes exist; page editing still missing |
+| Audio | Convert/extract, MP3, size fit, exact/fast trim, track selection, waveform/playback | Native and shared conversion/trim routes exist; waveform/playback/editor still missing |
+| Video | Convert/remux, resize/fit, exact/fast trim, audio selection/mute, poster/playback | Native routes and basic shared app routes exist; poster/playback/editor still missing; preserve original CFR/SDR limits |
+| Text/OCR | Embedded PDF text, image/scanned-PDF recognition | Native explicit-English routes exist; explicit-English app route exists; automatic multilingual behavior remains required |
 | Direct URLs | Inspect/save direct media, then convert/trim through the normal media flow | Portable backend and desktop flow are missing |
 | Shared UX | Mixed batches, task search, setups, persistence, progress/retry, output actions, settings | Most remain incomplete; they are part of parity, not later feature breadth |
 

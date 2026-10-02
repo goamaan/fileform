@@ -14,6 +14,7 @@ pub struct Extraction {
     #[serde(default)]
     pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
+    pub expected_source_sha256: Option<Vec<String>>,
     pub output: Option<PathBuf>,
     pub directory: PathBuf,
     pub pages: Option<Vec<PdfPageSelection>>,
@@ -65,6 +66,7 @@ pub fn extract(options: &Extraction, cancel: &Cancellation) -> Result<Extraction
         counts.push(info.pages);
         sources.push(source);
     }
+    crate::source_binding::multiple(&sources, options.expected_source_sha256.as_deref())?;
     let ranged = options
         .page_ranges
         .as_ref()

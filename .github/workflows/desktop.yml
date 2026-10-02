@@ -79,18 +79,21 @@ jobs:
       - name: Build desktop
         working-directory: apps/desktop
         run: npm run build
+      - name: Verify shared desktop native workflows
+        working-directory: apps/desktop
+        run: node tests/native-workflows.mjs
       - name: Collect distribution notices
         working-directory: apps/desktop
         run: npm run notices
       - name: Package Windows preview
         if: runner.os == 'Windows'
         working-directory: apps/desktop
-        run: npx electron-builder --win nsis --x64 --config electron-builder.cjs
+        run: npx electron-builder --win nsis --x64 --config electron-builder.cjs --publish never
       - name: Package Mac preview
         if: runner.os == 'macOS'
         working-directory: apps/desktop
         run: |
-          npx electron-builder --mac dir --arm64 --config electron-builder.cjs
+          npx electron-builder --mac dir --arm64 --config electron-builder.cjs --publish never
           ditto -c -k --keepParent "artifacts/mac-arm64/Fileform Preview.app" "artifacts/Fileform-Preview-mac-arm64.zip"
       - name: Retain preview artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

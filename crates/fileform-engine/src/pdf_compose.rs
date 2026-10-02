@@ -24,6 +24,7 @@ pub struct Composition {
     #[serde(default)]
     pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
+    pub expected_source_sha256: Option<Vec<String>>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
@@ -73,6 +74,7 @@ pub fn compose(options: &Composition, cancel: &Cancellation) -> Result<Compositi
         return Err(fail("collision", "The output already exists."));
     }
     let mut state = prepare(&options.inputs, &options.directory, cancel)?;
+    crate::source_binding::multiple(&state.sources, options.expected_source_sha256.as_deref())?;
     compose_prepared(options, &mut state, cancel, 512 * 1024 * 1024)
 }
 

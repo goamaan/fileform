@@ -13,6 +13,7 @@ pub struct RasterBatch {
     #[serde(default)]
     pub collision: crate::OutputCollision,
     pub inputs: Vec<PathBuf>,
+    pub expected_source_sha256: Option<Vec<String>>,
     pub output: PathBuf,
     pub directory: PathBuf,
     pub renderer_directory: PathBuf,
@@ -74,6 +75,7 @@ pub fn export(options: &RasterBatch, cancel: &Cancellation) -> Result<BatchRecei
     }
     let transaction = DirectoryTransaction::with_collision(&options.output, options.collision)?;
     let mut prepared = pdf_compose::prepare(&options.inputs, &options.directory, cancel)?;
+    crate::source_binding::multiple(&prepared.sources, options.expected_source_sha256.as_deref())?;
     let ranged = options
         .page_ranges
         .as_ref()
