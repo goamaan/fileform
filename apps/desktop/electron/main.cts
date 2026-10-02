@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import {inspectAsset,type AssetRecord} from './assets.cjs';
 import {planTask} from './task-request.cjs';
 import {previewPages} from './page-preview.cjs';
+import {MediaPreviewCache} from './media-preview.cjs';
 import {tasks,type TaskID} from '../src/tasks.js';
 import type {AssetSource,TaskResult} from '../src/contracts.js';
 import type { Appearance, SourceFile, SavedFile, TableOutput, ImageSource, ImageSavedFile } from '../src/contracts.js';
@@ -21,6 +22,10 @@ let window:BrowserWindow|null=null;
 let windowCreation:Promise<void>|null=null;
 let busy=false;
 let cancelCurrent:(()=>void)|null=null;
+let operation:AbortController|null=null;
+let mediaPreviews:MediaPreviewCache|undefined;
+let previewCleanup=Promise.resolve();
+function playbackCache(){return mediaPreviews??=new MediaPreviewCache(app.getPath('temp'));}
 let mode:Appearance='system';
 let runtimePromise:Promise<NativeRuntime>|null=null;
 function nativeRuntime(){return runtimePromise??=loadRuntime(runtimeRoot(app.isPackaged,process.resourcesPath,resolve(__dirname,'../../../..')));}
@@ -31,16 +36,18 @@ const images=new Map<string,ImageSource & {path:string;sha256:string}>();
 const assets=new Map<string,AssetRecord>();
 const rendererRoot=resolve(__dirname,'../../dist');
 const page='fileform://app/index.html';
-protocol.registerSchemesAsPrivileged([{scheme:'fileform',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
+protocol.registerSchemesAsPrivileged([{scheme:'fileform',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
 function authorize(event:IpcMainInvokeEvent) {
   if (!window || event.sender!==window.webContents || event.senderFrame!==window.webContents.mainFrame || event.senderFrame.url.split('#')[0]!==page) throw new Error('Request is not from the app window.');
 }
-async function exclusive<T>(work:()=>Promise<T>):Promise<T> {
+async function exclusive<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T> {
   if(busy) throw new Error('Wait for the current file to finish.');
-  busy=true; try { return await work(); } finally { busy=false; }
+  busy=true;const controller=new AbortController();operation=controller;
+  try { return await work(controller.signal); } finally { if(operation===controller)operation=null;busy=false; }
 }
 function worker(request:unknown):Promise<any> {
   return nativeRuntime().then(runtime=>{
+  if(operation?.signal.aborted)throw new Error('Cancelled.');
   const executable=runtime.worker;
   return new Promise((resolve,reject)=>{
     const temp=app.getPath('temp');
@@ -112,6 +119,11 @@ ipcMain.handle('fileform:preview-pages',async(event,pages:unknown)=>{
   if(!Array.isArray(pages)||!pages.length||pages.length>12||!pages.every(v=>v&&typeof v.sourceID==='string'&&assets.has(v.sourceID)&&Number.isSafeInteger(v.pageIndex)))throw new Error('Choose existing PDF pages.');
   return exclusive(async()=>previewPages(pages.map(v=>({record:assets.get(v.sourceID)!,pageIndex:v.pageIndex})),worker,await nativeRuntime(),app.getPath('temp')));
 });
+ipcMain.handle('fileform:preview-media',async(event,id:unknown,options:unknown)=>{
+  authorize(event);if(typeof id!=='string'||!assets.has(id))throw new Error('Choose an inspected recording.');
+  return exclusive(async signal=>playbackCache().prepare(assets.get(id)!,options,worker,await nativeRuntime(),signal));
+});
+ipcMain.handle('fileform:release-media-preview',(event,id:unknown)=>{authorize(event);if(typeof id==='string')mediaPreviews?.release(id);});
 ipcMain.handle('fileform:run-task',async(event,ids:unknown,task:unknown,options:unknown)=>{
   authorize(event);
   if(!Array.isArray(ids)||!ids.length||ids.length>128||!ids.every(v=>typeof v==='string'&&assets.has(v))||typeof task!=='string')throw new Error('Choose the files again.');
@@ -133,7 +145,14 @@ ipcMain.handle('fileform:run-task',async(event,ids:unknown,task:unknown,options:
       const names=await fs.readdir(choice.filePath);if(names.length>1000)throw new Error('Too many result files.');
       for(const name of names){const stat=await fs.stat(join(choice.filePath,name));if(!stat.isFile())throw new Error('Invalid result folder.');bytes+=stat.size;}
     }
-    const result:TaskResult={id:randomUUID(),name:basename(choice.filePath),bytes,folder:probe.folder,summary:probe.folder?'Saved '+(await fs.readdir(choice.filePath)).length+' files':'Saved '+probe.extension.toUpperCase(),warnings:Array.isArray(receipt.warnings)?receipt.warnings.filter((v:unknown)=>typeof v==='string').map((v:string)=>v.slice(0,1000)):[]};
+    let summary=probe.folder?'Saved '+(await fs.readdir(choice.filePath)).length+' files':'Saved '+probe.extension.toUpperCase();
+    if(receipt.realized_interval){
+      const {start,end}=receipt.realized_interval;
+      const valid=(v:any)=>v&&Number.isSafeInteger(v.ticks)&&v.ticks>=0&&Number.isSafeInteger(v.timescale)&&v.timescale>0&&v.ticks/v.timescale<=21600;
+      if(!valid(start)||!valid(end)||start.ticks/start.timescale>=end.ticks/end.timescale)throw new Error('Invalid saved time range. Check the output folder.');
+      summary+=' · Range '+(start.ticks/start.timescale).toFixed(3)+'–'+(end.ticks/end.timescale).toFixed(3)+' s';
+    }
+    const result:TaskResult={id:randomUUID(),name:basename(choice.filePath),bytes,folder:probe.folder,summary,warnings:Array.isArray(receipt.warnings)?receipt.warnings.filter((v:unknown)=>typeof v==='string').map((v:string)=>v.slice(0,1000)):[]};
     if(saved.size>=100)saved.delete(saved.keys().next().value!);saved.set(result.id,choice.filePath);return result;
   });
 });
@@ -141,7 +160,7 @@ ipcMain.handle('fileform:open-result',async(event,id:unknown)=>{
   authorize(event);if(typeof id!=='string'||!saved.has(id))throw new Error('Choose a saved result.');
   const error=await shell.openPath(saved.get(id)!);if(error)throw new Error('This result could not be opened.');
 });
-ipcMain.handle('fileform:cancel',(event)=>{authorize(event);cancelCurrent?.();});
+ipcMain.handle('fileform:cancel',(event)=>{authorize(event);operation?.abort();cancelCurrent?.();});
 const count=(x:unknown):x is number=>Number.isSafeInteger(x) && Number(x)>=0;
 ipcMain.handle('fileform:choose',async(event)=>{
   authorize(event);
@@ -243,8 +262,8 @@ async function createWindow(){
   window.webContents.on('will-navigate',(event,url)=>{if(url!==page)event.preventDefault();});
   window.webContents.session.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));
   window.once('ready-to-show',()=>{window!.maximize();window!.show();});
-  window.on('close',(event)=>{if(children.size){event.preventDefault();dialog.showMessageBoxSync(window!,{type:'info',message:'A file is still being processed.',detail:'Please wait for it to finish before closing.',buttons:['Keep working']});}});
-  window.on('closed',()=>{window=null;});
+  window.on('close',(event)=>{if(busy||children.size){event.preventDefault();dialog.showMessageBoxSync(window!,{type:'info',message:'A file is still being processed.',detail:'Please wait for it to finish before closing.',buttons:['Keep working']});}});
+  window.on('closed',()=>{window=null;const cache=mediaPreviews;mediaPreviews=undefined;if(cache)previewCleanup=previewCleanup.then(()=>cache.close());});
   await window.loadURL(page);
 }
 if(ownsInstance)app.whenReady().then(async()=>{
@@ -267,7 +286,10 @@ if(ownsInstance)app.whenReady().then(async()=>{
   protocol.handle('fileform',(request)=>{
     try{
       const url=new URL(request.url);
-      if(url.hostname!=='app'||request.method!=='GET'||url.username||url.password)return new Response('Not found',{status:404});
+      if(url.hostname!=='app'||url.username||url.password)return new Response('Not found',{status:404});
+      const preview=/^\/preview\/([a-f0-9-]{36})$/.exec(url.pathname);
+      if(preview&&!url.search)return mediaPreviews?.respond(preview[1],request)??new Response('Not found',{status:404});
+      if(request.method!=='GET')return new Response('Not found',{status:404});
       const asset=resolve(rendererRoot,'.'+decodeURIComponent(url.pathname));
       const part=relative(rendererRoot,asset);
       if(part==='..'||part.startsWith('..'+sep)||isAbsolute(part))return new Response('Not found',{status:404});
@@ -278,4 +300,11 @@ if(ownsInstance)app.whenReady().then(async()=>{
 });
 app.on('activate',()=>{void showWindow();});
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
-app.on('before-quit',(event)=>{if(children.size){event.preventDefault();dialog.showMessageBoxSync({type:'info',message:'A file is still being processed.',detail:'Please wait for it to finish before quitting.',buttons:['Keep working']});}});
+app.on('before-quit',(event)=>{if(busy||children.size){event.preventDefault();dialog.showMessageBoxSync({type:'info',message:'A file is still being processed.',detail:'Please wait for it to finish before quitting.',buttons:['Keep working']});}});
+let quittingAfterCleanup=false;
+app.on('will-quit',event=>{
+ if(quittingAfterCleanup)return;
+ event.preventDefault();quittingAfterCleanup=true;
+ const cache=mediaPreviews;mediaPreviews=undefined;
+ void previewCleanup.then(()=>cache?.close()).catch(()=>{}).finally(()=>app.quit());
+});

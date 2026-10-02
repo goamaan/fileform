@@ -12,6 +12,7 @@ const {planTask}=require('../dist-main/electron/task-request.cjs');
 const {loadRuntime}=require('../dist-main/electron/runtime.cjs');
 const {previewPages}=require('../dist-main/electron/page-preview.cjs');
 const {availableTasksForAssets}=require('../dist-main/src/tasks.js');
+const {MediaPreviewCache}=require('../dist-main/electron/media-preview.cjs');
 const root=resolve(import.meta.dirname,'../../..');
 const runtime=await loadRuntime(resolve(process.env.FILEFORM_RUNTIME_ROOT??join(root,'Artifacts/DesktopRuntime')));
 const executable=resolve(process.env.FILEFORM_WORKER??runtime.worker);
@@ -50,6 +51,29 @@ try{
  const silentPath=join(folder,'silent.mp4');await worker(planTask([records.video],'video.trim',{format:'mp4',start:'0',end:'1',fast:true,muteAudio:true},silentPath,runtime).request);
  const silent=await inspectAsset(silentPath,worker,runtime);assert.equal(silent.asset.audioTracks.length,0);assert(!availableTasksForAssets([silent.asset]).some(v=>v.id.startsWith('audio.')));assert.throws(()=>planTask([silent],'audio.convert',{format:'wav'},'',runtime));
  console.log('Contextual actions reject silent-video audio extraction before saving');
+ const cache=new MediaPreviewCache(folder);
+ try {
+  const signal=new AbortController().signal;
+  const playback=await cache.prepare(records.video,{audioOnly:false},worker,runtime,signal);
+  assert.equal(playback.kind,'video');assert(playback.poster.startsWith('data:image/png;base64,'));assert(playback.waveform.channels.length>0);assert.equal(playback.duration.ticks/playback.duration.timescale,2);
+  assert(!playback.url.includes(folder));assert.equal((await cache.respond('unknown',new Request('fileform://app/preview/unknown'))).status,404);
+  const response=await cache.respond(playback.id,new Request(playback.url));assert.equal(response.status,200);const bytes=Buffer.from(await response.arrayBuffer());assert(bytes.length>0);
+  const ranged=await cache.respond(playback.id,new Request(playback.url,{headers:{Range:'bytes=2-9'}}));assert.equal(ranged.status,206);assert(Buffer.from(await ranged.arrayBuffer()).equals(bytes.subarray(2,10)));
+  const suffix=await cache.respond(playback.id,new Request(playback.url,{headers:{Range:'bytes=-8'}}));assert(Buffer.from(await suffix.arrayBuffer()).equals(bytes.subarray(-8)));
+  const head=await cache.respond(playback.id,new Request(playback.url,{method:'HEAD'}));assert.equal(Number(head.headers.get('Content-Length')),bytes.length);assert.equal((await head.arrayBuffer()).byteLength,0);
+  for(const range of ['bytes=999999999999999999999-','bytes=3-1','bytes=0-1,4-5','bytes=-0'])assert.equal((await cache.respond(playback.id,new Request(playback.url,{headers:{Range:range}}))).status,416);
+  const proxy=join(folder,'reopened-playback.mp4');await fs.writeFile(proxy,bytes);assert.equal((await inspectAsset(proxy,worker,runtime)).asset.family,'video');
+  cache.release(playback.id);assert.equal((await cache.respond(playback.id,new Request(playback.url))).status,404);
+  const audioPlayback=await cache.prepare(records.video,{audioOnly:true},worker,runtime,signal);assert.equal(audioPlayback.kind,'audio');assert.equal(audioPlayback.poster,undefined);
+  const audioProxy=join(folder,'reopened-audio.wav');await fs.writeFile(audioProxy,Buffer.from(await (await cache.respond(audioPlayback.id,new Request(audioPlayback.url))).arrayBuffer()));assert.equal((await inspectAsset(audioProxy,worker,runtime)).asset.family,'audio');
+  cache.release(audioPlayback.id);
+  await assert.rejects(cache.prepare({...records.video,sha256:'0'.repeat(64)},{audioOnly:false},worker,runtime,signal),/changed/);
+  const cancelled=new AbortController();cancelled.abort();await assert.rejects(cache.prepare(records.video,{audioOnly:false},worker,runtime,cancelled.signal));
+  const midway=new AbortController();let operations=0;
+  await assert.rejects(cache.prepare(silent,{audioOnly:false},async request=>{operations++;const result=await worker(request);midway.abort();return result;},runtime,midway.signal));
+  assert.equal(operations,1); // Cancellation after the native export cannot start later preview steps or publish a lease.
+ }finally{await cache.close();}
+ assert(!(await fs.readdir(folder)).some(v=>v.startsWith('fileform-playback-')));console.log('Native playback/waveforms, streamed seeking, leases, identity/cancellation and cache cleanup passed');
 
  const combined=await inspectAsset(join(folder,'combined.pdf'),worker,runtime);
  const thumbs=await previewPages([{record:records.pdf,pageIndex:0}],worker,runtime,folder);

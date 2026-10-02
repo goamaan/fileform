@@ -4,6 +4,7 @@ import type {Appearance,AssetSource,TaskOptions,TaskResult} from './contracts';
 import {tasks,availableTasksForAssets,type TaskID} from './tasks';
 import {ImageWorkspace} from './image-workspace';
 import {PdfPageEditor} from './pdf-page-editor';
+import {MediaEditor} from './media-editor';
 import {useOpenFile} from './use-open-file';
 import './style.css';
 const bytes=(value:number)=>value<1000?value+' B':new Intl.NumberFormat(undefined,{style:'unit',unit:value>=1e6?'megabyte':'kilobyte',maximumFractionDigits:1}).format(value/(value>=1e6?1e6:1e3));
@@ -44,7 +45,8 @@ function App(){
    <section className="task-workspace"><div className="heading"><h1>{active.length===1?first.name:active.length+' files'}</h1>{active.length===1&&first&&<span className="format">{first.pages?first.pages+' pages':first.duration?first.duration.toFixed(1)+' seconds':first.table?first.table.rows+(first.table.rows===1?' row':' rows'):''}</span>}</div>
     <div className="action-bar"><label>Action<select aria-label="Action" disabled={busy||childBusy||!active.length} value={definition?task:''} onChange={e=>selectTask(e.target.value as TaskID)}>{!definition&&<option value="">Choose compatible files</option>}{available.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select></label></div>
     {definition&&(task==='pdf.combine'||task==='pdf.images'||task==='pdf.split'&&options.splitAfter!==undefined)&&<PdfPageEditor key={task==='pdf.split'?'split-markers':'editable-pages'} sources={active} disabled={busy} onChange={pages=>patch({pageOrder:pages})} onBusyChange={setChildBusy} markers={task==='pdf.split'?options.splitAfter:undefined} onMarkersChange={splitAfter=>patch({splitAfter})}/>}
-    {task==='image.convert'&&first?.image&&active.length===1?<ImageWorkspace hidden={false} selectedSource={first.image} onBusyChange={setChildBusy} onChoose={choose}/>:definition?<>
+    {task==='image.convert'&&first?.image&&active.length===1?<ImageWorkspace hidden={false} selectedSource={first.image} onBusyChange={setChildBusy} onChoose={choose}/>:definition?<div className={isMedia?'media-workspace-layout':undefined}>
+     {isMedia&&first&&<MediaEditor key={first.id} source={first} audioOnly={task.startsWith('audio.')} trim={isTrim} options={options} disabled={busy} onChange={patch} onBusyChange={setChildBusy}/>}
      <div className="task-panel"><fieldset className="option-grid" disabled={busy||childBusy}><label>Output<select aria-label="Output format" disabled={busy} value={options.format} onChange={e=>patch({format:e.target.value})}>{(task==='table.convert'?first?.table?.outputs??[]:definition.outputFormats).map(value=><option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
       {task==='pdf.split'&&<label>Split by<select aria-label="PDF split mode" value={options.splitAfter!==undefined?'markers':options.pages!==undefined?'ranges':'every'} onChange={e=>patch({splitAfter:e.target.value==='markers'?[]:undefined,pages:e.target.value==='ranges'?'':undefined,splitEvery:e.target.value==='every'?1:undefined})}><option value="every">Page intervals</option><option value="ranges">Page ranges</option><option value="markers">Page markers</option></select></label>}
       {(task==='pdf.extract-images'||task==='pdf.split'&&options.pages!==undefined)&&<label>{task==='pdf.split'?'Page groups':'Pages'}<input aria-label="Page selection" placeholder={task==='pdf.split'?'1-3;4-6':'All pages, or 3,1-2'} value={options.pages??''} onChange={e=>patch({pages:e.target.value})}/></label>}
@@ -63,7 +65,7 @@ function App(){
      {(task==='pdf.combine'||task==='pdf.split')&&<p className="task-note">Creates new documents. Bookmarks, metadata, and form behavior may change.</p>}
      {task==='pdf.compress'&&options.lossy&&<p className="task-note">Image recompression is lossy; unsupported images remain unchanged.</p>}
      <div className="actions"><span>{active.length} {active.length===1?'file':'files'} selected</span><button className="primary" disabled={busy||childBusy||!active.length||!!options.pageOrder&&(options.pageOrder.length===0||options.pageOrder.length>1000)} onClick={()=>run(async()=>{const saved=await window.fileform.runTask(active.map(v=>v.id),task,options);if(saved)setResult(saved);})}>{busy?'Processing…':'Save result…'}</button></div></div>
-    </>:<p className="task-note">Select files to see their available actions.</p>}
+    </div>:<p className="task-note">Select files to see their available actions.</p>}
     {error&&<p className="error" role="alert">{error}</p>}
     {result&&<article className="result" role="status"><span aria-hidden="true">✓</span><div><h2>{result.name}</h2><p>{result.summary} · {bytes(result.bytes)}</p></div>{result.warnings.length>0&&<details className="result-notes"><summary>Output notes</summary>{result.warnings.map((note,index)=><p key={index}>{note}</p>)}</details>}{result.id&&<><button onClick={()=>run(()=>window.fileform.openResult(result.id))}>Open</button><button onClick={()=>run(()=>window.fileform.reveal(result.id))}>Show in folder</button></>}</article>}
    </section>

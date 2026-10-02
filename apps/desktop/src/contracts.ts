@@ -32,6 +32,11 @@ export interface TaskOptions {
 }
 export interface PageChoice {sourceID:string;pageIndex:number;rotation:number}
 export interface PageThumbnail {sourceID:string;pageIndex:number;dataURL:string;width:number;height:number}
+export interface MediaPreviewOptions {audioOnly:boolean;audioStream?:number;muteAudio?:boolean}
+export interface MediaPreview {
+ id:string;url:string;kind:'audio'|'video';duration:{ticks:number;timescale:number};poster?:string;
+ waveform?:{sampleRate:number;sampleCount:number;samplesPerBucket:number;channels:{minimum:number[];maximum:number[]}[]};
+}
 export interface TaskResult {id:string;name:string;bytes:number;summary:string;warnings:string[];folder:boolean}
 export interface FileformAPI {
   chooseFiles(task?:import('./tasks.js').TaskID):Promise<AssetSource[]>;
@@ -39,4 +44,6 @@ export interface FileformAPI {
   runTask(ids:string[],task:import('./tasks.js').TaskID,options:TaskOptions):Promise<TaskResult|null>;
   openResult(id:string):Promise<void>;
   previewPages(pages:{sourceID:string;pageIndex:number}[]):Promise<PageThumbnail[]>;
+  previewMedia(id:string,options:MediaPreviewOptions):Promise<MediaPreview>;
+  releaseMediaPreview(id:string):Promise<void>;
 }

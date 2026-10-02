@@ -9,7 +9,8 @@ chooser. Thirteen main actions connect table/image conversion, PDF assembly/spli
 compression/image export, audio/video conversion/trim and embedded/English OCR
 text export. Image crop/resize/fit controls remain contextual. PDF thumbnails and page
 order/rotate/remove/duplicate/insert controls, toolbar undo/redo and visual split
-markers are connected; arrangements survive switching PDF/page-image output. All five
+markers are connected; arrangements survive switching PDF/page-image output. Audio/video playback, posters, waveforms and visual trimming are connected through
+private streamed preview leases; exports continue to use original files. All five
 reviewed tool packs are bundled. Main processing stays native and file IDs are
 opaque to the renderer. Follow Documentation/BREADTH_FIRST_PARITY.md.
 Light/dark/system appearance and normal display-filling launch are implemented.
@@ -74,7 +75,8 @@ in Documentation/CI_VERIFICATION.md. Full-runtime package evidence is recorded i
 Documentation/ELECTRON_RELEASE.md. Native success does not establish desktop
 exposure or signed-release acceptance.
 
-Remaining: complete original editing/playback, automatic multilingual OCR, URLs,
+Remaining: complete original editing/playback policy and history/large-file
+acceptance, automatic multilingual OCR, URLs,
 batches/setups/persistence, exhaustive shared-intake/GUI acceptance,
 Windows packaged-app checks, native isolation/crash cleanup, final performance,
 complete licensing/rebuild delivery, full-runtime signing/notarization, secure

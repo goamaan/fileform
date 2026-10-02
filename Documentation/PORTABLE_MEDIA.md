@@ -748,3 +748,39 @@ Windows [36926777751](https://github.com/goamaan/fileform/actions/runs/369267777
 at `5b305ec` now passes complete native playback exports and all prior media suites.
 This supersedes the pending playback runtime statement above. Electron player,
 lease/cache management and final release acceptance remain open.
+
+
+## Electron playback/editor integration — October 1, 2026
+
+Playback now accepts `audio_only` (CLI `--audio-only`) to export the complete
+selected audio stream from picture input as WAV without encoding its video.
+One-second-offset, distinct-track native fixtures reopen it as audio only and
+verify exact decoded PCM/duration. Default video behavior remains compatible.
+
+The shared Electron media module prepares a source-bound complete native preview,
+original-source waveform (2,048 buckets, up to eight channels), and a video poster.
+Generated-file hashes and source/track identity are checked; the renderer receives
+only opaque playback leases and bounded waveform/poster data. GET/HEAD and single
+byte ranges stream verified file handles; released/unknown leases cannot be read.
+Up to eight records / 2 GiB are retained, plus at most one 2 GiB native preparation.
+Normal window/app close revokes leases, closes streams and removes cache folders.
+Main cancellation persists across preparation steps, including the JS hash pass;
+close/quit protection includes the entire operation, not only active child tools.
+Unexpected-process-exit/hard-kill scavenging and global resource isolation remain
+release gates; no blanket crash-cleanup claim is made.
+
+The player exposes seek, volume, play/pause and channel waveforms, visual range
+handles, precise seconds and set-at-playhead/reset controls. It plays locally
+prepared data while every final transform stays bound to the original recording.
+Realized saved ranges are shown because frame/packet boundaries may differ from
+requested times. Static waveform geometry is memoized during playhead animation.
+The export panel sits beside the editor at desktop sizes and stacks on smaller
+windows. Light/dark packaged Mac layouts, actual playback/seeking, visual dragging,
+audio-only playback from video and audio/video saves were exercised. The actual
+video output reopens at 0.8 seconds for the frame-onset selection 0.25–1.001;
+WAV reopens with 33,120 samples at 44.1 kHz. Normal quit leaves no playback caches.
+
+This connects the evaluated native playback profiles, not complete original-media
+acceptance. CFR/SDR/current clock/format limits still apply. Wider playback such as
+VFR, histories/persistence, exhaustive track/format/large-file and Windows GUI
+acceptance remain required; VFR trimming remains original future breadth.

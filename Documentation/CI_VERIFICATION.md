@@ -159,3 +159,24 @@ macOS 26 and Windows 2025, including the expanded real PDF editing/thumbnail/mar
 module workflows, contextual silent-video checks, complete runtimes, notices and
 Mac/NSIS packaging. Manual Windows GUI and production signing/release gates remain
 open. The next breadth-first implementation is media playback/waveform/trim UI.
+
+
+## Media desktop integration — October 1
+
+Local Rust tests (103 passed / 2 explicit subprocess fixtures ignored by the
+ordinary runner), Clippy, Windows MSVC cross-target compile, source-built media
+playback smoke (including new audio-only-from-video PCM proof), and the expanded
+shared desktop native workflows pass. The latter prepares real playback and
+waveforms, reopens stream bytes, verifies GET/HEAD/range/suffix behavior, rejects
+unknown/released leases and malformed ranges, checks source identity, exercises
+cancellation before and between preparation steps, and removes owned cache folders.
+All prior 13 action/PDF editing routes still pass in that same script.
+
+Actual unsigned packaged Mac GUI: video playback reaches its final frame and
+clock, seeking works, dragging a visual start handle updates the seconds field,
+selected video export reopens correctly; audio-only playback advances from the
+same original video and exact WAV export reopens with expected sample count.
+Both themes/editor/export layouts were inspected and normal quit removed caches.
+Current-head Mac/Windows CI and unavailable manual Windows GUI are separate gates.
+Do not claim VFR/wider media profiles, history/persistence or crash cleanup from
+these representative checks.

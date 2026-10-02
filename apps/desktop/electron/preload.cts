@@ -6,6 +6,8 @@ const api:FileformAPI = {
   runTask:(ids,task,options)=>ipcRenderer.invoke('fileform:run-task',ids,task,options),
   openResult:(id)=>ipcRenderer.invoke('fileform:open-result',id),
   previewPages:(pages)=>ipcRenderer.invoke('fileform:preview-pages',pages),
+  previewMedia:(id,options)=>ipcRenderer.invoke('fileform:preview-media',id,options),
+  releaseMediaPreview:(id)=>ipcRenderer.invoke('fileform:release-media-preview',id),
   onOpenFile:(callback)=>{
     const listener=()=>callback();
     ipcRenderer.on('fileform:open-request',listener);

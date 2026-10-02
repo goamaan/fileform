@@ -62,8 +62,8 @@ integration next rather than expanding PDF graph/format corner cases.
 | Tables | CSV/TSV/flat JSON conversion | Native and shared table intake/conversion exist; batches/persistence still missing |
 | Images | PNG/JPEG/TIFF/HEIC input, conversion, crop, resize, compress/fit, preview | Native common routes and shared app route exist; required tools are bundled |
 | PDFs | Combine PDF/images; reorder/rotate/remove/insert; split; page images; embedded images; compress/fit | Native routes and basic shared app routes exist; basic page editing/visual markers are now connected; wider original policies remain |
-| Audio | Convert/extract, MP3, size fit, exact/fast trim, track selection, waveform/playback | Native and shared conversion/trim routes exist; waveform/playback/editor still missing |
-| Video | Convert/remux, resize/fit, exact/fast trim, audio selection/mute, poster/playback | Native routes and basic shared app routes exist; poster/playback/editor still missing; preserve original CFR/SDR limits |
+| Audio | Convert/extract, MP3, size fit, exact/fast trim, track selection, waveform/playback | Native and shared conversion/trim routes exist; basic waveform/playback/editor now connected; wider policy/GUI acceptance remains |
+| Video | Convert/remux, resize/fit, exact/fast trim, audio selection/mute, poster/playback | Native routes and basic shared app routes exist; basic poster/playback/editor now connected; wider playback/policy/GUI acceptance remains; preserve original CFR/SDR limits |
 | Text/OCR | Embedded PDF text, image/scanned-PDF recognition | Native explicit-English routes exist; explicit-English app route exists; automatic multilingual behavior remains required |
 | Direct URLs | Inspect/save direct media, then convert/trim through the normal media flow | Portable backend and desktop flow are missing |
 | Shared UX | Mixed batches, task search, setups, persistence, progress/retry, output actions, settings | Most remain incomplete; they are part of parity, not later feature breadth |
@@ -92,3 +92,22 @@ Parity is complete only when every release-and-parity main action has a usable,
 verified app path with working shared UX, and the original requirements/limits are
 accounted for. Release completion additionally needs actual bundled, signed downloads
 and secure updates. Keep the active goal open until those outcomes are achieved.
+
+
+## Media desktop checkpoint
+
+The next increment connects native complete playback, selected-track audio-only
+playback from video, original-source waveforms, seek/volume/play controls, visual
+trim handles, precise fields, set-at-playhead/reset controls and saved realized
+ranges. Private generated files are streamed through opaque leases; originals
+remain the source of every export. Complete native, streamed-range/cache and
+representative packaged Mac audio/video checks pass locally; current-head Windows
+CI remains required. The editor/export panel now fits together at normal maximized
+size and supports both themes.
+
+Do not treat this as all media policy acceptance. Wider playback including VFR,
+original formats/limits, source/track/task history, persistence and abnormal-exit/
+hard-kill/resource cleanup remain required. VFR *trimming* stays original deferred
+breadth; VFR playback must not be silently reclassified as optional. Move next to
+broad missing URL and automatic multilingual OCR behavior and shared batch/setup/
+persistence work; do not expand niche codec/picture corpora now.

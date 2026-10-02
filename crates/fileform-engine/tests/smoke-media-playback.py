@@ -59,6 +59,11 @@ with tempfile.TemporaryDirectory(prefix='fileform-playback-') as folder:
         samples=pcm(output,1);values=struct.unpack('<'+'h'*(len(samples)//2),samples)
         average=sum(values[1024:-1024])/len(values[1024:-1024]);assert abs(average-[8192,-16384][index-1])<100
         assert receipt['sha256']==hashlib.sha256(output.read_bytes()).hexdigest() and receipt['source_sha256']==hashlib.sha256(video_bytes).hexdigest()
+    selected=base/'video-audio-playback.wav'
+    receipt=json.loads(good(cli,'playback-preview',video,selected,pack,'--audio-stream',2,'--audio-only').stdout)
+    assert receipt['source_audio_stream_index']==2 and receipt['source_video_stream_index'] is None and receipt['width'] is None
+    assert receipt['duration']['ticks']/receipt['duration']['timescale']==2 and pcm(selected)==pcm(video,2)
+    assert json.loads(good(cli,'inspect-media',selected,pack).stdout)['video_tracks']==0
     muted=base/'muted.mp4'
     receipt=json.loads(good(cli,'playback-preview',video,muted,pack,'--mute-audio','--max-dimension',64).stdout)
     assert receipt['source_audio_stream_index'] is None and json.loads(good(cli,'inspect-media',muted,pack).stdout)['audio_tracks']==0

@@ -15,6 +15,8 @@ pub struct Playback {
     pub audio_stream: Option<u32>,
     #[serde(default)]
     pub mute_audio: bool,
+    #[serde(default)]
+    pub audio_only: bool,
     pub max_dimension: Option<u32>,
     pub expected_source_sha256: Option<String>,
 }
@@ -65,7 +67,7 @@ pub fn export(options: &Playback, cancel: &Cancellation) -> Result<PlaybackRecei
     }
     let info = media_probe::inspect(source.snapshot.path(), &options.directory, cancel)?;
     let audio = media_probe::retained_audio(&info, options.audio_stream, options.mute_audio)?;
-    let is_video = info.video_tracks > 0;
+    let is_video = info.video_tracks > 0 && !options.audio_only;
     if !is_video && (options.mute_audio || options.max_dimension.is_some()) {
         return Err(fail(
             "invalid_request",

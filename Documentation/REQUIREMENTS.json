@@ -93,7 +93,8 @@
       "reference_ledger_status": "implementing",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "PDF page thumbnails/editing and visual split markers are connected and packaged Mac GUI tested. Media editor/playback remains required."
+      "evidence_notes": "PDF page editing/markers and audio/video playback/waveforms/visual trimming are connected with real native-module and packaged Mac GUI evidence.",
+      "remaining": "Complete histories/persistence, wider original profiles, exhaustive/Windows GUI and final UX acceptance."
     },
     {
       "id": "IMG01",
@@ -151,8 +152,8 @@
       "reference_ledger_status": "planned",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Native audio/video conversion, extraction and fitting exist; selected audio streams are supported with explicit indices and real distinct-track Mac fixtures.",
-      "remaining": "Current Windows track-selection acceptance, wider original policy/format tests and Electron integration."
+      "evidence_notes": "Native audio/video conversion, extraction and fitting exist; selected audio streams are supported with explicit indices and real distinct-track Mac fixtures. Shared Electron conversion/fit routes and selected-track playback are connected.",
+      "remaining": "Wider original policy/format, complete lifecycle and desktop/Windows GUI acceptance."
     },
     {
       "id": "MED02",
@@ -160,8 +161,8 @@
       "reference_ledger_status": "planned",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "LAME-backed native MP3 conversion has Mac/Windows evidence.",
-      "remaining": "Remaining policy limits and Electron integration."
+      "evidence_notes": "LAME-backed native MP3 conversion has Mac/Windows evidence. Shared Electron native MP3 conversion route passes real module integration.",
+      "remaining": "Remaining original policy limits and exhaustive desktop/Windows GUI acceptance."
     },
     {
       "id": "MED03",
@@ -169,8 +170,8 @@
       "reference_ledger_status": "implementing",
       "portable_status": "partial",
       "priority": "release-and-parity",
-      "evidence_notes": "Native exact WAV/FLAC/M4A and CFR H.264 trims, AAC/keyframe-copy trims and explicit audio-stream selection have real Mac fixtures. CFR-only trimming matches the original Swift reference.",
-      "remaining": "Current Windows selected-track acceptance, remaining original-policy fixtures, playback proxies and desktop editor integration. VFR trimming is not original parity and remains future breadth."
+      "evidence_notes": "Native exact WAV/FLAC/M4A and CFR H.264 trims, AAC/keyframe-copy trims and explicit audio-stream selection have real Mac fixtures. CFR-only trimming matches the original Swift reference. Electron playback, source-bound waveform/range editing and real audio/video saves are connected and Mac GUI tested.",
+      "remaining": "Wider playback (including VFR), complete histories/persistence, original-policy and desktop/Windows GUI acceptance, resource/crash cleanup. VFR trimming remains original future breadth."
     },
     {
       "id": "MED04",
